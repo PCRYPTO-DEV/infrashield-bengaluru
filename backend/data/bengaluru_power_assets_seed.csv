@@ -1,0 +1,12 @@
+# SYNTHETIC DEMO DATA — Not verified. Approximate locations and capacity figures.
+id,name,asset_type,latitude,longitude,zone,capacity_mva,feeder_count,reliability_score
+PA001,Peenya 220kV Substation,substation,13.0260,77.5175,Peenya,220,12,62
+PA002,Whitefield 110kV Substation,substation,12.9700,77.7480,Whitefield,110,8,68
+PA003,Bellandur 66kV Substation,substation,12.9276,77.6645,Bellandur,66,6,55
+PA004,Hebbal 110kV Substation,substation,13.0390,77.5970,Hebbal,110,9,65
+PA005,Electronic City 66kV Substation,substation,12.8450,77.6610,Electronic City,66,5,60
+PA006,Yeshwantpur 220kV Substation,substation,13.0200,77.5450,Central Bengaluru,220,14,70
+PA007,Koramangala 33kV Feeder Station,feeder_station,12.9352,77.6245,Koramangala,33,4,65
+PA008,Marathahalli Distribution Centre,feeder_station,12.9560,77.7010,Marathahalli,33,4,62
+PA009,Yelahanka 66kV Substation,substation,13.1000,77.5960,Yelahanka,66,6,72
+PA010,KR Puram 66kV Substation,substation,13.0020,77.6980,KR Puram,66,5,58

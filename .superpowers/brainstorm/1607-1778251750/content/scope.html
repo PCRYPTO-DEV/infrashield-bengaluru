@@ -1,0 +1,69 @@
+<h2>InfraShield — Data Intelligence Expansion</h2>
+<p class="subtitle">Three subsystems, each independent. Which do we spec first?</p>
+
+<div style="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:20px;margin-bottom:24px;font-family:monospace;font-size:11px;color:#94a3b8;line-height:1.8">
+  <div style="color:#38bdf8;font-weight:700;margin-bottom:8px;font-size:12px">CURRENT INFRASHIELD DATA STACK</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+    <div style="background:#1e293b;border-radius:6px;padding:8px;border-left:3px solid #22c55e">
+      <div style="color:#22c55e;font-size:10px;font-weight:700">POWER</div>
+      <div>OSM Substations</div><div>GDELT Outages</div><div>BESCOM Public</div>
+    </div>
+    <div style="background:#1e293b;border-radius:6px;padding:8px;border-left:3px solid #3b82f6">
+      <div style="color:#3b82f6;font-size:10px;font-weight:700">WATER</div>
+      <div>OSM Pumping Stns</div><div>BWSSB Reports</div><div>GDELT Stress</div>
+    </div>
+    <div style="background:#1e293b;border-radius:6px;padding:8px;border-left:3px solid #f59e0b">
+      <div style="color:#f59e0b;font-size:10px;font-weight:700">ENVIRONMENT</div>
+      <div>NASA FIRMS</div><div>Open-Meteo</div><div>GloFAS Flood</div>
+    </div>
+    <div style="background:#1e293b;border-radius:6px;padding:8px;border-left:3px solid #f97316">
+      <div style="color:#f97316;font-size:10px;font-weight:700">ROADS</div>
+      <div>OSM Network</div><div>GDELT Disruption</div><div>Weather Overlay</div>
+    </div>
+  </div>
+  <div style="color:#475569;text-align:center">↑ existing — feeds 8-dimension facility risk score</div>
+</div>
+
+<div style="color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">THREE NEW SUBSYSTEMS TO ADD</div>
+
+<div class="options">
+  <div class="option" data-choice="A" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>📡 Mobility & Foot Traffic Layer</h3>
+      <p>Ingest <strong>telecom CDR / ACR data</strong> (Jio/Airtel anonymised location signals) or marketplace sources (SafeGraph, Spectus) to build <strong>hourly pedestrian density heatmaps</strong> across Bengaluru zones. Feeds into road load, power demand, and evacuation-corridor planning.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Builds</h4><ul><li>Zone-level footfall grid</li><li>Peak hour demand model</li><li>Ghost corridor load factor</li></ul></div>
+        <div class="cons"><h4>Needs</h4><ul><li>ACR / data broker API key</li><li>Privacy compliance layer</li><li>Tile-based heatmap renderer</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="B" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>⚡ Power Event Intelligence Layer</h3>
+      <p>Combine <strong>BESCOM public reliability data</strong> (SAIFI/SAIDI/CAIDI at circle + feeder level) with <strong>weather triggers</strong> (IMD alerts, rainfall, wind) and <strong>complaint signals</strong> (Twitter/social, 1912 helpline proxy) to predict feeder-level outage probability before it happens.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Builds</h4><ul><li>Feeder-level outage risk score</li><li>Weather-triggered alerts</li><li>Predictive DG activation window</li></ul></div>
+        <div class="cons"><h4>Needs</h4><ul><li>BESCOM outage scraper</li><li>IMD API integration</li><li>Alert notification system</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="C" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>🧠 LLM Ontological Action Engine</h3>
+      <p>Run Claude/Gemini over the full facility risk dataset to <strong>reason about shortfalls</strong>, <strong>generate AIP action plans</strong>, and surface prioritised interventions — "Hospital X has power gap: recommend dual-feed + DG audit this week" — with confidence scores and rationale.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Builds</h4><ul><li>AI-generated action plans</li><li>Shortfall reasoning chains</li><li>Weekly digest + alerts</li></ul></div>
+        <div class="cons"><h4>Needs</h4><ul><li>Anthropic API key</li><li>Structured prompt templates</li><li>Action output schema</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:16px;padding:12px;background:#0f172a;border:1px solid #1e293b;border-radius:8px;font-size:11px;color:#64748b">
+  <strong style="color:#38bdf8">Recommended order:</strong> A → B → C. Mobility data feeds power demand signals. Power signals feed the LLM with richer context. But we can start anywhere — pick what matters most to you first.
+</div>

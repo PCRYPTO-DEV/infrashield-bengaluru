@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    environment:
+      POSTGRES_USER: infrashield
+      POSTGRES_PASSWORD: infrashield
+      POSTGRES_DB: infrashield
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://infrashield:infrashield@db:5432/infrashield
+      ENVIRONMENT: docker
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE: http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

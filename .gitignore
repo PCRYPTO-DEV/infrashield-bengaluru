@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.vite/
+*.log
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Database (large, regeneratable)
+backend/infrashield.db
+*.db-journal
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Superpowers / local agent working state
+.superpowers/
+.claude/
+.cursor/
+
+# Local docs / artifacts not meant for repo
+*.pdf
+*.docx
+*.lnk
+nul
+
+# Environment
+.env
+.env.local
+.env.*.local

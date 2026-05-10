@@ -1,0 +1,122 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "note": "SYNTHETIC DEMO DATA — Not verified. Approximate zone boundaries for illustration only.",
+    "generated": "2026-05-07",
+    "source": "Illustrative data based on publicly known flood/risk areas in Bengaluru"
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "RZ001",
+        "name": "Bellandur Flood Risk Zone",
+        "risk_type": "flood",
+        "severity": "High",
+        "description": "Historically flood-prone area around Bellandur lake. Stormwater drain overflow risk during monsoon."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[77.640,12.915],[77.680,12.915],[77.680,12.945],[77.640,12.945],[77.640,12.915]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "RZ002",
+        "name": "Hebbal Drainage Stress Zone",
+        "risk_type": "flood",
+        "severity": "Medium",
+        "description": "Stormwater drainage stress around Hebbal lake and elevated flyover approaches."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[77.580,13.025],[77.620,13.025],[77.620,13.055],[77.580,13.055],[77.580,13.025]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "RZ003",
+        "name": "Majestic / City Railway Flood Pocket",
+        "risk_type": "flood",
+        "severity": "High",
+        "description": "Low-lying area near KSR station prone to waterlogging. Impacts road access and utility corridors."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[77.560,12.970],[77.585,12.970],[77.585,12.988],[77.560,12.988],[77.560,12.970]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "RZ004",
+        "name": "Electronic City Low-Lying Flood Zone",
+        "risk_type": "flood",
+        "severity": "Medium",
+        "description": "Pockets in Electronic City Phase 1 and 2 susceptible to stormwater accumulation."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[77.645,12.835],[77.680,12.835],[77.680,12.860],[77.645,12.860],[77.645,12.835]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "RZ005",
+        "name": "Peenya Industrial Water Stress Zone",
+        "risk_type": "water_stress",
+        "severity": "High",
+        "description": "Industrial area with high water demand and borewell dependency. Tanker supply risk during dry months."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[77.500,13.015],[77.545,13.015],[77.545,13.045],[77.500,13.045],[77.500,13.015]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "RZ006",
+        "name": "Whitefield Road Access Risk Corridor",
+        "risk_type": "road_access",
+        "severity": "Medium",
+        "description": "ORR and Whitefield main roads face chronic congestion. Emergency vehicle access impaired during peak hours."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[77.725,12.955],[77.760,12.955],[77.760,12.985],[77.725,12.985],[77.725,12.955]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "RZ007",
+        "name": "KR Puram Flood-Road Risk Zone",
+        "risk_type": "flood",
+        "severity": "Medium",
+        "description": "KR Puram bridge area and adjoining roads face flooding risk. Industrial effluent compounds drainage stress."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[77.685,12.990],[77.720,12.990],[77.720,13.015],[77.685,13.015],[77.685,12.990]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "RZ008",
+        "name": "Central Bengaluru Heat Island Zone",
+        "risk_type": "heat",
+        "severity": "Medium",
+        "description": "Dense built-up area with limited green cover. Urban heat island effect impacts facility operations and staff."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[77.555,12.960],[77.620,12.960],[77.620,13.005],[77.555,13.005],[77.555,12.960]]]
+      }
+    }
+  ]
+}
