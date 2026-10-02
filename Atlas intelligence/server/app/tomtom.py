@@ -75,7 +75,8 @@ class TomTomClient:
         if not self.api_key:
             raise HTTPException(503, "TOMTOM_API_KEY is not configured")
         self._spend()
-        async with httpx.AsyncClient(timeout=20) as client:
+        from .osm import http_client
+        async with http_client(httpx.Timeout(20.0, connect=8.0)) as client:
             r = await client.get(self.base + path, params={**params, "key": self.api_key})
             r.raise_for_status()
             return r.content if binary else r.json()

@@ -124,6 +124,8 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
         """Scores for the cells in a bbox, from cached tiles only (no network), for a city-level view."""
         import h3
         w, s_, e, n = (float(v) for v in bbox.split(","))
+        if not (w < e and s_ < n) or (e - w) * (n - s_) > 0.05:
+            raise HTTPException(400, "bbox must be a small box (at most about 0.05 square degrees, roughly 25 km x 20 km)")
         poly = h3.LatLngPoly([(s_, w), (s_, e), (n, e), (n, w)])
         ids = list(h3.polygon_to_cells(poly, res))[:limit]
         if cells.weather is None:
@@ -146,9 +148,17 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
     if WEB_DIST.exists():
         app.mount("/assets", StaticFiles(directory=WEB_DIST / "assets"), name="assets")
 
+        dist_root = WEB_DIST.resolve()
+
         @app.get("/{path:path}", include_in_schema=False)
         async def spa(path: str):
-            candidate = WEB_DIST / path
+            # Unknown API paths are 404s, never the app page.
+            if path.startswith("api/") or path == "api":
+                raise HTTPException(404, "no such endpoint")
+            # Only files inside web/dist are ever served: resolve and check the parent chain (no ..%2F tricks).
+            candidate = (WEB_DIST / path).resolve()
+            if candidate != dist_root and dist_root not in candidate.parents:
+                raise HTTPException(404, "not found")
             if path and candidate.is_file():
                 return FileResponse(candidate)
             # a folder with its own page (e.g. /integration/) is served as that page, not the app

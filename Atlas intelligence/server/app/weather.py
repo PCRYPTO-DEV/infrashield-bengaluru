@@ -37,7 +37,8 @@ class WeatherClient:
                 raise LookupError("no weather fixture")
             data = json.loads(f.read_text())
         else:
-            async with httpx.AsyncClient(timeout=15) as client:
+            from .osm import http_client
+            async with http_client(httpx.Timeout(15.0, connect=8.0)) as client:
                 r = await client.get(self.base + "/v1/forecast", params={"latitude": lat_r, "longitude": lng_r, "current": "temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m", "timezone": "auto"})
                 r.raise_for_status()
                 data = r.json()

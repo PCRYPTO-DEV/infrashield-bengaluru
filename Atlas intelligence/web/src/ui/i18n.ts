@@ -143,6 +143,7 @@ const S = {
   'legend.derived': ['worked out from data · soft colour', 'डेटा से निकाला · हल्का रंग'],
   'legend.predicted': ['a guess about the future · dashed', 'भविष्य का अनुमान · टूटी लकीर'],
   'legend.simulated': ['made up by the simulation · purple when ahead of now', 'सिमुलेशन का बनाया · आगे के समय में बैंगनी'],
+  'legend.motion': ['moving cars = the speed TomTom measures on that road right now, shown as motion; bunched where slow. Not individual vehicles. People appear only from a camera.', 'चलती गाड़ियाँ = उस सड़क पर TomTom की नापी हुई अभी की रफ़्तार, हरकत के रूप में; धीमी जगह पर पास-पास। असली एक-एक गाड़ी नहीं। लोग सिर्फ़ कैमरे से दिखते हैं।'],
   'legend.traffic': ['traffic · green, orange, red, dark red (like Google Maps); dashed when only a guess', 'ट्रैफ़िक · हरा, नारंगी, लाल, गहरा लाल (Google Maps जैसा); अनुमान हो तो टूटी लकीर'],
   'legend.risk': ['accident or risk · rings', 'हादसा या ख़तरा · गोल घेरे'],
   // timeline

@@ -193,8 +193,8 @@ class History:
     def recent_zone_events(self, hours: float = 24, now: float | None = None, limit: int = 50) -> list[dict[str, Any]]:
         now = time.time() if now is None else now
         with self._lock:
-            rows = self._conn.execute("SELECT ts, zone, kind, description FROM zone_events WHERE ts >= ? ORDER BY ts DESC LIMIT ?", (now - hours * 3600, limit)).fetchall()
-        return [{"t": int(ts * 1000), "zone": z, "kind": k, "description": d} for ts, z, k, d in rows]
+            rows = self._conn.execute("SELECT ts, zone, kind, description, lng, lat FROM zone_events WHERE ts >= ? ORDER BY ts DESC LIMIT ?", (now - hours * 3600, limit)).fetchall()
+        return [{"t": int(ts * 1000), "ts": ts, "zone": z, "kind": k, "description": d, "lng": lng, "lat": lat} for ts, z, k, d, lng, lat in rows]
 
     def count(self, table: str) -> int:
         with self._lock:

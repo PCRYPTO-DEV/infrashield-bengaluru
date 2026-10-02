@@ -294,6 +294,8 @@ class OverpassClient:
             except Exception as e:
                 fut.set_exception(e)
             finally:
+                if not fut.done():  # the creating task was cancelled: release everyone waiting on this block
+                    fut.set_exception(RuntimeError(f"block {bkey} fetch cancelled"))
                 self._blocks.pop(bkey, None)
         await asyncio.shield(fut)
 

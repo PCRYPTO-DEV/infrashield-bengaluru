@@ -83,7 +83,7 @@ class HotTiles:
     def hot_bboxes(self, now: float | None = None) -> list[str]:
         now = time.time() if now is None else now
         self.bboxes = {k: t for k, t in self.bboxes.items() if now - t <= HOT_WINDOW_S}
-        return sorted(self.bboxes)[:4]
+        return [k for k, _ in sorted(self.bboxes.items(), key=lambda kv: kv[1], reverse=True)[:4]]
 
     @staticmethod
     def interval(hot_count: int, budget_left: int) -> float:
@@ -126,7 +126,7 @@ def register(app: FastAPI, history: Any, tomtom: Any, osm: Any, fixtures_mode: b
     @app.get("/api/live/status")
     async def live_status():
         return {"hotTiles": hot.hot(), "hotBboxes": hot.hot_bboxes(), "subscribers": len(bc.queues), "eventsSent": bc.sent, "lastCycle": hot.last_cycle,
-                "intervalS": HotTiles.interval(len(hot.hot()), max(0, getattr(tomtom, "daily_budget", 0) - tomtom.calls_today()) if hasattr(tomtom, "calls_today") else 0)}
+                "intervalS": HotTiles.interval(len(hot.hot()) + len(hot.hot_bboxes()), max(0, getattr(tomtom, "daily_budget", 0) - tomtom.calls_today()) if hasattr(tomtom, "calls_today") else 0)}
 
     @app.get("/api/warm")
     async def warm(lng: float = Query(..., ge=-180, le=180), lat: float = Query(..., ge=-90, le=90)):
@@ -154,8 +154,9 @@ def register(app: FastAPI, history: Any, tomtom: Any, osm: Any, fixtures_mode: b
         while True:
             try:
                 keys = hot.hot()
+                boxes = hot.hot_bboxes()
                 budget_left = max(0, tomtom.daily_budget - tomtom.calls_today()) if hasattr(tomtom, "calls_today") else 0
-                interval = HotTiles.interval(len(keys), budget_left)
+                interval = HotTiles.interval(len(keys) + len(boxes), budget_left)
                 done = 0
                 for k in keys:
                     z, x, y = (int(v) for v in k.split("/"))
@@ -165,7 +166,7 @@ def register(app: FastAPI, history: Any, tomtom: Any, osm: Any, fixtures_mode: b
                     except Exception as e:
                         log.warning("hot flow %s: %s", k, e)
                         break
-                for b in hot.hot_bboxes():
+                for b in boxes:
                     try:
                         await tomtom.incidents(b, max_age=interval - 5)
                     except Exception as e:

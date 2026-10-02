@@ -408,3 +408,5 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .ca-around-chip b { font-size: 11.5px; font-weight: 600; }
 .ca-around-chip.ok b { color: var(--observed); } .ca-around-chip.mid b { color: var(--traffic-slow); } .ca-around-chip.bad b { color: var(--risk); } .ca-around-chip.none b { color: var(--fg-faint); font-weight: 400; }
 @media (max-width: 720px) { .ca-around { top: 60px; left: 12px; right: 12px; max-width: none; } }
+
+.ca-legend .sw.ca-car { height: 6px; border: none; border-radius: 1px; background: linear-gradient(90deg, var(--fg) 60%, var(--traffic-free) 60%); flex: 0 0 22px; }

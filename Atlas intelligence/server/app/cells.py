@@ -158,6 +158,8 @@ class CellModel:
                     shops += 1
         osm_prov = [prov("openstreetmap", osm_ts, "vector tiles z14 · entities", now)] if ents else []
         have_osm = len(ents) > 0
+        # Points of interest only arrive with the vector-tile delivery path; without any, access is unknown, not zero.
+        have_poi = any(e.get("type") == "poi" for e in ents)
 
         # ---- live readings ----
         flow = self.history.flow_in_bbox(b.west, b.south, b.east, b.north, within_s=900, now=now) if self.history else []
@@ -232,6 +234,8 @@ class CellModel:
         for key, kinds, label in services:
             if not have_osm:
                 dims.append(dim(f"access_{key}", None, "derived", None, ["Streets for this area are not loaded yet."], [], "no data")); continue
+            if not have_poi:
+                dims.append(dim(f"access_{key}", None, "derived", None, ["Points of interest were not delivered for this area (streets came from the live OpenStreetMap query path, which carries roads and buildings only)."], osm_prov, "no data")); continue
             d = nearest(kinds)
             if d is None:
                 dims.append(dim(f"access_{key}", 0.0 if key in ("health", "school") else None, "derived", 0.5, [f"No mapped {label} within about 2.5 km (OpenStreetMap; unmapped ones are not counted)."], osm_prov, None if key in ("health", "school") else "no data"))
@@ -270,7 +274,7 @@ class CellModel:
             score = max(0.0, 100.0 - roads_km["arterial"] / area_km2 * 20.0 - (0 if not flow else 10.0))
             dims.append(dim("noise", score, "inferred", 0.4, [f"Inferred from {round(roads_km['arterial'], 1)} km of main roads in the cell{' and live traffic on them' if flow else ''}; no sound measurement exists."], osm_prov))
         # shopping
-        if have_osm:
+        if have_osm and have_poi:
             dims.append(dim("shopping", min(100.0, shops * 12.0), "derived", 0.55, [f"{shops} mapped shops, groceries and eating places within 600 m (OpenStreetMap)."], osm_prov))
         # camera counts
         if cams:

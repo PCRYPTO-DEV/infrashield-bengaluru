@@ -139,8 +139,6 @@ def decode_tile(pbf: bytes, b: BBox, tier: str) -> list[dict[str, Any]]:
             hw = ROAD_CLASS.get(cls)
             if not hw or (tier == "district" and cls not in major):
                 continue
-            if props.get("brunnel") == "tunnel" and tier == "street":
-                pass
             for j, ln in enumerate(lines(feat["geometry"])):
                 if len(ln) < 2:
                     continue

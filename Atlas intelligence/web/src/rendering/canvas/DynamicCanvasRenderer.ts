@@ -58,6 +58,7 @@ export class DynamicCanvasRenderer {
     if (s.layers.density && s.intel.density) this.drawDensity(ctx, s, inView)
     if (s.layers.activity && s.intel.activity) this.drawActivity(ctx, s, inView, px)
     if (s.layers.flow && s.intel.flow) this.drawFlow(ctx, s, px, inView)
+    if (s.lod !== 'city' && s.world.observedFlow.size > 0) this.drawFlowMotion(ctx, s, px, inView, upm)
     if (s.layers.forecast && s.intel.forecast) this.drawForecast(ctx, s, px, inView)
     if (s.layers.risk && s.intel.risk) this.drawRisk(ctx, s, px, inView, upm)
 
@@ -242,6 +243,37 @@ export class DynamicCanvasRenderer {
       ctx.lineWidth = (f.observed ? 3.5 + c * 3 : 2 + f.count * 0.6) * px
       if (!f.observed) ctx.setLineDash([5 * px, 4 * px])
       ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1
+    }
+  }
+
+  /**
+   * Cars that move at the measured speed. Every marker on a road travels at the speed TomTom
+   * reports for that road right now, and markers sit closer together where the road is slower,
+   * the way real traffic bunches up. Positions are a function of the clock and the reading only:
+   * no vehicle is simulated, nothing is invented, and the legend says so.
+   */
+  private drawFlowMotion(ctx: CanvasRenderingContext2D, s: WorldState, px: number, inView: (p: WorldPoint, pad?: number) => boolean, upm: number): void {
+    const g = s.world.graph
+    const t = s.wallClock / 1000
+    const L = 4.4 * upm, W = 2.1 * upm
+    const minLen = 12 * upm
+    for (const [edgeId, f] of s.world.observedFlow) {
+      const e = g.edge(edgeId); const ep = e && g.endpoints(e); if (!e || !ep || e.length < minLen || !inView(ep.a, 80)) continue
+      const level = Math.max(0, Math.min(1, f.level))
+      const dx = ep.b.x - ep.a.x, dy = ep.b.y - ep.a.y, len = Math.hypot(dx, dy) || 1
+      const ux = dx / len, uy = dy / len
+      const speed = Math.max(0.6 * upm, level * e.speedLimit)                 // units per second: the measured speed
+      const spacing = (16 + level * 44) * upm                                 // bunched when slow, spread when free
+      const phase = ((t * speed) % spacing + spacing) % spacing
+      const colour = trafficColour(1 - level)
+      ctx.save(); ctx.translate(ep.a.x, ep.a.y); ctx.rotate(Math.atan2(uy, ux))
+      for (let d = phase; d < len - L; d += spacing) {
+        ctx.fillStyle = this.c.ink; ctx.globalAlpha = 0.85
+        ctx.fillRect(d, -W / 2, L, W)
+        ctx.globalAlpha = 1; ctx.fillStyle = colour
+        ctx.fillRect(d + L * 0.62, -W / 2, L * 0.38, W)                       // the tail carries the traffic colour
+      }
+      ctx.restore()
     }
   }
 

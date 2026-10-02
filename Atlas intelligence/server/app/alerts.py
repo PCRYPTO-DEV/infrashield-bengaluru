@@ -172,7 +172,7 @@ class AlertEngine:
                 continue
             facts = self._check(alert, kind, payload, now)
             if facts is not None:
-                self.fire(alert, facts, now)
+                self.fire(alert, facts, now, background=True)
 
     def _check(self, alert: Alert, kind: str, p: dict[str, Any], now: float) -> dict[str, Any] | None:
         r = alert.rule
@@ -203,7 +203,8 @@ class AlertEngine:
             return {"description": p.get("description", "")}
         return None
 
-    def fire(self, alert: Alert, facts: dict[str, Any], now: float | None = None) -> dict[str, Any]:
+    def fire(self, alert: Alert, facts: dict[str, Any], now: float | None = None, background: bool = False) -> dict[str, Any]:
+        """Record and deliver. From a reading (`background`), the network send runs in a thread so the event loop never waits on Twilio."""
         now = time.time() if now is None else now
         body = message_for(alert, facts)
         delivered, detail = "app", "shown in the app only"
@@ -212,6 +213,18 @@ class AlertEngine:
                 if self.sender:
                     detail = self.sender(alert.channel, alert.to, body)
                     delivered = alert.channel
+                elif self.twilio and self.twilio.configured and background:
+                    def deliver() -> None:
+                        try:
+                            d = self.twilio.send(alert.channel, alert.to, body)
+                            with self._lock:
+                                self._conn.execute("UPDATE alert_log SET delivered = ?, detail = ? WHERE t = ? AND alert_id = ?", (alert.channel, d, now, alert.id)); self._conn.commit()
+                        except Exception as e:
+                            log.warning("alert %s delivery failed: %s", alert.id, e)
+                            with self._lock:
+                                self._conn.execute("UPDATE alert_log SET delivered = ?, detail = ? WHERE t = ? AND alert_id = ?", ("failed", str(e)[:200], now, alert.id)); self._conn.commit()
+                    threading.Thread(target=deliver, daemon=True).start()
+                    delivered, detail = "queued", f"sending by {alert.channel}"
                 elif self.twilio and self.twilio.configured:
                     detail = self.twilio.send(alert.channel, alert.to, body)
                     delivered = alert.channel

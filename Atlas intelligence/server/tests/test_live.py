@@ -53,3 +53,17 @@ def test_history_notifies_incidents_and_warm_is_skipped_on_fixtures(tmp_path):
         # a viewed flow tile becomes hot
         c.get("/api/traffic/flow/12/2926/1707")
         assert c.get("/api/live/status").json()["hotTiles"] == ["12/2926/1707"]
+
+
+def test_spa_never_serves_outside_dist_and_api_unknowns_are_404(tmp_path):
+    from app.config import WEB_DIST
+    cache = Cache(tmp_path / "c.db"); history = History(tmp_path / "c.db")
+    app = create_app(cache=cache, fixtures=FIXTURES, history=history)
+    with TestClient(app) as c:
+        if WEB_DIST.exists():
+            for p in ("/..%2F..%2Fserver%2Fapp%2Fconfig.py", "/../../server/app/config.py", "/..%2F..%2F..%2F..%2Fetc%2Fpasswd"):
+                r = c.get(p)
+                assert r.status_code == 404 or (r.status_code == 200 and "<!doctype html>" in r.text.lower()), p
+                assert "TOMTOM" not in r.text and "root:" not in r.text
+        assert c.get("/api/no/such/thing").status_code == 404
+        assert c.get("/api/cells", params={"bbox": "68,6,97,36"}).status_code == 400

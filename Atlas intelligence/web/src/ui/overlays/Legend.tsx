@@ -17,6 +17,7 @@ export function Legend({ app }: { app: CityAtlas }) {
       <div className="row"><span className="sw" style={{ borderColor: 'var(--simulated)' }} />{T('legend.simulated')}</div>
       <div className="row"><span className="sw" style={{ borderImage: 'linear-gradient(90deg,#2e9e4f,#f5a623,#e03c31,#8f1b1b) 1', borderTopWidth: 3 }} />{T('legend.traffic')}</div>
       <div className="row"><span className="sw" style={{ borderColor: 'var(--risk)', borderTopStyle: 'dotted' }} />{T('legend.risk')}</div>
+      <div className="row"><span className="sw ca-car" />{T('legend.motion')}</div>
       {app.feeds && <div className="ca-stats" title={app.liveStatus.detail}>{app.liveStatus.detail}</div>}
       <div className="ca-stats">{s.fps} fps · {s.frameMs} ms · {s.agents} agents · {s.chunks} chunks{s.inFlight ? ` (+${s.inFlight})` : ''} · sim {s.simStepMs} ms · intel {s.intelMs} ms · LOD {app.lodController.lod(app.camera.zoom)}{app.lodController.demotion ? ' (budgeted)' : ''}{app.sim.mode === 'inline' ? ' · main-thread fallback' : ''}</div>
     </div>
