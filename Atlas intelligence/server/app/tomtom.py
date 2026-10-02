@@ -26,7 +26,7 @@ from .config import settings
 FLOW_TTL = 120
 SEGMENT_TTL = 60
 INCIDENT_TTL = 60
-FLOW_STYLE = "relative0"
+FLOW_STYLE = "relative"  # vector flow tiles: traffic_level = current ÷ free-flow speed (relative0 is raster-only)
 INCIDENT_FIELDS = "{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,events{description,code},startTime,endTime,from,to,length,delay,roadNumbers}}}"
 
 # iconCategory → Atlas incident kind (see TomTom Incident Details v5)

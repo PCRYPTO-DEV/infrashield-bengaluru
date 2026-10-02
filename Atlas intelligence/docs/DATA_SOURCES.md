@@ -3,7 +3,7 @@
 | source | what | how it enters | class | cache | cost |
 |---|---|---|---|---|---|
 | OpenStreetMap (Overpass API) | roads, buildings, signals, transit, parks, place names | server `/api/tiles/osm/{z}/{x}/{y}.json`, tiers `street` (z16) and `district` (z13) | observed | SQLite, 30 days | free; the public Overpass server is rate-limited, so the server sends at most 1 request/s |
-| TomTom Traffic Flow (vector tiles, `relative0`) | current speed ÷ free-flow speed per road segment | `/api/traffic/flow/{z}/{x}/{y}` at zoom 12, decoded server-side | observed | 120 s per tile | counts against the daily budget |
+| TomTom Traffic Flow (vector tiles, `relative`) | current speed ÷ free-flow speed per road segment | `/api/traffic/flow/{z}/{x}/{y}` at zoom 12, decoded server-side | observed | 120 s per tile | counts against the daily budget |
 | TomTom Incident Details v5 | accidents, road works, closures, jams, with start and end times | `/api/traffic/incidents?bbox=` | observed | 60 s | counts against the daily budget |
 | Open-Meteo | temperature, humidity, rain, wind, weather code | `/api/weather?lat&lng` | observed | 10 min | free, no key |
 | Phone or laptop camera | people and vehicles as tracked dots | in the browser only; never uploaded | observed | none | free |
