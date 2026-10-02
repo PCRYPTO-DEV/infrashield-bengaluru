@@ -70,15 +70,45 @@ export function ZonesPanel({ app }: { app: CityAtlas }) {
   )
 }
 
+function PlaceInput({ app, value, onPick, placeholder, label }: { app: CityAtlas; value: PlacePick | null; onPick: (p: PlacePick | null) => void; placeholder: string; label: string }) {
+  const [q, setQ] = useState(value?.label ?? '')
+  const [open, setOpen] = useState(false)
+  const results = open && q && q !== value?.label ? search(app.world, q, 8) : []
+  return (
+    <label className="ca-place">
+      <span>{label}</span>
+      <span className="ca-search">
+        <input value={q} placeholder={placeholder} onChange={(e) => { setQ(e.target.value); setOpen(true); if (value) onPick(null) }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} />
+        {results.length > 0 && <ul>{results.map((r, i) => <li key={i} onMouseDown={() => { setQ(r.label); setOpen(false); onPick({ label: r.label, point: r.point }) }}>{r.label}<small>{r.sub}</small></li>)}</ul>}
+      </span>
+    </label>
+  )
+}
+type PlacePick = { label: string; point: { x: number; y: number } }
+
 export function RoutePanel({ app }: { app: CityAtlas }) {
   const T = makeT(app.language)
   const r = app.route
   const w = app.routeWeights
+  const [from, setFrom] = useState<PlacePick | null>(null)
+  const [to, setTo] = useState<PlacePick | null>(null)
+  const [swapKey, setSwapKey] = useState(0)
   const rows: Array<keyof typeof w> = ['travelTime', 'incidentRisk', 'congestion', 'pedestrianRisk', 'environmental']
+  const go = () => { if (from && to) { app.setRouteEndpoints(from.point, to.point); app.flyTo({ x: (from.point.x + to.point.x) / 2, y: (from.point.y + to.point.y) / 2 }) } }
+  const swap = () => { const a = from; setFrom(to); setTo(a); setSwapKey((k) => k + 1) }
   return (
-    <div className="ca-panel ca-side">
+    <div className="ca-panel ca-side ca-route">
       <h3>{T('route.title')}</h3>
       <p className="note">{T('route.help')}</p>
+      <div className="ca-route-form" key={swapKey}>
+        <PlaceInput app={app} value={from} onPick={setFrom} label={T('route.from')} placeholder={T('route.fromph')} />
+        <PlaceInput app={app} value={to} onPick={setTo} label={T('route.to')} placeholder={T('route.toph')} />
+        <div className="ca-row">
+          <button className="primary" disabled={!from || !to} onClick={go}>{T('route.go')}</button>
+          <button className="small" onClick={swap}>⇅ {T('route.swap')}</button>
+          {r && <button className="small" onClick={() => app.clearHighlights()}>{T('route.clear')}</button>}
+        </div>
+      </div>
       <button className={`ca-tool ${app.draw.state?.kind === 'route' ? 'active' : ''}`} onClick={() => app.draw.start('route')}>{T('route.pick')}</button>
       {rows.map((k) => <div className="w" key={k}><span>{T(`route.w.${k}` as StringKey)}</span><input type="range" min={0} max={k === 'travelTime' ? 5 : 300} step={k === 'travelTime' ? 0.1 : 5} value={w[k]} onChange={(e) => app.setRouteWeights({ [k]: Number(e.target.value) })} /><span style={{ fontFamily: 'var(--mono)' }}>{w[k]}</span></div>)}
       {r && <>

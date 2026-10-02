@@ -23,7 +23,7 @@ export interface RoadGraphData { nodes: GraphNode[]; edges: GraphEdge[]; signals
 /** Flat, renderer-friendly geometry (local coordinates). */
 export interface RenderRoad { id: string; roadClass: RoadClass; pts: number[]; width: number; name: string }
 export interface RenderBuilding { id: string; ring: number[]; floors: number; landUse: LandUse }
-export interface RenderPark { id: string; ring: number[] }
+export interface RenderPark { id: string; ring: number[]; kind?: string; name?: string }
 export interface RenderSignal { id: string; x: number; y: number }
 export interface RenderPoint { id: string; x: number; y: number; label: string }
 export interface RenderBlock { ring: number[]; density: number; use: LandUse | 'park' | 'construction' | 'transit' }
@@ -36,6 +36,8 @@ export interface RenderChunk {
   transit: RenderPoint[]
   construction: RenderPark[]
   blocks: RenderBlock[]
+  /** Mapped trees (OSM natural=tree); absent for procedural chunks. */
+  trees?: RenderPoint[]
 }
 
 export interface ChunkMeta {

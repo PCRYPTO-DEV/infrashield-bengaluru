@@ -215,6 +215,16 @@ button { cursor: pointer; }
 .ca-vision .ca-inline input { width: 48px; margin: 0 4px; }
 .ca-visionview { margin-top: 8px; border-radius: var(--radius-s); overflow: hidden; }
 
+/* ---------- route: from / to ---------- */
+.ca-route-form { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 10px; }
+.ca-place { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-faint); }
+.ca-place .ca-search { display: block; }
+.ca-place .ca-search input { width: 100%; box-shadow: none; backdrop-filter: none; background: var(--panel-raised); padding: 7px 12px; text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.ca-place .ca-search ul { left: 0; right: auto; width: 100%; top: 36px; }
+.ca-route .ca-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.ca-route button.primary { background: linear-gradient(135deg, var(--brand-blue), #1f8fe6); color: #fff; border: none; border-radius: 999px; padding: 7px 14px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+.ca-route button.primary:disabled { opacity: 0.45; cursor: default; }
+
 /* ---------- alerts ---------- */
 .ca-alerts .ca-kinds { display: flex; gap: 5px; flex-wrap: wrap; margin: 4px 0 10px; }
 .ca-alerts .ca-kinds button { background: var(--panel-raised); border: 1px solid var(--line); border-radius: 999px; font-size: 11px; padding: 5px 11px; cursor: pointer; color: var(--fg-soft); }

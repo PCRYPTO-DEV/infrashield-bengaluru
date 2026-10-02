@@ -23,7 +23,7 @@ const MAXSPEED_DEFAULT: Record<RoadClass, number> = { arterial: 13.9, collector:
 
 export function overpassQuery(b: GeoBounds): string {
   const bbox = `${b.south},${b.west},${b.north},${b.east}`
-  return `[out:json][timeout:25];(way["highway"](${bbox});way["building"](${bbox});node["highway"="traffic_signals"](${bbox});node["public_transport"="station"](${bbox});way["leisure"="park"](${bbox}););out geom;`
+  return `[out:json][timeout:25];(way["highway"](${bbox});way["building"](${bbox});node["highway"="traffic_signals"](${bbox});node["public_transport"="station"](${bbox});way["leisure"~"^(park|garden|nature_reserve|playground|pitch)$"](${bbox});way["landuse"~"^(grass|forest|recreation_ground|village_green|orchard|meadow|cemetery)$"](${bbox});way["natural"~"^(wood|scrub|grassland|heath)$"](${bbox});node["natural"="tree"](${bbox}););out geom;`
 }
 
 /**

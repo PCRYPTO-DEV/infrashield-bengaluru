@@ -1,4 +1,5 @@
 import type { RenderChunk, RenderBuilding, RenderPark } from '../../engine/world/chunkTypes'
+import type { RoadClass } from '../../entities/types'
 import { PALETTE } from '../palette'
 import { PRNG } from '../../engine/seed/prng'
 
@@ -28,6 +29,64 @@ function polyline(pts: number[]): string {
 
 function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
+}
+
+/** Green areas by what OSM says they are. */
+export function greenFill(kind?: string): string {
+  if (kind === 'wood' || kind === 'forest' || kind === 'scrub' || kind === 'orchard') return PALETTE.wood
+  if (kind === 'grass' || kind === 'meadow' || kind === 'grassland' || kind === 'pitch' || kind === 'heath' || kind === 'village_green' || kind === 'recreation_ground') return PALETTE.grass
+  return PALETTE.park
+}
+
+/** One mapped tree as a small canopy mark. */
+export function tree2d(x: number, y: number): string {
+  return `<circle class="ca-tree" cx="${f(x)}" cy="${f(y)}" r="2.6" fill="${PALETTE.foliage}" stroke="${PALETTE.foliageInk}" stroke-width="0.6"/>`
+}
+
+/** Names of the larger green areas, at their centre. */
+export function parkLabels(chunk: RenderChunk): string {
+  const out: string[] = []
+  for (const p of chunk.parks) {
+    if (!p.name || !p.kind || p.name === p.kind.replace('_', ' ')) continue
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    for (let i = 0; i < p.ring.length; i += 2) { minX = Math.min(minX, p.ring[i]); maxX = Math.max(maxX, p.ring[i]); minY = Math.min(minY, p.ring[i + 1]); maxY = Math.max(maxY, p.ring[i + 1]) }
+    if ((maxX - minX) < p.name.length * 5) continue
+    out.push(`<text class="ca-park-label" x="${f((minX + maxX) / 2)}" y="${f((minY + maxY) / 2)}" font-size="8" text-anchor="middle" fill="${PALETTE.foliageInk}" stroke="${PALETTE.paper}" stroke-width="2" paint-order="stroke" font-family="'DM Sans', 'Helvetica Neue', Arial, sans-serif" font-style="italic">${escapeXml(p.name)}</text>`)
+  }
+  return out.join('')
+}
+
+/** OSM roads without a name carry their highway class as the name; those get no label. */
+const CLASS_NAMES = new Set(['residential', 'service', 'unclassified', 'tertiary', 'secondary', 'primary', 'trunk', 'motorway', 'living_street', 'road', 'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link', 'arterial', 'collector', 'local'])
+
+/**
+ * Street names: one label per distinct name in the chunk, on that road's
+ * longest segment, rotated along it and kept upright, with a paper halo so
+ * it reads over buildings. Sizes are world units; the map scales them.
+ */
+export function roadLabels(chunk: RenderChunk, opts: { halo?: string; fill?: string } = {}): string {
+  const best = new Map<string, { len: number; mx: number; my: number; angle: number; roadClass: RoadClass }>()
+  for (const r of chunk.roads) {
+    if (!r.name || CLASS_NAMES.has(r.name.toLowerCase())) continue
+    for (let i = 0; i + 3 < r.pts.length; i += 2) {
+      const x0 = r.pts[i], y0 = r.pts[i + 1], x1 = r.pts[i + 2], y1 = r.pts[i + 3]
+      const len = Math.hypot(x1 - x0, y1 - y0)
+      const cur = best.get(r.name)
+      if (cur && cur.len >= len) continue
+      let angle = (Math.atan2(y1 - y0, x1 - x0) * 180) / Math.PI
+      if (angle > 90) angle -= 180
+      if (angle < -90) angle += 180
+      best.set(r.name, { len, mx: (x0 + x1) / 2, my: (y0 + y1) / 2, angle, roadClass: r.roadClass })
+    }
+  }
+  const out: string[] = []
+  for (const [name, l] of best) {
+    const size = l.roadClass === 'arterial' ? 11 : l.roadClass === 'collector' ? 9 : 7.5
+    // A label longer than its segment would float over nothing: skip it.
+    if (name.length * size * 0.62 > l.len * 1.6) continue
+    out.push(`<text class="ca-road-label" x="${f(l.mx)}" y="${f(l.my - 2)}" transform="rotate(${l.angle.toFixed(1)} ${f(l.mx)} ${f(l.my)})" font-size="${size}" text-anchor="middle" fill="${opts.fill ?? PALETTE.ink}" stroke="${opts.halo ?? PALETTE.paper}" stroke-width="${(size * 0.28).toFixed(1)}" paint-order="stroke" stroke-linejoin="round" font-family="'DM Sans', 'Helvetica Neue', Arial, sans-serif" font-weight="600" letter-spacing="0.4">${escapeXml(name)}</text>`)
+  }
+  return out.join('')
 }
 
 /** Stipple texture for parks: a nod to Shan Shui's noisy dot textures, seeded so it is stable. */
@@ -107,9 +166,10 @@ export function buildChunkSvg(key: string, chunk: RenderChunk, lod: Lod): string
     parts.push(`<path d="${ringPath(bl.ring)}" fill="rgba(43,42,38,0.025)" stroke="none"/>`)
   }
   for (const p of chunk.parks) {
-    parts.push(`<path d="${ringPath(p.ring)}" fill="${PALETTE.park}" stroke="${PALETTE.inkHair}" stroke-width="0.8"/>`)
-    parts.push(stipple(p, rng.fork(p.id)))
+    parts.push(`<path d="${ringPath(p.ring)}" fill="${greenFill(p.kind)}" stroke="${PALETTE.inkHair}" stroke-width="0.8"/>`)
+    if (!p.kind || p.kind === 'park' || p.kind === 'garden' || p.kind === 'wood' || p.kind === 'forest') parts.push(stipple(p, rng.fork(p.id)))
   }
+  for (const t of chunk.trees ?? []) parts.push(tree2d(t.x, t.y))
   for (const c of chunk.construction) {
     parts.push(`<path d="${ringPath(c.ring)}" fill="${PALETTE.construction}" stroke="${PALETTE.constructionHatch}" stroke-width="1" stroke-dasharray="4 3"/>`)
   }
@@ -131,15 +191,7 @@ export function buildChunkSvg(key: string, chunk: RenderChunk, lod: Lod): string
   for (const s of chunk.signals) {
     parts.push(`<circle cx="${f(s.x)}" cy="${f(s.y)}" r="2.2" fill="${PALETTE.paper}" stroke="${PALETTE.ink}" stroke-width="0.8"/>`)
   }
-  // Street labels: one per road, placed on the first segment, rotated to the road.
-  for (const r of chunk.roads) {
-    if (r.pts.length < 4) continue
-    const x0 = r.pts[0], y0 = r.pts[1], x1 = r.pts[2], y1 = r.pts[3]
-    const mx = (x0 + x1) / 2, my = (y0 + y1) / 2
-    const vertical = Math.abs(x1 - x0) < Math.abs(y1 - y0)
-    const rot = vertical ? -90 : 0
-    const size = r.roadClass === 'arterial' ? 7 : 5.5
-    parts.push(`<text x="${f(mx)}" y="${f(my - 1.5)}" transform="rotate(${rot} ${f(mx)} ${f(my)})" font-size="${size}" text-anchor="middle" fill="${PALETTE.inkSoft}" font-family="Georgia, serif" letter-spacing="0.6">${escapeXml(r.name.toUpperCase())}</text>`)
-  }
+  parts.push(roadLabels(chunk))
+  parts.push(parkLabels(chunk))
   return `<g data-chunk="${key}" data-lod="street">${parts.join('')}</g>`
 }

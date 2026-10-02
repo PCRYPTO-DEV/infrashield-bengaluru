@@ -196,15 +196,19 @@ export class DynamicCanvasRenderer {
   }
 
   private drawIncident(ctx: CanvasRenderingContext2D, p: WorldPoint, props: IncidentProperties, s: WorldState, px: number, upm: number): void {
-    const phase = (s.wallClock / 3000) % 1
+    // An accident or closure is the one thing on the map that must never be missed: a filled halo that
+    // grows with severity, three travelling rings, a solid core and a label pill.
+    const phase = (s.wallClock / 2400) % 1
+    const base = (14 + 30 * props.severity) * upm
+    ctx.beginPath(); ctx.arc(p.x, p.y, base, 0, Math.PI * 2); ctx.fillStyle = this.c.riskSoft; ctx.fill()
     for (let i = 0; i < 3; i++) {
       const f = (phase + i / 3) % 1
-      const r = (8 + f * 30 * props.severity) * upm
-      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
-      ctx.strokeStyle = `rgba(181,73,58,${(0.45 * (1 - f)).toFixed(3)})`; ctx.lineWidth = 1 * px; ctx.stroke()
+      ctx.beginPath(); ctx.arc(p.x, p.y, base * (0.4 + f * 1.4), 0, Math.PI * 2)
+      ctx.strokeStyle = this.c.risk; ctx.globalAlpha = 0.7 * (1 - f); ctx.lineWidth = 2 * px; ctx.stroke(); ctx.globalAlpha = 1
     }
-    ctx.beginPath(); ctx.arc(p.x, p.y, 3 * upm, 0, Math.PI * 2); ctx.fillStyle = this.c.paper; ctx.fill(); ctx.strokeStyle = this.c.risk; ctx.lineWidth = 1.2 * px; ctx.stroke()
-    if (s.lod !== 'city') this.label(ctx, props.kind, { x: p.x + 5 * upm, y: p.y - 4 * upm }, px, this.c.risk)
+    const core = Math.max(5 * px, 4 * upm)
+    ctx.beginPath(); ctx.arc(p.x, p.y, core, 0, Math.PI * 2); ctx.fillStyle = this.c.risk; ctx.fill(); ctx.strokeStyle = this.c.paper; ctx.lineWidth = 2 * px; ctx.stroke()
+    if (s.lod !== 'city') this.pill(ctx, props.kind.replace(/_/g, ' '), { x: p.x + core + 4 * px, y: p.y }, px, this.c.risk, this.c.paper)
   }
 
   private drawPrediction(ctx: CanvasRenderingContext2D, path: WorldPoint[], envelope: number[], confidence: number, s: WorldState, px: number, alternatives: Array<{ path: WorldPoint[]; probability: number }>): void {
@@ -258,12 +262,19 @@ export class DynamicCanvasRenderer {
   }
 
   private drawRisk(ctx: CanvasRenderingContext2D, s: WorldState, px: number, inView: (p: WorldPoint, pad?: number) => boolean, upm: number): void {
+    // Risk epicentres: a soft filled disc sized by risk, a firm ring, a slow pulse and the score, so the
+    // worst spots read at a glance even from the neighbourhood level.
+    const phase = (s.wallClock / 3000) % 1
     for (const h of s.intel.risk!.hotspots) {
-      if (!inView(h, 80)) continue
-      for (let i = 4; i >= 1; i--) {
-        ctx.beginPath(); ctx.arc(h.x, h.y, i * 14 * upm * h.risk + 6 * upm, 0, Math.PI * 2)
-        ctx.strokeStyle = `rgba(181,73,58,${(0.35 * h.risk * (1 - i / 5)).toFixed(3)})`; ctx.lineWidth = 1 * px; ctx.stroke()
-      }
+      if (!inView(h, 120)) continue
+      const r = (18 + 70 * h.risk) * upm
+      ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, Math.PI * 2); ctx.fillStyle = this.c.risk; ctx.globalAlpha = 0.08 + 0.2 * h.risk; ctx.fill(); ctx.globalAlpha = 1
+      ctx.beginPath(); ctx.arc(h.x, h.y, r * 0.55, 0, Math.PI * 2); ctx.fillStyle = this.c.risk; ctx.globalAlpha = 0.12 + 0.2 * h.risk; ctx.fill(); ctx.globalAlpha = 1
+      ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, Math.PI * 2); ctx.strokeStyle = this.c.risk; ctx.globalAlpha = 0.35 + 0.5 * h.risk; ctx.lineWidth = 1.5 * px; ctx.stroke(); ctx.globalAlpha = 1
+      ctx.beginPath(); ctx.arc(h.x, h.y, r * (1 + phase * 0.6), 0, Math.PI * 2); ctx.strokeStyle = this.c.risk; ctx.globalAlpha = 0.5 * h.risk * (1 - phase); ctx.lineWidth = 1.5 * px; ctx.stroke(); ctx.globalAlpha = 1
+      const core = Math.max(4 * px, 3 * upm)
+      ctx.beginPath(); ctx.arc(h.x, h.y, core, 0, Math.PI * 2); ctx.fillStyle = this.c.risk; ctx.fill(); ctx.strokeStyle = this.c.paper; ctx.lineWidth = 1.5 * px; ctx.stroke()
+      if (s.lod !== 'city' && h.risk >= 0.35) this.pill(ctx, `${Math.round(h.risk * 100)}% risk`, { x: h.x + core + 4 * px, y: h.y }, px, this.c.risk, this.c.paper)
     }
   }
 
@@ -323,6 +334,16 @@ export class DynamicCanvasRenderer {
     ctx.save(); ctx.translate(at.x, at.y); ctx.scale(px, px)
     ctx.font = '10px Georgia, serif'; ctx.fillStyle = colour; ctx.textBaseline = 'middle'
     ctx.fillText(text, 4, 0)
+    ctx.restore()
+  }
+
+  /** A small rounded label with a solid background, readable on any map. */
+  private pill(ctx: CanvasRenderingContext2D, text: string, at: WorldPoint, px: number, bg: string, fg: string): void {
+    ctx.save(); ctx.translate(at.x, at.y); ctx.scale(px, px)
+    ctx.font = "600 11px 'DM Sans', 'Helvetica Neue', Arial, sans-serif"; ctx.textBaseline = 'middle'
+    const w = ctx.measureText(text).width + 12, h = 18
+    ctx.fillStyle = bg; ctx.beginPath(); ctx.roundRect(0, -h / 2, w, h, 9); ctx.fill()
+    ctx.fillStyle = fg; ctx.fillText(text, 6, 0.5)
     ctx.restore()
   }
 

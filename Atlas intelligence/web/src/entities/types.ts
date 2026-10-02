@@ -34,6 +34,7 @@ export type UrbanEntityType =
   | 'transit'
   | 'infrastructure'
   | 'park'
+  | 'tree'
   | 'construction'
 
 export interface UrbanEntity<P extends Record<string, unknown> = Record<string, unknown>> {
@@ -96,6 +97,14 @@ export interface IncidentProperties extends Record<string, unknown> {
 export interface ParkProperties extends Record<string, unknown> {
   name: string
   areaM2: number
+  /** OSM kind: park, garden, wood, grass, forest, cemetery… (what the green is) */
+  kind?: string
+}
+
+/** One mapped tree (OSM natural=tree). Only drawn where someone mapped one. */
+export interface TreeProperties extends Record<string, unknown> {
+  name?: string
+  species?: string
 }
 
 export interface ConstructionProperties extends Record<string, unknown> {

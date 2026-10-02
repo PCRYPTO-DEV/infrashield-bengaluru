@@ -3,6 +3,7 @@ import { Scene, Prism, Vector, Matrix, Paths, type Path } from '../ln'
 import { inkPaths, type Pt } from './ink'
 import { PRNG } from '../../engine/seed/prng'
 import { PALETTE } from '../palette'
+import { roadLabels, parkLabels, greenFill } from './chunkSvg'
 
 /**
  * The Ink 3D tier: fogleman/ln's hidden-line renderer drawing the chunk as
@@ -103,6 +104,8 @@ export function buildInkSvg(key: string, chunk: RenderChunk, upm: number, opts: 
 
   const rng = new PRNG(0x1a4 ^ key.length)
   const parts: string[] = []
+  // Greenery first, under everything: every mapped green area as a soft ground; trees only where OSM has one.
+  for (const p of chunk.parks) parts.push(greenGround(ringPts(p.ring), p.kind))
   const roadStrokes = strokes(roads, 1.6 * upm, 0.35)
   if (roadStrokes.length) parts.push(inkPaths(roadStrokes, PALETTE.roadCasing, rng.fork('roads'), 8 * upm))
   const parkStrokes = strokes(parks, 0.8 * upm, 0.6)
@@ -112,9 +115,29 @@ export function buildInkSvg(key: string, chunk: RenderChunk, upm: number, opts: 
   const edgeStrokes = strokes(edges, 0.95 * upm, 0.45)
   if (edgeStrokes.length) parts.push(inkPaths(edgeStrokes, PALETTE.ink, rng.fork('edges'), 7 * upm))
 
+  // Street names on the ground plane, the same labels as the 2D map, so they line up across modes.
+  parts.push(roadLabels(chunk))
+  parts.push(parkLabels(chunk))
+  for (const t of chunk.trees ?? []) parts.push(tree3d(t.x, t.y, upm))
   // Transit marks stay flat on the ground so they match the 2D map.
   for (const t of chunk.transit) parts.push(`<rect x="${(t.x - 7).toFixed(1)}" y="${(t.y - 7).toFixed(1)}" width="14" height="14" fill="none" stroke="${PALETTE.transit}" stroke-width="1.2"/>`)
   return `<g data-chunk="${key}" data-lod="ink">${parts.join('')}</g>`
+}
+
+/** A park in ink: its real outline as a soft green ground. No texture is invented for it. */
+function greenGround(ring: Pt[], kind?: string): string {
+  if (ring.length < 3) return ''
+  const d = ring.map((q, i) => `${i ? 'L' : 'M'}${q.x.toFixed(1)} ${q.y.toFixed(1)}`).join('') + 'Z'
+  return `<path d="${d}" fill="${greenFill(kind)}" stroke="none"/>`
+}
+
+/** One mapped tree in 3D: a trunk of about 4 m and a canopy at its top, in the same oblique projection as the buildings. */
+function tree3d(x: number, y: number, upm: number): string {
+  const top = inkProject(x, y, 4 * upm)
+  const r = 2.8 * upm
+  return `<path d="M${x.toFixed(1)} ${y.toFixed(1)}L${top.x.toFixed(1)} ${top.y.toFixed(1)}" stroke="${PALETTE.foliageInk}" stroke-width="${(0.7 * upm).toFixed(2)}" fill="none"/>` +
+    `<circle class="ca-tree" cx="${top.x.toFixed(1)}" cy="${top.y.toFixed(1)}" r="${r.toFixed(1)}" fill="${PALETTE.foliage}" stroke="${PALETTE.foliageInk}" stroke-width="${(0.5 * upm).toFixed(2)}"/>` +
+    `<circle cx="${(top.x - r * 0.45).toFixed(1)}" cy="${(top.y + r * 0.2).toFixed(1)}" r="${(r * 0.65).toFixed(1)}" fill="${PALETTE.foliage}" stroke="${PALETTE.foliageInk}" stroke-width="${(0.4 * upm).toFixed(2)}"/>`
 }
 
 function parallelFilter(scene: Scene) {

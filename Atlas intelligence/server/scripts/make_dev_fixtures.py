@@ -59,6 +59,8 @@ def make_tile(z: int, x: int, y: int, seed: int) -> dict:
             if rng.random() < 0.15:
                 ring = [{"lat": y0 + 0.3 * (y1 - y0), "lon": x0 + 0.3 * (x1 - x0)}, {"lat": y0 + 0.3 * (y1 - y0), "lon": x0 + 0.7 * (x1 - x0)}, {"lat": y0 + 0.7 * (y1 - y0), "lon": x0 + 0.7 * (x1 - x0)}, {"lat": y0 + 0.7 * (y1 - y0), "lon": x0 + 0.3 * (x1 - x0)}, {"lat": y0 + 0.3 * (y1 - y0), "lon": x0 + 0.3 * (x1 - x0)}]
                 elements.append({"type": "way", "id": nid, "tags": {"leisure": "park", "name": "Neighbourhood park"}, "geometry": ring}); nid += 1
+                for _ in range(rng.randint(3, 7)):
+                    elements.append({"type": "node", "id": nid, "lat": rng.uniform(y0 + 0.32 * (y1 - y0), y0 + 0.68 * (y1 - y0)), "lon": rng.uniform(x0 + 0.32 * (x1 - x0), x0 + 0.68 * (x1 - x0)), "tags": {"natural": "tree"}}); nid += 1
     # signals at some interior intersections
     for c in cols[1:-1]:
         for r in rows[1:-1]:

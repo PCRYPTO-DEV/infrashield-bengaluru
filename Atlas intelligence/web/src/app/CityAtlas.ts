@@ -409,6 +409,8 @@ export class CityAtlas {
     this.route = routeBetween({ graph: this.world.graph, risk: this.intel.state.risk, flow: this.intel.state.flow, unitPerMetre: this.world.unitPerMetre, time: this.temporal.current.timestamp }, from, to, this.routeWeights)
     this.notify()
   }
+  /** A route between two chosen places (from the search box), drawn like a picked one. */
+  setRouteEndpoints(a: WorldPoint, b: WorldPoint): void { this.routePick = [a, b]; this.computeRoute(a, b) }
   setRouteWeights(w: Partial<RouteWeights>): void { this.routeWeights = { ...this.routeWeights, ...w }; if (this.routePick.length === 2) this.computeRoute(this.routePick[0], this.routePick[1]); else this.notify() }
 
   // ---------- theme ----------

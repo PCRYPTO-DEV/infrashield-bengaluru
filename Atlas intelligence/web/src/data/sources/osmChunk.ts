@@ -101,7 +101,8 @@ export function buildOsmChunk(req: ChunkRequest, tile: OsmTile): ChunkData {
       buildingArea += area
       entities.push({ ...e, properties: { ...bp, footprintM2: Math.round(area) } })
     } else if (e.type === 'park') {
-      render.parks.push({ id: e.id, ring: flat })
+      const pp = e.properties as { kind?: string; name?: string }
+      render.parks.push({ id: e.id, ring: flat, kind: pp.kind, name: pp.name })
       entities.push({ ...e, properties: { ...e.properties, areaM2: Math.round(area) } })
     }
   }
@@ -127,6 +128,9 @@ export function buildOsmChunk(req: ChunkRequest, tile: OsmTile): ChunkData {
       render.transit.push({ id: e.id, x: p.x, y: p.y, label: String(e.properties.name ?? 'Station') })
       entities.push(e)
     } else if (e.type === 'zone') {
+      entities.push(e)
+    } else if (e.type === 'tree') {
+      ;(render.trees ??= []).push({ id: e.id, x: p.x, y: p.y, label: String(e.properties.species ?? e.properties.name ?? '') })
       entities.push(e)
     }
   }

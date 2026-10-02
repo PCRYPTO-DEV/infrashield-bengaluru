@@ -119,8 +119,16 @@ const S = {
   'zones.events': ['What happened', 'क्या हुआ'],
   // route
   'route.title': ['A route with less risk', 'कम ख़तरे वाला रास्ता'],
-  'route.help': ['Click where you start and where you want to go. Move the sliders to say what matters more.', 'क्लिक करें कहाँ से चलना है और कहाँ जाना है। स्लाइडर से बताएँ क्या ज़्यादा ज़रूरी है।'],
-  'route.pick': ['Pick start and end', 'शुरू और अंत चुनें'],
+  'route.help': ['Type where you start and where you want to go. Move the sliders to say what matters more.', 'लिखें कहाँ से चलना है और कहाँ जाना है। स्लाइडर से बताएँ क्या ज़्यादा ज़रूरी है।'],
+  'route.pick': ['or pick two points on the map', 'या नक्शे पर दो जगह चुनें'],
+  'route.from': ['From', 'कहाँ से'],
+  'route.to': ['To', 'कहाँ तक'],
+  'route.fromph': ['a road, a station, a park…', 'सड़क, स्टेशन, पार्क…'],
+  'route.toph': ['where you want to go', 'जहाँ जाना है'],
+  'route.go': ['Find route', 'रास्ता ढूँढें'],
+  'route.swap': ['swap', 'उलटें'],
+  'route.nomatch': ['Nothing by that name on the loaded map. Try a road name, or zoom to the area first.', 'इस नाम की कोई जगह लोड हुए नक्शे पर नहीं। सड़क का नाम लिखें या पहले उस इलाक़े तक ज़ूम करें।'],
+  'route.clear': ['clear route', 'रास्ता हटाएँ'],
   'route.w.travelTime': ['time', 'समय'], 'route.w.incidentRisk': ['accidents', 'हादसे'], 'route.w.congestion': ['jams', 'जाम'], 'route.w.pedestrianRisk': ['people on foot', 'पैदल लोग'], 'route.w.environmental': ['air and weather', 'हवा और मौसम'],
   'route.distance': ['Distance', 'दूरी'], 'route.time': ['Time (about)', 'समय (लगभग)'], 'route.inc': ['Accidents on the way', 'रास्ते में हादसे'], 'route.cong': ['Jams on the way', 'रास्ते में जाम'], 'route.ped': ['People on foot on the way', 'रास्ते में पैदल लोग'],
   // upload

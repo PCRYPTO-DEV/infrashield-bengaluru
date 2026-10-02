@@ -26,7 +26,9 @@ function fixture() {
   const crossEnt: UrbanEntity = { id: 'osm:w2', type: 'road', geometry: cross, evidence: ev, properties: { name: 'Cross', roadClass: 'local', lanes: 1, oneway: false, speedLimit: 8.3, edgeIds: [] } }
   const sigLL = ll(bA.minX + 200, midY)
   const signal: UrbanEntity = { id: 'osm:n9', type: 'traffic_signal', geometry: { type: 'Point', coordinates: [sigLL.lng, sigLL.lat] }, evidence: ev, properties: { nodeId: 'osm:n9', cycleSeconds: 0, offsetSeconds: 0, greenNorthSouthSeconds: 0 } }
-  const entsA: UrbanEntity[] = [roadEnt, crossEnt, signal, { id: 'osm:w3', type: 'building', geometry: bld(bA.minX + 300, bA.minY + 300), evidence: ev, properties: { landUse: 'office', floors: 12, heightM: 38, footprintM2: 0 } }, { id: 'osm:w4', type: 'building', geometry: bld(bB.minX + 300, bB.minY + 300), evidence: ev, properties: { landUse: 'residential', floors: 3, heightM: 9, footprintM2: 0 } }]
+  const treeLL = ll(bA.minX + 400, bA.minY + 400)
+  const tree: UrbanEntity = { id: 'osm:n77', type: 'tree', geometry: { type: 'Point', coordinates: [treeLL.lng, treeLL.lat] }, evidence: ev, properties: { species: 'Neem' } }
+  const entsA: UrbanEntity[] = [roadEnt, crossEnt, signal, tree, { id: 'osm:w3', type: 'building', geometry: bld(bA.minX + 300, bA.minY + 300), evidence: ev, properties: { landUse: 'office', floors: 12, heightM: 38, footprintM2: 0 } }, { id: 'osm:w4', type: 'building', geometry: bld(bB.minX + 300, bB.minY + 300), evidence: ev, properties: { landUse: 'residential', floors: 3, heightM: 9, footprintM2: 0 } }]
   const tileA: OsmTile = { key: keyA, tier: 'street', bounds: { west: 0, south: 0, east: 0, north: 0 }, entities: entsA, fetchedAt: 1000, source: 'openstreetmap' }
   const tileB: OsmTile = { ...tileA, key: keyB }
   return { keyA, keyB, tileA, tileB }
@@ -63,7 +65,10 @@ describe('OSM chunk builder', () => {
     expect(a.graph.signals.length).toBe(1)
     expect(a.graph.nodes.some((n) => n.signal)).toBe(true)
     expect(a.entities.find((e) => e.type === 'intersection')).toBeDefined()
-    expect(a.svg.street).toContain('RING ROAD')
+    expect(a.svg.street).toContain('>Ring Road<')
+    expect(a.render.trees?.length).toBe(1)
+    expect(a.svg.street).toContain('ca-tree')
+    expect(a.entities.find((e) => e.type === 'tree')?.evidence.classification).toBe('observed')
     expect(a.meta.vehicleBudget).toBeGreaterThan(0)
     const road = a.entities.find((e) => e.id === 'osm:w1')!
     expect((road.properties.edgeIds as string[]).length).toBeGreaterThan(0)

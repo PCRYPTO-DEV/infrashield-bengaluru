@@ -38,9 +38,13 @@ STREET_QUERY = (
     'node["highway"="traffic_signals"]({bbox});'
     'node["public_transport"="station"]({bbox});'
     'node["railway"="station"]({bbox});'
-    'way["leisure"="park"]({bbox});'
+    'way["leisure"~"^(park|garden|nature_reserve|playground|pitch)$"]({bbox});'
+    'way["landuse"~"^(grass|forest|recreation_ground|village_green|orchard|meadow|cemetery)$"]({bbox});'
+    'way["natural"~"^(wood|scrub|grassland|heath)$"]({bbox});'
+    'node["natural"="tree"]({bbox});'
     ');out geom;'
 )
+GREEN_KINDS = {"park", "garden", "nature_reserve", "playground", "pitch", "grass", "forest", "recreation_ground", "village_green", "orchard", "meadow", "cemetery", "wood", "scrub", "grassland", "heath"}
 MAJOR_QUERY = (
     '[out:json][timeout:25];('
     'way["highway"~"^(motorway|trunk|primary|secondary)$"]({bbox});'
@@ -98,6 +102,9 @@ def normalize(elements: list[dict[str, Any]], fetched_at: float) -> list[dict[st
                 mode = "metro" if tags.get("station") == "subway" or tags.get("subway") == "yes" else ("rail" if "railway" in tags else "bus")
                 out.append({"id": f"osm:n{el['id']}", "type": "transit", "geometry": geom, "evidence": ev(),
                             "properties": {"name": tags.get("name", "Station"), "mode": mode, "osm": tags}})
+            elif tags.get("natural") == "tree":
+                out.append({"id": f"osm:n{el['id']}", "type": "tree", "geometry": geom, "evidence": ev(),
+                            "properties": {"name": tags.get("name"), "species": tags.get("species") or tags.get("genus"), "osm": tags}})
             elif tags.get("place"):
                 out.append({"id": f"osm:n{el['id']}", "type": "zone", "geometry": geom, "evidence": ev(),
                             "properties": {"name": tags.get("name", tags["place"]), "restricted": False, "place": tags["place"]}})
@@ -130,9 +137,11 @@ def normalize(elements: list[dict[str, Any]], fetched_at: float) -> list[dict[st
                             "evidence": ev(0.9 if (levels or height) else 0.7),
                             "properties": {"landUse": land_use(tags), "floors": floors, "heightM": height or floors * 3.2, "footprintM2": 0,
                                            "name": tags.get("name"), "floorsSource": "osm:building:levels" if levels else ("osm:height" if height else "assumed"), "osm": tags}})
-            elif tags.get("leisure") == "park":
-                out.append({"id": f"osm:w{el['id']}", "type": "park", "geometry": {"type": "Polygon", "coordinates": [close_ring(coords)]},
-                            "evidence": ev(), "properties": {"name": tags.get("name", "Park"), "areaM2": 0, "osm": tags}})
+            else:
+                kind = next((tags[k] for k in ("leisure", "landuse", "natural") if tags.get(k) in GREEN_KINDS), None)
+                if kind:
+                    out.append({"id": f"osm:w{el['id']}", "type": "park", "geometry": {"type": "Polygon", "coordinates": [close_ring(coords)]},
+                                "evidence": ev(), "properties": {"name": tags.get("name", kind.replace("_", " ")), "kind": kind, "areaM2": 0, "osm": tags}})
     return out
 
 
