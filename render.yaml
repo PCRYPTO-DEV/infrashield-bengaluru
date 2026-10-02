@@ -1,0 +1,37 @@
+# Render Blueprint for Atlas Infinity (the "Atlas intelligence" folder of this repository).
+# One web service runs the FastAPI server, which serves the built web app from web/dist.
+# Dashboard: New → Blueprint → this repository → branch atlas-intelligence → Apply, then paste the two keys.
+services:
+  - type: web
+    name: atlas-infinity
+    runtime: python
+    plan: starter
+    region: singapore
+    branch: atlas-intelligence
+    rootDir: Atlas intelligence
+    buildCommand: |
+      pip install -r server/requirements.txt
+      npm --prefix web ci
+      npm --prefix web run build
+    startCommand: uvicorn app.main:app --app-dir server --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: atlas-cache
+      mountPath: /var/data
+      sizeGB: 2
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: NODE_VERSION
+        value: "20"
+      - key: ATLAS_REGION
+        value: ncr
+      - key: ATLAS_DATA_DIR
+        value: /var/data
+      - key: TOMTOM_DAILY_BUDGET
+        value: "2000"
+      - key: TOMTOM_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

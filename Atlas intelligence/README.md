@@ -32,6 +32,12 @@ Atlas intelligence/
   render.yaml one-click Render deployment · Dockerfile for anything else
 ```
 
+## Deploy it
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/PCRYPTO-DEV/infrashield-bengaluru)
+
+New → Blueprint → `PCRYPTO-DEV/infrashield-bengaluru` → branch `atlas-intelligence` → Apply, then paste `TOMTOM_API_KEY` and `ANTHROPIC_API_KEY`. Details in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
 ## Run it
 
 ```bash

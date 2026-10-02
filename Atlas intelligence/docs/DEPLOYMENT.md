@@ -22,13 +22,25 @@ serves the built web app from `web/dist` with a single-page fallback.
 
 ## Render (recommended)
 
-1. Push the repository to GitHub.
-2. In Render, **New → Blueprint**, pick the repository; `render.yaml` at the
-   root defines the service (Python runtime, Node 20 for the web build, a
-   2 GB disk for the cache, health check on `/api/health`).
-3. Set `TOMTOM_API_KEY` and `ANTHROPIC_API_KEY` in the service's
-   environment.
-4. Open the service URL: `https://<name>.onrender.com/?region=ncr`.
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/PCRYPTO-DEV/infrashield-bengaluru)
+
+While the code lives in the `Atlas intelligence/` folder of
+`PCRYPTO-DEV/infrashield-bengaluru`, a root-level `render.yaml` on the
+`atlas-intelligence` branch points Render at that folder (`rootDir`). Steps:
+
+1. In Render, **New → Blueprint**, pick `PCRYPTO-DEV/infrashield-bengaluru`,
+   choose branch **atlas-intelligence**, click **Apply**. The blueprint defines
+   one web service (Python runtime, Node 20 for the web build, a 2 GB disk for
+   the cache, health check on `/api/health`, auto-deploy on push).
+2. Render asks for the two secret values: paste `TOMTOM_API_KEY` and
+   `ANTHROPIC_API_KEY`. Optional: `TWILIO_*` for alerts by message.
+3. Wait for the first build (about 3 to 5 minutes), then open
+   `https://atlas-infinity.onrender.com/` (or whatever name Render gave it).
+4. Check `https://<name>.onrender.com/api/health` shows `"tomtom": true` and
+   `"writer": true`.
+
+When the code moves to its own repository, the `render.yaml` inside this
+folder is the one to use (same service, no `rootDir`).
 
 The web build uses relative asset paths, so the same build works under any
 path. Cameras need HTTPS, which Render provides.
