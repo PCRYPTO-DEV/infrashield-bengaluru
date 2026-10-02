@@ -31,6 +31,10 @@ class Settings:
     baseline_minutes: int = field(default_factory=lambda: int(os.getenv("ATLAS_BASELINE_MINUTES", "10")))
     # How many z14 blocks around the region origin to pre-fetch at startup (1 = a 3x3 ring, 144 street tiles). 0 disables.
     warm_radius: int = field(default_factory=lambda: int(os.getenv("ATLAS_WARM_RADIUS", "1")))
+    # The official OpenStreetMap API: a different host from the Overpass mirrors, used when none of them answers.
+    osm_api_url: str = field(default_factory=lambda: os.getenv("OSM_API_URL", "https://api.openstreetmap.org/api/0.6/map.json"))
+    # Many hosts publish IPv6 addresses that containers cannot route; IPv4 only avoids "all connection attempts failed".
+    ipv4_only: bool = field(default_factory=lambda: os.getenv("ATLAS_IPV4_ONLY", "1") != "0")
     tomtom_base: str = "https://api.tomtom.com"
     open_meteo_base: str = "https://api.open-meteo.com"
 

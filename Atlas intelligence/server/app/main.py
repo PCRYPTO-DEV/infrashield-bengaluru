@@ -72,6 +72,11 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
     async def regions():
         return {"default": settings.region, "regions": REGIONS}
 
+    @app.get("/api/diag/osm")
+    async def diag_osm():
+        """What the server's network does to each map source: DNS, status, latency, last error."""
+        return {"ipv4Only": settings.ipv4_only, "lastError": osm.last_error, "calls": osm.live_calls, "tilesWarmed": osm.warmed, "sources": await osm.diagnose()}
+
     @app.get("/api/tiles/osm/{z}/{x}/{y}.json")
     async def osm_tile(z: int, x: int, y: int, tier: str = Query("street", pattern="^(street|district)$")):
         if z not in (13, 16):

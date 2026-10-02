@@ -55,3 +55,24 @@ def test_api_tile_endpoint(tmp_path):
     assert c.get("/api/tiles/osm/16/1/1.json").status_code == 404
     assert c.get("/api/tiles/osm/12/1/1.json").status_code == 400
     assert c.get("/api/regions").json()["regions"]["ncr"]["source"] == "osm"
+
+
+def test_map_api_conversion_matches_overpass_selection():
+    from app.osm import from_map_api, wanted
+    data = {"elements": [
+        {"type": "node", "id": 1, "lat": 28.63, "lon": 77.21},
+        {"type": "node", "id": 2, "lat": 28.631, "lon": 77.211},
+        {"type": "node", "id": 3, "lat": 28.632, "lon": 77.212, "tags": {"natural": "tree"}},
+        {"type": "node", "id": 4, "lat": 28.633, "lon": 77.213, "tags": {"amenity": "bench"}},
+        {"type": "way", "id": 10, "nodes": [1, 2], "tags": {"highway": "primary", "name": "Janpath"}},
+        {"type": "way", "id": 11, "nodes": [1, 2, 1], "tags": {"building": "yes", "building:levels": "4"}},
+        {"type": "way", "id": 12, "nodes": [1, 2], "tags": {"waterway": "canal"}},
+    ]}
+    els = from_map_api(data, "street")
+    kinds = sorted((e["type"], e["id"]) for e in els)
+    assert kinds == [("node", 3), ("way", 10), ("way", 11)]
+    assert els[1]["geometry"] == [{"lat": 28.63, "lon": 77.21}, {"lat": 28.631, "lon": 77.211}]
+    assert wanted({"highway": "primary"}, "district") and not wanted({"highway": "residential"}, "district")
+    # the normaliser understands the converted elements exactly like Overpass ones
+    out = normalize(els, 1000.0)
+    assert {e["type"] for e in out} == {"tree", "road", "building"}

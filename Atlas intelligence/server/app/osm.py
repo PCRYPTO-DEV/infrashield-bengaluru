@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import socket
 import time
 from pathlib import Path
 from typing import Any
@@ -149,6 +150,47 @@ def normalize(elements: list[dict[str, Any]], fetched_at: float) -> list[dict[st
     return out
 
 
+def http_client(timeout: httpx.Timeout) -> httpx.AsyncClient:
+    """An httpx client that binds to IPv4 when ATLAS_IPV4_ONLY is set (the default)."""
+    transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0") if settings.ipv4_only else None
+    return httpx.AsyncClient(timeout=timeout, transport=transport, headers={"User-Agent": "atlas-infinity/0.2 (OpenStreetMap data for a live city map)"})
+
+
+HIGHWAYS = set(HIGHWAY_CLASS)
+
+
+def wanted(tags: dict[str, str], tier: str) -> bool:
+    """The same selection the Overpass queries make, applied to raw map-API elements."""
+    if tier == "district":
+        return tags.get("highway") in ("motorway", "trunk", "primary", "secondary") or tags.get("place") in ("suburb", "neighbourhood", "town", "city")
+    if tags.get("highway") in HIGHWAYS or "building" in tags:
+        return True
+    if tags.get("highway") == "traffic_signals" or tags.get("public_transport") == "station" or tags.get("railway") == "station":
+        return True
+    if tags.get("natural") == "tree":
+        return True
+    return any(tags.get(k) in GREEN_KINDS for k in ("leisure", "landuse", "natural"))
+
+
+def from_map_api(data: dict[str, Any], tier: str) -> list[dict[str, Any]]:
+    """Turn an OSM API 0.6 map.json answer (nodes + ways with node ids) into Overpass-style elements with geometry."""
+    nodes: dict[int, dict[str, Any]] = {}
+    for el in data.get("elements", []):
+        if el.get("type") == "node":
+            nodes[el["id"]] = el
+    out: list[dict[str, Any]] = []
+    for el in data.get("elements", []):
+        tags = el.get("tags") or {}
+        if el.get("type") == "node":
+            if tags and wanted(tags, tier):
+                out.append({"type": "node", "id": el["id"], "lat": el["lat"], "lon": el["lon"], "tags": tags})
+        elif el.get("type") == "way" and tags and wanted(tags, tier):
+            geom = [{"lat": nodes[n]["lat"], "lon": nodes[n]["lon"]} for n in el.get("nodes", []) if n in nodes]
+            if len(geom) >= 2:
+                out.append({"type": "way", "id": el["id"], "tags": tags, "geometry": geom})
+    return out
+
+
 def intersects(el: dict[str, Any], b: BBox) -> bool:
     """Does this Overpass element touch the bbox? Nodes by position; ways by the bbox of their geometry."""
     if "lat" in el:
@@ -273,8 +315,8 @@ class OverpassClient:
             for url in live:
                 t0 = time.monotonic()
                 try:
-                    async with httpx.AsyncClient(timeout=httpx.Timeout(timeout_s + 30.0, connect=8.0)) as client:
-                        r = await client.post(url, data={"data": query}, headers={"User-Agent": "atlas-infinity/0.2 (OpenStreetMap data for a live city map)"})
+                    async with http_client(httpx.Timeout(timeout_s + 30.0, connect=8.0)) as client:
+                        r = await client.post(url, data={"data": query})
                         r.raise_for_status()
                         self.url = url
                         self._down.pop(url, None)
@@ -286,4 +328,64 @@ class OverpassClient:
                     self._down[url] = time.monotonic() + DOWN_SECONDS
                     self.last_error = f"{url}: {type(e).__name__}: {str(e)[:160]}"
                     log.warning("osm %s failed via %s after %.1fs: %s: %s", key, url, time.monotonic() - t0, type(e).__name__, str(e)[:200])
+            # Every mirror failed: the official API on a different host, splitting the area when it is too dense.
+            if settings.osm_api_url:
+                try:
+                    elements = await self._map_api(bbox, tier)
+                    self.url = settings.osm_api_url
+                    self.last_error = None
+                    log.info("osm %s via the OpenStreetMap API (%d elements)", key, len(elements))
+                    return elements
+                except Exception as e:
+                    self.last_error = f"{settings.osm_api_url}: {type(e).__name__}: {str(e)[:160]} (after Overpass: {self.last_error})"
+                    log.warning("osm %s failed via the map API too: %s: %s", key, type(e).__name__, str(e)[:200])
+                    last_error = e
             raise last_error or RuntimeError("no Overpass endpoint configured")
+
+    async def _map_api(self, bbox: BBox, tier: str, depth: int = 0) -> list[dict[str, Any]]:
+        """GET /api/0.6/map.json for the bbox; on 400 (too many nodes) split into four and recurse (depth <= 3)."""
+        async with http_client(httpx.Timeout(60.0, connect=8.0)) as client:
+            r = await client.get(settings.osm_api_url, params={"bbox": f"{bbox.west:.6f},{bbox.south:.6f},{bbox.east:.6f},{bbox.north:.6f}"})
+        if r.status_code == 400 and depth < 3:
+            mx, my = (bbox.west + bbox.east) / 2, (bbox.south + bbox.north) / 2
+            quads = [BBox(bbox.west, bbox.south, mx, my), BBox(mx, bbox.south, bbox.east, my), BBox(bbox.west, my, mx, bbox.north), BBox(mx, my, bbox.east, bbox.north)]
+            seen: set[tuple[str, int]] = set()
+            out: list[dict[str, Any]] = []
+            for q in quads:
+                for el in await self._map_api(q, tier, depth + 1):
+                    k = (el["type"], el["id"])
+                    if k not in seen:
+                        seen.add(k)
+                        out.append(el)
+            return out
+        r.raise_for_status()
+        return from_map_api(r.json(), tier)
+
+    async def diagnose(self) -> list[dict[str, Any]]:
+        """Try every source with a tiny request and report what the network does; for /api/diag/osm."""
+        probe = BBox(77.2160, 28.6310, 77.2175, 28.6320)
+        results: list[dict[str, Any]] = []
+        targets = [(u, "overpass") for u in self.urls] + ([(settings.osm_api_url, "map-api")] if settings.osm_api_url else [])
+        for url, kind in targets:
+            host = httpx.URL(url).host
+            entry: dict[str, Any] = {"url": url, "kind": kind, "host": host}
+            try:
+                infos = socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)
+                entry["addresses"] = sorted({i[4][0] for i in infos})
+            except Exception as e:
+                entry["dns"] = f"{type(e).__name__}: {e}"
+            t0 = time.monotonic()
+            try:
+                async with http_client(httpx.Timeout(15.0, connect=8.0)) as client:
+                    if kind == "overpass":
+                        r = await client.post(url, data={"data": f"[out:json][timeout:10];node[\"highway\"=\"traffic_signals\"]({probe.overpass()});out 1;"})
+                    else:
+                        r = await client.get(url, params={"bbox": f"{probe.west},{probe.south},{probe.east},{probe.north}"})
+                entry["status"] = r.status_code
+                entry["bytes"] = len(r.content)
+            except Exception as e:
+                entry["error"] = f"{type(e).__name__}: {str(e)[:160]}"
+            entry["seconds"] = round(time.monotonic() - t0, 2)
+            entry["skippedUntil"] = round(self._down.get(url, 0.0) - time.monotonic(), 1) if url in self._down else 0
+            results.append(entry)
+        return results
