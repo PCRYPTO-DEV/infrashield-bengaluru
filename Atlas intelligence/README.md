@@ -18,6 +18,7 @@ Three open-source ideas are merged into one product:
   Ported to TypeScript and fed with the city's buildings: the **Ink 3D** mode,
   **Atlas Vision** (the city drawn from a camera's own eye) and plottable SVG
   exports.
+- The City Atlas brand (logo package) for the chrome; ink on paper for the map.
 - An evidence-first intelligence layer: traffic flow, crowding, odd behaviour,
   risk, forecasts, zones, routes, business scoring, memory, City Pulse, and
   **Ask the City** with an AI writer that only rephrases measured facts, in
@@ -68,6 +69,8 @@ server.
 | **Upload** | GeoJSON / JSON / CSV up to 10 MB become a "seen" layer |
 | **Timeline** | live, recorded replay, or what may come next |
 | **Save line drawing** | in Ink 3D, export the view as a plotter-ready SVG |
+| **Alerts** | "tell me when a road gets very slow / a camera counts too many / something happens in a zone", by WhatsApp or SMS in English or Hindi |
+| **Memory** | every live reading is kept; roads show "usual at this hour" and you can ask "is it worse than usual?" |
 
 ## Honesty rules
 

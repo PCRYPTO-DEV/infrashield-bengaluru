@@ -22,6 +22,13 @@ class Settings:
     fixtures: Path | None = field(default_factory=lambda: Path(os.environ["ATLAS_FIXTURES"]) if os.getenv("ATLAS_FIXTURES") else None)
     tomtom_daily_budget: int = field(default_factory=lambda: int(os.getenv("TOMTOM_DAILY_BUDGET", "2000")))
     overpass_url: str = field(default_factory=lambda: os.getenv("OVERPASS_URL", "https://overpass-api.de/api/interpreter"))
+    twilio_account_sid: str = field(default_factory=lambda: os.getenv("TWILIO_ACCOUNT_SID", ""))
+    twilio_auth_token: str = field(default_factory=lambda: os.getenv("TWILIO_AUTH_TOKEN", ""))
+    twilio_from_sms: str = field(default_factory=lambda: os.getenv("TWILIO_FROM_SMS", ""))
+    twilio_from_whatsapp: str = field(default_factory=lambda: os.getenv("TWILIO_FROM_WHATSAPP", ""))
+    # Baseline recorder: flow tiles (z/x/y, comma separated) polled every N minutes so the memory grows even with nobody watching
+    baseline_tiles: str = field(default_factory=lambda: os.getenv("ATLAS_BASELINE_TILES", "12/2926/1707"))
+    baseline_minutes: int = field(default_factory=lambda: int(os.getenv("ATLAS_BASELINE_MINUTES", "10")))
     tomtom_base: str = "https://api.tomtom.com"
     open_meteo_base: str = "https://api.open-meteo.com"
 

@@ -220,6 +220,7 @@ export class CityAtlas {
     for (const a of state.anomalies) this.memory.record({ id: a.id, type: a.type, timestamp: a.timestamp, location: a.location, severity: a.severity, description: a.explanation, entityIds: a.entityIds, evidence: a.meta })
     for (const inc of this.world.activeIncidents(time)) this.memory.record({ id: inc.entity.id, type: `incident:${inc.props.kind}`, timestamp: inc.props.startTime, location: inc.point, severity: inc.props.severity, description: inc.props.description, entityIds: [inc.entity.id], evidence: inc.entity.evidence })
     const z = this.zones.evaluate(this.world.allAgents(), time)
+    for (const e of z.events) { const zn = this.zones.zones.get(e.zoneId); if (zn && (e.type === 'count' || e.type === 'dwell' || e.type === 'density' || e.type === 'entry')) this.feeds?.postZoneEvent(zn.name, e.type, e.description, zn.ring[0] ? localToLngLat(this.frame, zn.ring[0]) : null) }
     for (const e of z.events) { this.zoneEvents.push(e); this.memory.record({ id: e.id, type: `zone:${e.type}`, timestamp: e.timestamp, location: this.zones.zones.get(e.zoneId)?.ring[0] ?? { x: 0, y: 0 }, severity: 0.3, description: e.description, entityIds: [`agent:${e.agentId}`], evidence: { classification: 'derived', model: 'zone-engine/1', timestamp: e.timestamp } }) }
     if (this.zoneEvents.length > 200) this.zoneEvents.splice(0, this.zoneEvents.length - 200)
     this.zoneStats = z.stats
@@ -319,7 +320,27 @@ export class CityAtlas {
       return { id: o.trackId, kind: o.kind, x: p.x, y: p.y, heading: o.heading, speed: o.speed * upm, edgeId: '', history: [], lastSeen: o.timestamp, evidence: { classification: 'observed', source: `camera:${this.vision.cameraId}`, timestamp: o.timestamp, confidence: o.confidence, model: 'tracker:sort-lite/1' } }
     })
     this.world.setObservedAgents(0, views)
+    const people = views.filter((v) => v.kind === 'pedestrian').length
+    if (views.length) this.feeds?.postCamera(this.vision.cameraId, people, views.length - people, this.vision.position)
     this.notify()
+  }
+
+  /** The nearest road edge that carries a live speed reading, for alert rules. */
+  nearestObservedEdge(p: WorldPoint, maxM = 60): { edgeId: string; segment: string; roadName: string; tile: string } | null {
+    const upm = this.world.unitPerMetre
+    let best: { edgeId: string; d: number } | null = null
+    for (const edgeId of this.world.observedFlow.keys()) {
+      const e = this.world.graph.edge(edgeId); const ep = e && this.world.graph.endpoints(e); if (!e || !ep) continue
+      const d = Math.hypot((ep.a.x + ep.b.x) / 2 - p.x, (ep.a.y + ep.b.y) / 2 - p.y)
+      if (d <= maxM * upm && (!best || d < best.d)) best = { edgeId, d }
+    }
+    if (!best) return null
+    const segment = this.feeds?.edgeSegment.get(best.edgeId)
+    if (!segment) return null
+    const e = this.world.graph.edge(best.edgeId)!
+    const roadName = (this.world.entities.get(e.roadId)?.entity.properties as RoadProperties | undefined)?.name ?? 'this road'
+    const tile = segment.split(':')[1] ?? ''
+    return { edgeId: best.edgeId, segment, roadName, tile }
   }
 
   private visionCache: { key: string; frame: VisionFrame; t: number } | null = null
@@ -429,6 +450,11 @@ export class CityAtlas {
       const top = [...roads.values()].sort((a, b) => b.cong - a.cong).slice(0, 5)
       if (top.length) f.push({ id: 'slow', classification: top.some((r) => r.observed) ? 'observed' : 'derived', statement: `Slowest roads: ${top.map((r) => `${r.name} (${Math.round(r.cong * 100)}% congested${r.observed ? ', live' : ''})`).join('; ')}.` })
     }
+    // The memory: now versus usual for roads that have both a live reading and a baseline.
+    const cmp: string[] = []
+    for (const [edgeId, u] of w.observedUsual) { if (u.usual === null || cmp.length >= 4) continue; const e = w.graph.edge(edgeId); if (!e) continue; const name = (w.entities.get(e.roadId)?.entity.properties as RoadProperties | undefined)?.name ?? e.roadId; if (cmp.some((c) => c.startsWith(name))) continue; cmp.push(`${name}: ${Math.round(u.now * 100)}% of free speed now, usually ${Math.round(u.usual * 100)}% (${u.samples} past readings)`) }
+    if (cmp.length) f.push({ id: 'usual', classification: 'derived', source: 'atlas.memory', statement: `Compared with what is usual at this hour: ${cmp.join('; ')}.` })
+    else if (w.observedUsual.size) f.push({ id: 'usual', classification: 'derived', source: 'atlas.memory', statement: 'The memory does not yet have enough past readings at this hour to say what is usual.' })
     const incidents = w.activeIncidents(t.timestamp).slice(0, 6)
     if (incidents.length) f.push({ id: 'incidents', classification: incidents.some((i) => i.entity.evidence.classification === 'observed') ? 'observed' : 'simulated', statement: `Active incidents: ${incidents.map((i) => `${i.props.kind} (${i.props.description})`).join('; ')}.` })
     for (const a of this.intel.state.anomalies.slice(0, 4)) f.push({ id: a.id, classification: 'derived', statement: `Unusual: ${a.type.replace(/_/g, ' ')}: ${a.explanation}`, confidence: a.confidence })

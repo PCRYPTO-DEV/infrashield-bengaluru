@@ -46,6 +46,7 @@ class TomTomClient:
         self.daily_budget = daily_budget
         self.base = base or settings.tomtom_base
         self.live_calls = 0
+        self.history = None  # set by the app: every fresh reading is remembered
 
     # ---- budget ----
     def _day_key(self) -> str:
@@ -88,6 +89,8 @@ class TomTomClient:
         now = time.time()
         result = {"key": f"{z}/{x}/{y}", "fetchedAt": int(now * 1000), "segments": decode_flow_tile(pbf, z, x, y), "source": "tomtom", "style": FLOW_STYLE}
         self.cache.set(key, result, FLOW_TTL, now)
+        if self.history is not None:
+            self.history.record_flow(result["key"], result["segments"], now)
         return result
 
     async def flow_segment(self, lat: float, lng: float, zoom: int = 12) -> dict[str, Any]:
@@ -115,6 +118,8 @@ class TomTomClient:
         now = time.time()
         result = {"fetchedAt": int(now * 1000), "source": "tomtom", "entities": normalize_incidents(data, now)}
         self.cache.set(key, result, INCIDENT_TTL, now)
+        if self.history is not None:
+            self.history.record_incidents(result["entities"], now)
         return result
 
 
@@ -196,8 +201,9 @@ def _ts(v: str | None) -> int | None:
         return None
 
 
-def register(app: FastAPI, cache: Cache, fixtures: Path | None) -> None:
+def register(app: FastAPI, cache: Cache, fixtures: Path | None, history=None) -> None:
     client = TomTomClient(cache, settings.tomtom_api_key, fixtures, settings.tomtom_daily_budget)
+    client.history = history
     app.state.tomtom = client
 
     def guard(fn):

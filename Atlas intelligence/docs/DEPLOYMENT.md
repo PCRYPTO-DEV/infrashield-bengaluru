@@ -14,6 +14,11 @@ serves the built web app from `web/dist` with a single-page fallback.
 | `TOMTOM_DAILY_BUDGET` | no | calls per UTC day before the server stops asking TomTom (default 2000) |
 | `ATLAS_FIXTURES` | no | folder of recorded responses; runs offline |
 | `OVERPASS_URL` | no | another Overpass endpoint |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | for alerts by message | Twilio credentials. Without them alerts show in the app only. |
+| `TWILIO_FROM_SMS` | for SMS alerts | the Twilio number, e.g. `+1415…` |
+| `TWILIO_FROM_WHATSAPP` | for WhatsApp alerts | the Twilio WhatsApp sender, e.g. `whatsapp:+14155238886` (sandbox) |
+| `ATLAS_BASELINE_TILES` | no | flow tiles (`z/x/y`, comma separated) the server keeps reading for the memory even when nobody is watching; default the Connaught Place tile `12/2926/1707` |
+| `ATLAS_BASELINE_MINUTES` | no | how often the baseline reader runs (default 10; one tile every 10 minutes is 144 TomTom calls a day) |
 
 ## Render (recommended)
 
@@ -41,6 +46,7 @@ docker run -p 8000:8000 -e TOMTOM_API_KEY=... -e ANTHROPIC_API_KEY=... -v atlas-
 - `api.tomtom.com`
 - `api.open-meteo.com`
 - `api.anthropic.com`
+- `api.twilio.com` (alerts by WhatsApp or SMS)
 - optionally `download.geofabrik.de` for a bulk extract
 
 The browser additionally loads the camera detector from

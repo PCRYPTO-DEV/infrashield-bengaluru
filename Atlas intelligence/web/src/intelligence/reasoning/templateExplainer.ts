@@ -22,7 +22,7 @@ export function createTemplateExplainer(language: () => Language = () => 'en'): 
   }
 }
 
-const LEADS: Record<string, true> = { 'tpl.whats_happening': true, 'tpl.why_slow': true, 'tpl.unusual': true, 'tpl.dangerous_intersections': true, 'tpl.history': true, 'tpl.forecast': true, 'tpl.site_selection': true, 'tpl.route': true, 'tpl.pulse': true, 'tpl.help': true }
+const LEADS: Record<string, true> = { 'tpl.whats_happening': true, 'tpl.why_slow': true, 'tpl.unusual': true, 'tpl.dangerous_intersections': true, 'tpl.history': true, 'tpl.forecast': true, 'tpl.site_selection': true, 'tpl.route': true, 'tpl.pulse': true, 'tpl.compare': true, 'tpl.help': true }
 
 /** English default, for callers that do not carry a language. */
 export const TemplateExplainer: ExplanationProvider = createTemplateExplainer()

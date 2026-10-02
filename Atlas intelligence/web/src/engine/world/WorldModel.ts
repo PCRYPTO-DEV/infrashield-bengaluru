@@ -64,6 +64,9 @@ export class WorldModel {
   /** Observed per-edge speed level (current / free-flow, 0..1) from a live feed. */
   observedFlow = new Map<string, { level: number; t: number; source: string }>()
   observedFlowMeta: { t: number; source: string; segments: number } | null = null
+  /** What each observed edge usually reads at this weekday and hour (from the server's memory). */
+  observedUsual = new Map<string, { now: number; usual: number | null; samples: number; basis: string; delta: number | null; segment: string }>()
+  setObservedUsual(m: Map<string, { now: number; usual: number | null; samples: number; basis: string; delta: number | null; segment: string }>): void { this.observedUsual = m }
   /** Latest observed weather for the region, or null when no feed is connected. */
   weather: import('../../data/realtime/liveFeeds').WeatherNow | null = null
   liveIncidents: UrbanEntity[] = []

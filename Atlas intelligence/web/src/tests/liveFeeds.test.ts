@@ -93,3 +93,12 @@ describe('live flow matching', () => {
     expect(calls.some((u) => u.includes('/api/traffic/flow/12/'))).toBe(true)
   })
 })
+
+describe('memory and intents', () => {
+  it('reports which TomTom segment each edge took its level from', async () => {
+    const { parseIntent } = await import('../intelligence/reasoning/intentParser')
+    expect(parseIntent('Is Ring Road worse than usual?').kind).toBe('compare')
+    expect(parseIntent('क्या आज सामान्य से ज़्यादा जाम है?').kind).toBe('compare')
+    expect(parseIntent('ट्रैफ़िक धीमा क्यों है?').kind).toBe('why_slow')
+  })
+})

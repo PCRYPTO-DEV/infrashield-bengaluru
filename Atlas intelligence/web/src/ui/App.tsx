@@ -9,6 +9,7 @@ import { AskPanel } from './panels/AskPanel'
 import { LayersPanel, PulsePanel, ZonesPanel, RoutePanel, UploadPanel, SearchBox } from './panels/SidePanels'
 import { Legend } from './overlays/Legend'
 import { VisionPanel } from './panels/VisionPanel'
+import { AlertsPanel } from './panels/AlertsPanel'
 import { MODES } from '../rendering/layers/modes'
 import { formatWorldUri, parseWorldUri } from '../engine/seed/worldSeed'
 import { makeT, type StringKey } from './i18n'
@@ -16,7 +17,7 @@ import { installEmbed, readEmbedParams } from '../app/embed'
 import { lngLatToLocal } from '../geo/projection/frame'
 import { useEffect } from 'react'
 
-type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | null
+type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | null
 
 function seedFromUrl(): string {
   const p = new URLSearchParams(window.location.search)
@@ -64,7 +65,7 @@ export default function App() {
     <div className={`ca-app${embed.embed ? ' ca-embed' : ''}`}>
       <CityView key={`${regionId}:${seed}`} app={app} />
       <div className="ca-top">
-        <h1 className="ca-wordmark">ATLAS INFINITY</h1>
+        <div className="ca-brand"><img src="./brand/symbol-64.png" alt="City Atlas" width={34} height={34} /><div><h1 className="ca-wordmark">ATLAS INFINITY</h1><span className="ca-by">CITY ATLAS · people · places · possibilities</span></div></div>
         <p className="ca-tagline">{T('top.tagline')} · {app.region.name}{district ? ` · ${district}` : ''}</p>
         <div className="ca-regions">{Object.values(REGIONS).filter((r) => !r.demo || showDemo || r.id === regionId).map((r) => <button key={r.id} className={r.id === regionId ? 'active' : ''} onClick={() => switchRegion(r.id)}>{r.name}</button>)}
           <span className="ca-lang" title="Language · भाषा"><button className={app.language === 'en' ? 'active' : ''} onClick={() => app.setLanguage('en')}>English</button><button className={app.language === 'hi' ? 'active' : ''} onClick={() => app.setLanguage('hi')}>हिंदी</button></span></div>
@@ -83,7 +84,7 @@ export default function App() {
       <div className="ca-tools">
         <SearchBox app={app} />
         <div className="ca-toolrow">
-          {(['layers', 'zones', 'route', 'upload', 'pulse', 'camera'] as const).map((t) => <button key={t} className={`ca-tool ${tool === t ? 'active' : ''}`} onClick={() => { toggle(t); app.select(null) }}>{T(`tool.${t}` as StringKey)}</button>)}
+          {(['layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts'] as const).map((t) => <button key={t} className={`ca-tool ${tool === t ? 'active' : ''}`} onClick={() => { toggle(t); app.select(null) }}>{T(`tool.${t}` as StringKey)}</button>)}
         </div>
         {tool === 'layers' && <LayersPanel app={app} />}
       </div>
@@ -92,6 +93,7 @@ export default function App() {
       {tool === 'upload' && !app.selection && <UploadPanel app={app} />}
       {tool === 'pulse' && !app.selection && <PulsePanel app={app} />}
       {tool === 'camera' && <VisionPanel app={app} />}
+      {tool === 'alerts' && <AlertsPanel app={app} />}
       <InspectorPanel app={app} />
       <AskPanel app={app} />
       <Legend app={app} />

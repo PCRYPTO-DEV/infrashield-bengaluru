@@ -1,6 +1,8 @@
 """Atlas Infinity server: real geography, live feeds and the AI writer behind one origin."""
 from __future__ import annotations
 
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -15,24 +17,45 @@ from .osm import OverpassClient
 from .regions import REGIONS
 
 
-def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=None) -> FastAPI:
+def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=None, history=None, alert_sender=None) -> FastAPI:
     cache = cache or Cache(settings.db_path)
     fixtures = fixtures if fixtures is not None else settings.fixtures
     osm = OverpassClient(cache, fixtures)
+    from .memory import History, register as register_memory
+    from .alerts import AlertEngine, register as register_alerts, twilio_from_env
+    history = history or History(cache.path)
+    alerts = AlertEngine(cache.path, history, twilio_from_env(), sender=alert_sender)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        # Baseline recorder: keeps the memory growing when nobody is watching. Live keys only; fixtures never spend.
+        task = None
+        if fixtures is None and settings.tomtom_api_key and settings.baseline_tiles:
+            async def baseline():
+                tiles = [t.strip() for t in settings.baseline_tiles.split(",") if t.strip()]
+                while True:
+                    for t in tiles:
+                        try:
+                            z, x, y = (int(v) for v in t.split("/"))
+                            await app.state.tomtom.flow_tile(z, x, y)
+                        except Exception as e:  # budget, network: try again next round
+                            logging.getLogger("atlas.baseline").warning("baseline %s: %s", t, e)
+                    await asyncio.sleep(max(60, settings.baseline_minutes * 60))
+            task = asyncio.create_task(baseline())
         yield
+        if task:
+            task.cancel()
 
     app = FastAPI(title="Atlas Infinity", version="0.2.0", lifespan=lifespan)
     app.state.cache = cache
     app.state.osm = osm
-    app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5174", "http://127.0.0.1:5174"], allow_methods=["GET", "POST"], allow_headers=["*"])
+    app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5174", "http://127.0.0.1:5174"], allow_methods=["GET", "POST", "DELETE"], allow_headers=["*"])
 
     @app.get("/api/health")
     async def health():
         return {"ok": True, "region": settings.region, "fixtures": fixtures is not None,
-                "tomtom": bool(settings.tomtom_api_key), "writer": bool(settings.anthropic_api_key)}
+                "tomtom": bool(settings.tomtom_api_key), "writer": bool(settings.anthropic_api_key),
+                "memory": history.count("flow_readings"), "alerts": bool(alerts.twilio)}
 
     @app.get("/api/regions")
     async def regions():
@@ -52,7 +75,9 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
     from .tomtom import register as register_tomtom
     from .weather import register as register_weather
     from .explain import register as register_explain
-    register_tomtom(app, cache, fixtures)
+    register_tomtom(app, cache, fixtures, history)
+    register_memory(app, history)
+    register_alerts(app, alerts)
     register_weather(app, cache, fixtures)
     register_explain(app, writer=writer, fake=fixtures is not None and not settings.anthropic_api_key)
 

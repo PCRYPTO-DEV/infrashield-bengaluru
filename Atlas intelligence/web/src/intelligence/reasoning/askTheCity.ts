@@ -48,6 +48,22 @@ function gather(intent: Intent, ctx: AskContext, ev: EvidenceItem[], hl: Answer[
   const inFocus = (p: WorldPoint) => p.x >= focus.minX && p.x <= focus.maxX && p.y >= focus.minY && p.y <= focus.maxY
   const push = (e: EvidenceItem) => ev.push(e)
   switch (intent.kind) {
+    case 'compare': {
+      // Now versus usual, from the server's memory of past readings for the roads in view.
+      const rows = new Map<string, { name: string; now: number; usual: number; samples: number; basis: string }>()
+      for (const [edgeId, u] of world.observedUsual) {
+        if (u.usual === null) continue
+        const e = world.graph.edge(edgeId); const ep = e && world.graph.endpoints(e); if (!e || !ep || !inFocus({ x: (ep.a.x + ep.b.x) / 2, y: (ep.a.y + ep.b.y) / 2 })) continue
+        const name = (world.entities.get(e.roadId)?.entity.properties as RoadProperties | undefined)?.name ?? e.roadId
+        const r = rows.get(name) ?? { name, now: u.now, usual: u.usual, samples: u.samples, basis: u.basis }
+        r.now = Math.min(r.now, u.now); r.usual = Math.min(r.usual, u.usual); rows.set(name, r)
+      }
+      const waiting = [...world.observedUsual.values()].filter((u) => u.usual === null).length
+      const sorted = [...rows.values()].sort((a, b) => (a.now - a.usual) - (b.now - b.usual))
+      if (!sorted.length) push({ id: 'nomem', classification: 'derived', statement: waiting > 0 ? `The memory has ${waiting} roads in view but not enough past readings yet to say what is usual; it needs a few days of readings at this hour` : world.observedFlow.size ? 'The memory has no past readings for the roads in view yet' : 'No live speed readings are in view, so nothing can be compared' })
+      for (const r of sorted.slice(0, 5)) push({ id: `cmp:${r.name}`, classification: 'derived', source: 'atlas.memory', statement: `${r.name}: ${Math.round(r.now * 100)}% of free speed now, usually ${Math.round(r.usual * 100)}% (${r.basis}, ${r.samples} past readings)${r.now < r.usual - 0.15 ? ': worse than usual' : r.now > r.usual + 0.15 ? ': better than usual' : ': about normal'}`, confidence: Math.min(0.9, 0.5 + r.samples * 0.05) })
+      break
+    }
     case 'whats_happening': {
       let vehicles = 0, peds = 0, seenV = 0, seenP = 0
       for (const a of world.agents.values()) if (inFocus(a)) { if (a.kind === 'vehicle') vehicles++; else peds++ }
