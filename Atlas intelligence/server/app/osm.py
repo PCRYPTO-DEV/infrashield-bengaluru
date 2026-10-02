@@ -19,6 +19,7 @@ import httpx
 from .cache import Cache
 from .config import settings
 from .tiles import BBox, lnglat_to_tile, tile_bbox
+from .vtiles import VectorTileSource
 
 HIGHWAY_CLASS = {
     "motorway": "arterial", "trunk": "arterial", "primary": "arterial",
@@ -32,7 +33,7 @@ log = logging.getLogger("atlas.osm")
 # One Overpass query covers a whole block of tiles (z14 for street tiles: 16 of them; z11 for district
 # tiles: 16 of those), and every tile in the block is cached from that one answer. A screen that needs
 # 40 street tiles then costs 3 or 4 queries instead of 40.
-BLOCK_ZOOM = {"street": 14, "district": 11}
+BLOCK_ZOOM = {"street": 14, "district": 13}
 # How long a mirror that failed is skipped before it is tried again.
 DOWN_SECONDS = 60.0
 
@@ -221,6 +222,7 @@ class OverpassClient:
         self._last = 0.0
         self._down: dict[str, float] = {}
         self._blocks: dict[str, asyncio.Future] = {}
+        self.vtiles = VectorTileSource() if settings.osm_tiles_url else None
         self.live_calls = 0
         self.last_error: str | None = None
         self.warmed = 0
@@ -232,7 +234,7 @@ class OverpassClient:
             return cached
         if self.fixtures is None:
             bz = BLOCK_ZOOM[tier]
-            if z > bz:
+            if z >= bz:
                 try:
                     await self._block(tier, z, bz, x >> (z - bz), y >> (z - bz))
                     cached = self.cache.get(key)
@@ -262,7 +264,17 @@ class OverpassClient:
             try:
                 bbox = tile_bbox(bz, bx, by)
                 t0 = time.monotonic()
-                elements = await self._elements(bbox, tier, f"osm:{bkey}", timeout_s=60)
+                elements: list[dict[str, Any]] | None = None
+                if self.vtiles is not None:
+                    try:
+                        elements = await self.vtiles.elements(tier, bz, bx, by)
+                        self.url = self.vtiles.base
+                        self.last_error = None
+                    except Exception as e:  # the CDN is down or the tile is odd: the live query path
+                        self.vtiles.last_error = f"{type(e).__name__}: {str(e)[:160]}"
+                        log.warning("vtile block %s failed (%s); using Overpass", bkey, self.vtiles.last_error)
+                if elements is None:
+                    elements = await self._elements(bbox, tier, f"osm:{bkey}", timeout_s=60)
                 now = time.time()
                 n = 1 << (z - bz)
                 for dy in range(n):
@@ -365,7 +377,7 @@ class OverpassClient:
         """Try every source with a tiny request and report what the network does; for /api/diag/osm."""
         probe = BBox(77.2160, 28.6310, 77.2175, 28.6320)
         results: list[dict[str, Any]] = []
-        targets = [(u, "overpass") for u in self.urls] + ([(settings.osm_api_url, "map-api")] if settings.osm_api_url else [])
+        targets = ([(self.vtiles.base, "vector-tiles")] if self.vtiles else []) + [(u, "overpass") for u in self.urls] + ([(settings.osm_api_url, "map-api")] if settings.osm_api_url else [])
         for url, kind in targets:
             host = httpx.URL(url).host
             entry: dict[str, Any] = {"url": url, "kind": kind, "host": host}
@@ -379,6 +391,9 @@ class OverpassClient:
                 async with http_client(httpx.Timeout(15.0, connect=8.0)) as client:
                     if kind == "overpass":
                         r = await client.post(url, data={"data": f"[out:json][timeout:10];node[\"highway\"=\"traffic_signals\"]({probe.overpass()});out 1;"})
+                    elif kind == "vector-tiles":
+                        tpl = await self.vtiles.template(client)  # type: ignore[union-attr]
+                        r = await client.get(tpl.replace("{z}", "14").replace("{x}", "11706").replace("{y}", "6799"))
                     else:
                         r = await client.get(url, params={"bbox": f"{probe.west},{probe.south},{probe.east},{probe.north}"})
                 entry["status"] = r.status_code

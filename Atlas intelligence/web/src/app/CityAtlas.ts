@@ -42,8 +42,11 @@ import { renderCameraScene, poseFromPoints, type VisionFrame } from '../renderin
 import type { LngLat } from '../geo/coordinates/lngLat'
 import { localToLngLat } from '../geo/projection/frame'
 import type { AgentView } from '../engine/world/WorldModel'
+import { deriveInsights, type Insight } from '../intelligence/insights/insightEngine'
+import type { IntelligenceState } from '../intelligence/types'
 
 export type Theme = 'day' | 'night'
+export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights'
 
 export const DEFAULT_SEED = REGIONS[DEFAULT_REGION].seed
 /** Base URL of the Atlas server; empty means same origin (Vite proxies /api in dev). */
@@ -230,6 +233,7 @@ export class CityAtlas {
     if (this.zoneEvents.length > 200) this.zoneEvents.splice(0, this.zoneEvents.length - 200)
     this.zoneStats = z.stats
     this.pulse = cityPulse(this.world, state, time)
+    this.insights = this.computeInsights(state, time)
     this.stats.intelMs = Math.round((performance.now() - t0) * 10) / 10
     this.notify()
   }
@@ -412,6 +416,34 @@ export class CityAtlas {
   /** A route between two chosen places (from the search box), drawn like a picked one. */
   setRouteEndpoints(a: WorldPoint, b: WorldPoint): void { this.routePick = [a, b]; this.computeRoute(a, b) }
   setRouteWeights(w: Partial<RouteWeights>): void { this.routeWeights = { ...this.routeWeights, ...w }; if (this.routePick.length === 2) this.computeRoute(this.routePick[0], this.routePick[1]); else this.notify() }
+
+  // ---------- insights for the people who run the city ----------
+  insights: Insight[] = []
+  sound: boolean = (typeof localStorage !== 'undefined' && localStorage.getItem('atlas.sound') !== 'off')
+  setSound(on: boolean): void { this.sound = on; try { localStorage.setItem('atlas.sound', on ? 'on' : 'off') } catch { /* private mode */ } this.notify() }
+  /** A panel another part of the app (or the host page, through the embed) asks to open. */
+  toolRequest: ToolName | null = null
+  requestTool(t: ToolName | null): void { this.toolRequest = t; this.notify() }
+  private edgeInfo(edgeId: string): { name: string; point: WorldPoint } | null {
+    const g = this.world.graph
+    const e = g.edge(edgeId); const ep = e && g.endpoints(e)
+    if (!e || !ep) return null
+    const name = String((this.world.entities.get(e.roadId)?.entity.properties as { name?: unknown } | undefined)?.name ?? '')
+    return { name, point: { x: (ep.a.x + ep.b.x) / 2, y: (ep.a.y + ep.b.y) / 2 } }
+  }
+  private computeInsights(state: IntelligenceState, time: number): Insight[] {
+    const w = this.world
+    const flow: Array<{ edgeId: string; level: number; name: string; point: WorldPoint }> = []
+    for (const [edgeId, f] of w.observedFlow) { const i = this.edgeInfo(edgeId); if (i && i.name && this.inViewPoint(i.point)) flow.push({ edgeId, level: f.level, name: i.name, point: i.point }) }
+    const usual: Array<{ edgeId: string; now: number; usual: number | null; delta: number | null; samples: number; name: string; point: WorldPoint }> = []
+    for (const [edgeId, u] of w.observedUsual) { const i = this.edgeInfo(edgeId); if (i && i.name) usual.push({ edgeId, now: u.now, usual: u.usual, delta: u.delta, samples: u.samples, name: i.name, point: i.point }) }
+    const incidents = w.activeIncidents(time).map((i) => ({ id: i.entity.id, kind: i.props.kind, severity: i.props.severity, description: i.props.description, startTime: i.props.startTime, point: i.point, classification: i.entity.evidence.classification, source: i.entity.evidence.source ?? 'feed' }))
+    const camPoint = this.vision.position ? lngLatToLocal(this.frame, this.vision.position) : null
+    const camera = this.vision.status === 'running' ? { people: this.vision.stats.people, vehicles: this.vision.stats.vehicles, point: camPoint } : null
+    const zoneEvents = this.zoneEvents.slice(-6).map((e) => { const z = this.zones.zones.get(e.zoneId); return { id: e.id, zone: z?.name ?? '', type: e.type as string, description: e.description, point: z?.ring[0] ?? null, timestamp: e.timestamp } })
+    return deriveInsights({ time, flow, usual, incidents, hotspots: state.risk?.hotspots ?? [], anomalies: state.anomalies, weather: w.weather, camera, zoneEvents, unitPerMetre: w.unitPerMetre, congestion: state.flow && state.flow.observedEdges > 0 ? state.flow.congestedShare : null })
+  }
+  private inViewPoint(p: WorldPoint): boolean { const b = this.camera.viewBounds(); const pad = (b.maxX - b.minX) * 0.5; return p.x >= b.minX - pad && p.x <= b.maxX + pad && p.y >= b.minY - pad && p.y <= b.maxY + pad }
 
   // ---------- theme ----------
   /** Day (white paper and ink) is the default; night is the City Atlas deep-night look. Remembered per browser. */

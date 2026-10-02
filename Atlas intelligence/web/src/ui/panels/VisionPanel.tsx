@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CityAtlas } from '../../app/CityAtlas'
-import { CocoSsdDetector, ScriptedDetector } from '../../cv/detectors'
-import { loadCocoSsdFromCdn } from '../../cv/detectors/cocoSsdCdn'
-import type { Detection } from '../../cv/types'
+import { BestDetector } from '../../cv/detectors/mediapipe'
 import { PRIVACY_GUARD } from '../../cv/vision/VisionSession'
 import { PALETTE } from '../../rendering/palette'
 import { makeT } from '../i18n'
@@ -10,73 +8,101 @@ import { makeT } from '../i18n'
 const W = 480, H = 270
 
 /**
- * Camera counts: people and vehicles as moving dots, from a phone or
- * laptop camera. The panel drives one VisionSession; what it shows is the
- * Atlas Vision drawing (the city from the camera's eye, as ink lines) with
- * the tracked dots on top. The live video appears only while matching
- * points and is never stored or sent.
+ * Atlas Vision: people and vehicles counted as moving dots from a phone or
+ * laptop camera. Open the camera, place it on the map (quick: where it
+ * stands and where it looks; exact: four matched points), count. The live
+ * picture with its boxes is shown on this device only; nothing is stored or
+ * sent, and no face model exists in the app.
  */
 export function VisionPanel({ app }: { app: CityAtlas }) {
   const v = app.vision
   const T = makeT(app.language)
-  const STEP_NAMES = [T('cam.s1'), T('cam.s2'), T('cam.s3'), T('cam.s4')]
+  const STEP_NAMES = [T('cam.s1'), T('cam.s3'), T('cam.s4')]
   const videoRef = useRef<HTMLVideoElement>(null)
+  const overlayRef = useRef<HTMLCanvasElement>(null)
   const [, force] = useState(0)
   const [pendingPx, setPendingPx] = useState<[number, number] | null>(null)
-  const [demo, setDemo] = useState(false)
+  const [exact, setExact] = useState(false)
   useEffect(() => v.subscribe(() => force((n) => n + 1)), [v])
-  useEffect(() => () => { if (v.status === 'running') v.stop() }, [v])
+  // Closing the panel releases the camera: the light goes off.
+  useEffect(() => () => { v.close(); app.onVisionObservations([]) }, [v]) // eslint-disable-line react-hooks/exhaustive-deps
+  // The video element must keep the stream when React re-renders.
+  useEffect(() => { if (videoRef.current && v.cameraOpen && !videoRef.current.srcObject) void v.attach(videoRef.current) })
 
   const running = v.status === 'running' || v.status === 'loading'
-  const step = running ? 3 : v.calibration && v.position ? 3 : v.calibration ? 2 : v.status === 'camera' || v.pairs.length > 0 || demo ? 1 : 0
+  const placed = !!v.calibration
+  const step = running ? 2 : placed ? 2 : v.cameraOpen ? 1 : 0
 
   const openCamera = async () => { if (videoRef.current) await v.openCamera(videoRef.current) }
-
   const onVideoClick = (e: React.MouseEvent<HTMLVideoElement>) => {
-    if (v.pairs.length >= 4 || running) return
+    if (!exact || v.pairs.length >= 4 || running) return
     const r = e.currentTarget.getBoundingClientRect()
     const px: [number, number] = [((e.clientX - r.left) / r.width) * v.frameSize.width, ((e.clientY - r.top) / r.height) * v.frameSize.height]
     setPendingPx(px)
     app.pickMapPoint(T('cam.match.map', { n: v.pairs.length + 1 }), (_p, ll) => { v.addPair(px, ll); setPendingPx(null) })
   }
-  const placeCamera = () => app.pickMapPoint(T('cam.place.hint'), (_p, ll) => v.setPosition(ll))
-
+  const pickStand = () => app.pickMapPoint(T('cam.stand.hint'), (_p, ll) => { if (v.lookAt) v.quickPlace(ll, v.lookAt); else v.setPosition(ll) })
+  const pickLook = () => app.pickMapPoint(T('cam.look.hint'), (_p, ll) => { if (v.position) v.quickPlace(v.position, ll); else { v.lookAt = ll; force((n) => n + 1) } })
   const startCounting = async () => {
     const video = videoRef.current
-    const detector = demo ? new ScriptedDetector(demoFrames()) : new CocoSsdDetector(() => loadCocoSsdFromCdn())
-    const frames = demo ? () => DEMO_FRAME : () => (video && video.readyState >= 2 ? video : null)
-    await v.run(detector, frames, (obs) => app.onVisionObservations(obs), demo ? 200 : 150)
+    await v.run(new BestDetector(), () => (video && video.readyState >= 2 ? video : null), (obs) => app.onVisionObservations(obs), 120)
   }
   const stop = () => { v.stop(); app.onVisionObservations([]) }
+  const off = () => { v.close(); app.onVisionObservations([]) }
 
-  /** Demo without a camera: a 40 × 25 m patch in front of the current map centre, a walker and a car crossing it. */
-  const startDemo = () => {
-    const c = app.camera.centre, upm = app.world.unitPerMetre
-    const corners = [{ x: c.x - 20 * upm, y: c.y - 40 * upm }, { x: c.x + 20 * upm, y: c.y - 40 * upm }, { x: c.x + 20 * upm, y: c.y - 15 * upm }, { x: c.x - 20 * upm, y: c.y - 15 * upm }]
-    v.resetPairs()
-    const px: Array<[number, number]> = [[0, 0], [v.frameSize.width, 0], [v.frameSize.width, v.frameSize.height], [0, v.frameSize.height]]
-    corners.forEach((p, i) => v.addPair(px[i], app.lngLatOf(p)))
-    v.setPosition(app.lngLatOf({ x: c.x, y: c.y + 10 * upm }))
-    setDemo(true)
-  }
+  // Boxes over the live picture, drawn on this device only.
+  useEffect(() => {
+    const c = overlayRef.current, video = videoRef.current
+    if (!c || !video || !running) return
+    const w = v.frameSize.width, h = v.frameSize.height
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h }
+    const ctx = c.getContext('2d'); if (!ctx) return
+    ctx.clearRect(0, 0, w, h)
+    for (const d of v.lastDetections) {
+      const car = d.label !== 'person'
+      ctx.strokeStyle = car ? '#0F6FFF' : '#7ED957'; ctx.lineWidth = 3
+      ctx.strokeRect(d.bbox.x, d.bbox.y, d.bbox.w, d.bbox.h)
+      ctx.fillStyle = car ? '#0F6FFF' : '#7ED957'
+      ctx.beginPath(); ctx.arc(d.bbox.x + d.bbox.w / 2, d.bbox.y + d.bbox.h, 6, 0, Math.PI * 2); ctx.fill()
+      ctx.font = '600 16px DM Sans, Arial, sans-serif'; ctx.fillText(`${d.label} ${Math.round(d.score * 100)}%`, d.bbox.x + 4, Math.max(16, d.bbox.y - 6))
+    }
+  })
 
   const frame = v.calibration && v.position ? app.visionFrame(W, H) : null
   const dots = frame ? app.visionDots(frame) : []
+  const showVideo = v.cameraOpen && (v.status === 'camera' || v.status === 'calibrating' || running)
+  const errorText = v.error ? (/NotAllowed|Permission|denied/i.test(v.error) ? T('cam.err.denied') : /NotFound|no camera|Requested device/i.test(v.error) ? T('cam.err.none') : v.error) : null
 
   return (
     <div className="ca-panel ca-side ca-vision">
-      <h3>{T('cam.title')}</h3>
+      <h3>{T('cam.title')} {v.cameraOpen && <button className="small" onClick={off}>{T('cam.off')}</button>}</h3>
       <p className="note">{T('cam.help')}</p>
       <ol className="ca-steps">{STEP_NAMES.map((n, i) => <li key={n} className={i === step ? 'now' : i < step ? 'done' : ''}>{n}</li>)}</ol>
 
-      {step === 0 && <div className="ca-row"><button onClick={openCamera}>{T('cam.s1')}</button><button className="ghost" onClick={startDemo}>{T('cam.demo')}</button></div>}
-      <video ref={videoRef} playsInline muted onClick={onVideoClick} style={{ display: v.status === 'camera' || v.status === 'calibrating' ? 'block' : 'none', width: '100%', cursor: v.pairs.length < 4 ? 'crosshair' : 'default', border: `1px solid ${PALETTE.inkHair}` }} />
-      {step === 1 && !demo && <p className="note">{pendingPx ? T('cam.match.now') : T('cam.match', { n: v.pairs.length })} {v.pairs.length > 0 && <button className="small" onClick={() => v.resetPairs()}>{T('cam.startover')}</button>}</p>}
-      {step === 2 && <div className="ca-row"><button onClick={placeCamera}>{T('cam.place')}</button><label className="ca-inline">{T('cam.height')} <input type="number" min={1} max={30} value={v.heightM} onChange={(e) => { v.heightM = Number(e.target.value) || 4; force((n) => n + 1) }} /> m</label></div>}
-      {step === 3 && !running && <div className="ca-row"><button onClick={startCounting}>{demo ? T('cam.startdemo') : T('cam.start')}</button><button className="ghost" onClick={() => { v.resetPairs(); setDemo(false) }}>{T('cam.reset')}</button></div>}
+      {step === 0 && <div className="ca-row"><button onClick={openCamera}>{T('cam.s1')}</button></div>}
+      <div className="ca-videowrap" style={{ display: showVideo ? 'block' : 'none' }}>
+        <video ref={videoRef} playsInline muted onClick={onVideoClick} style={{ width: '100%', display: 'block', cursor: exact && v.pairs.length < 4 ? 'crosshair' : 'default', borderRadius: 9 }} />
+        <canvas ref={overlayRef} className="ca-videoboxes" style={{ display: running ? 'block' : 'none' }} />
+      </div>
+      {running && <p className="note">{T('cam.live')}</p>}
+
+      {v.cameraOpen && !running && !exact && <>
+        <p className="note"><b>{T('cam.quick')}</b> · {T('cam.quick.help')}</p>
+        <div className="ca-row">
+          <button className={v.position ? 'ghost' : ''} onClick={pickStand}>{v.position ? '✓ ' : ''}{T('cam.stand')}</button>
+          <button className={v.lookAt ? 'ghost' : ''} onClick={pickLook}>{v.lookAt ? '✓ ' : ''}{T('cam.look')}</button>
+          <label className="ca-inline">{T('cam.height')} <input type="number" min={1} max={40} value={v.heightM} onChange={(e) => v.setHeight(Number(e.target.value) || 4)} /> m</label>
+        </div>
+        <button className="small" onClick={() => { setExact(true); v.resetPairs() }}>{T('cam.points')}</button>
+      </>}
+      {v.cameraOpen && !running && exact && <>
+        <p className="note">{pendingPx ? T('cam.match.now') : T('cam.match', { n: v.pairs.length })} {v.pairs.length > 0 && <button className="small" onClick={() => v.resetPairs()}>{T('cam.startover')}</button>} <button className="small" onClick={() => { setExact(false); v.resetPairs() }}>{T('cam.quick')}</button></p>
+        {v.pairs.length >= 4 && <div className="ca-row"><button onClick={() => app.pickMapPoint(T('cam.place.hint'), (_p, ll) => v.setPosition(ll))}>{T('cam.place')}</button><label className="ca-inline">{T('cam.height')} <input type="number" min={1} max={40} value={v.heightM} onChange={(e) => v.setHeight(Number(e.target.value) || 4)} /> m</label></div>}
+      </>}
+      {placed && !running && <div className="ca-row"><button onClick={startCounting}>{T('cam.start')}</button><span className="note">{v.calibrationMode === 'quick' ? T('cam.quickmode') : T('cam.pointsmode')}</span></div>}
       {v.status === 'loading' && <p className="note">{T('cam.loading')}</p>}
-      {running && <div className="ca-row"><span className="ca-badge observed">{T('cam.counting', { n: v.stats.fps })}</span><button className="ghost" onClick={stop}>{T('cam.stop')}</button></div>}
-      {v.error && <p className="note" style={{ color: PALETTE.risk }}>{v.error}</p>}
+      {running && <div className="ca-row"><span className="ca-badge observed">{T('cam.counting', { n: v.stats.fps })}</span>{v.detectorId && <span className="note">{T('cam.detector')}: {v.detectorId}</span>}<button className="ghost" onClick={stop}>{T('cam.stop')}</button></div>}
+      {errorText && <p className="note" style={{ color: 'var(--risk)' }}>{errorText}</p>}
 
       {(running || v.status === 'stopped') && (
         <table><tbody>
@@ -99,22 +125,4 @@ export function VisionPanel({ app }: { app: CityAtlas }) {
       <p className="note">{T('cam.labels', { l: PRIVACY_GUARD.labels.join(', ') })}</p>
     </div>
   )
-}
-
-const DEMO_FRAME = { data: new Uint8ClampedArray(4), width: 1, height: 1, colorSpace: 'srgb' } as ImageData
-
-/** A walker crossing left to right and a car driving top to bottom, 120 frames. */
-function demoFrames(): Detection[][] {
-  const frames: Detection[][] = []
-  for (let i = 0; i < 400; i++) {
-    const t = i / 60
-    const walkerX = (t * 90) % 520 - 40
-    const carY = (t * 60) % 300 - 30
-    const f: Detection[] = []
-    if (walkerX > -40) f.push({ bbox: { x: walkerX, y: 150, w: 28, h: 70 }, label: 'person', score: 0.9 })
-    f.push({ bbox: { x: 300 + Math.sin(t) * 20, y: carY, w: 70, h: 40 }, label: 'car', score: 0.85 })
-    if (i % 90 > 45) f.push({ bbox: { x: 420 - ((i % 90) - 45) * 4, y: 190, w: 26, h: 64 }, label: 'person', score: 0.8 })
-    frames.push(f)
-  }
-  return frames
 }

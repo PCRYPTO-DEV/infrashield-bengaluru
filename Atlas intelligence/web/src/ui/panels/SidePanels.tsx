@@ -71,6 +71,7 @@ export function ZonesPanel({ app }: { app: CityAtlas }) {
 }
 
 function PlaceInput({ app, value, onPick, placeholder, label }: { app: CityAtlas; value: PlacePick | null; onPick: (p: PlacePick | null) => void; placeholder: string; label: string }) {
+  const T = makeT(app.language)
   const [q, setQ] = useState(value?.label ?? '')
   const [open, setOpen] = useState(false)
   const results = open && q && q !== value?.label ? search(app.world, q, 8) : []
@@ -80,6 +81,7 @@ function PlaceInput({ app, value, onPick, placeholder, label }: { app: CityAtlas
       <span className="ca-search">
         <input value={q} placeholder={placeholder} onChange={(e) => { setQ(e.target.value); setOpen(true); if (value) onPick(null) }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} />
         {results.length > 0 && <ul>{results.map((r, i) => <li key={i} onMouseDown={() => { setQ(r.label); setOpen(false); onPick({ label: r.label, point: r.point }) }}>{r.label}<small>{r.sub}</small></li>)}</ul>}
+        {open && q.length >= 2 && results.length === 0 && q !== value?.label && <ul><li className="ca-nomatch">{T('route.nomatch')}</li></ul>}
       </span>
     </label>
   )

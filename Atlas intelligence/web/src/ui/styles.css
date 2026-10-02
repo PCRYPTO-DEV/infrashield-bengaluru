@@ -284,3 +284,37 @@ button { cursor: pointer; }
   * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
 }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--brand-teal); outline-offset: 2px; }
+
+/* ---------- state picker ---------- */
+.ca-place-select { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 11px; font-weight: 500; max-width: 230px; cursor: pointer; backdrop-filter: blur(10px); }
+.ca-place-select:focus { border-color: var(--brand-blue); outline: none; }
+
+/* ---------- insight bubbles: comic callouts on the map ---------- */
+.ca-bubbles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 1; }
+/* chrome always above the map callouts */
+.ca-top, .ca-modes, .ca-inkbar, .ca-tools, .ca-panel, .ca-timeline, .ca-legend-pill, .ca-hint, .ca-toast { z-index: 4; }
+.ca-welcome { z-index: 20; }
+.ca-bubble { position: absolute; transform: translate(14px, calc(-100% - 14px)); max-width: 280px; background: var(--panel-strong); color: var(--fg); border: 2px solid var(--brand-blue); border-radius: 16px 16px 16px 4px; padding: 8px 28px 8px 12px; font-size: 12.5px; font-weight: 500; line-height: 1.35; box-shadow: var(--shadow); pointer-events: auto; cursor: pointer; transform-origin: 0 100%; }
+.ca-bubble::after { content: ''; position: absolute; left: -2px; bottom: -14px; width: 0; height: 0; border-left: 2px solid transparent; border-right: 12px solid transparent; border-top: 14px solid var(--brand-blue); }
+.ca-bubble.sev-mid { border-color: var(--traffic-slow); } .ca-bubble.sev-mid::after { border-top-color: var(--traffic-slow); }
+.ca-bubble.sev-high { border-color: var(--risk); } .ca-bubble.sev-high::after { border-top-color: var(--risk); }
+.ca-bubble.pop { animation: ca-pop 0.55s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes ca-pop { 0% { transform: translate(14px, calc(-100% - 14px)) scale(0.2); opacity: 0 } 60% { transform: translate(14px, calc(-100% - 14px)) scale(1.12); opacity: 1 } 100% { transform: translate(14px, calc(-100% - 14px)) scale(1) } }
+.ca-bubble-txt { display: block; }
+.ca-bubble-meta { display: block; font-size: 10px; font-weight: 400; color: var(--fg-faint); margin-top: 3px; letter-spacing: 0.04em; text-transform: uppercase; }
+.ca-bubble-x { position: absolute; top: 4px; right: 6px; background: none; border: none; color: var(--fg-faint); font-size: 14px; cursor: pointer; padding: 0 4px; }
+.ca-bubble-x:hover { color: var(--fg); }
+
+/* ---------- insights panel ---------- */
+.ca-inslist { list-style: none; margin: 6px 0 0; padding: 0; }
+.ca-inslist li { border-top: 1px solid var(--line); padding: 8px 0; }
+.ca-ins-head { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; font-weight: 500; line-height: 1.35; }
+.ca-ins-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--brand-blue); flex: 0 0 auto; margin-top: 4px; }
+.sev-mid .ca-ins-dot { background: var(--traffic-slow); } .sev-high .ca-ins-dot { background: var(--risk); }
+.ca-ins-meta { margin: 4px 0 0 17px; font-size: 11px; color: var(--fg-soft); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+/* ---------- camera: live picture with boxes ---------- */
+.ca-videowrap { position: relative; margin: 6px 0; }
+.ca-videoboxes { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.ca-nomatch { color: var(--fg-soft); font-style: italic; cursor: default; }
+.ca-tool:first-child.active { background: var(--brand-blue); color: #fff; }

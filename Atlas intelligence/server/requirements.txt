@@ -4,3 +4,4 @@ httpx>=0.27
 mapbox-vector-tile>=2.1
 anthropic>=0.40
 python-dotenv>=1.0
+h3>=4.0

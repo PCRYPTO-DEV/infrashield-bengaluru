@@ -1,6 +1,6 @@
 import type { Detection, ObjectDetector, CameraCalibration } from '../types'
 import { CameraPipeline, type TrackObservation } from '../pipeline'
-import { calibration as makeCalibration } from '../calibration'
+import { calibration as makeCalibration, poseCalibration } from '../calibration'
 import type { LngLat } from '../../geo/coordinates/lngLat'
 import type { UrbanEntity } from '../../entities/types'
 
@@ -39,6 +39,14 @@ export class VisionSession {
   position: LngLat | null = null
   heightM = 4
   observations: TrackObservation[] = []
+  /** the boxes from the latest frame, for the on-device overlay only */
+  lastDetections: Detection[] = []
+  /** which detector is running once loaded */
+  detectorId: string | null = null
+  /** how the calibration was made: four matched points, or a quick placement (less exact) */
+  calibrationMode: 'points' | 'quick' | null = null
+  /** where the camera looks, for quick placement */
+  lookAt: LngLat | null = null
   private pipeline: CameraPipeline | null = null
   private stream: MediaStream | null = null
   private stopFlag = false
@@ -64,18 +72,41 @@ export class VisionSession {
     } catch (e) { this.fail((e as Error).message) }
   }
 
+  /** Re-attach the open stream to a (re)mounted video element. */
+  async attach(video: HTMLVideoElement): Promise<void> { if (!this.stream) return; video.srcObject = this.stream; try { await video.play() } catch { /* autoplay rules */ } }
+
   /** Calibration: the same real-world spot clicked in the image and on the map. */
   addPair(px: [number, number], ground: LngLat): void {
     this.pairs.push({ px, ground })
     if (this.pairs.length >= 4) {
-      try { this.calibration = makeCalibration(this.cameraId, this.pairs, this.position ?? undefined); this.error = null }
+      try { this.calibration = makeCalibration(this.cameraId, this.pairs, this.position ?? undefined); this.calibrationMode = 'points'; this.error = null }
       catch (e) { this.calibration = null; this.error = (e as Error).message }
     }
     if (this.status === 'camera' || this.status === 'idle') this.status = 'calibrating'
     this.changed()
   }
-  resetPairs(): void { this.pairs = []; this.calibration = null; this.changed() }
-  setPosition(p: LngLat): void { this.position = p; if (this.calibration) this.calibration = { ...this.calibration, position: p }; this.changed() }
+  resetPairs(): void { this.pairs = []; this.calibration = null; this.calibrationMode = null; this.lookAt = null; this.changed() }
+  setPosition(p: LngLat): void { this.position = p; if (this.calibration) this.calibration = { ...this.calibration, position: p }; if (this.calibrationMode === 'quick' && this.lookAt) this.quickPlace(p, this.lookAt); this.changed() }
+
+  /** Quick placement: where it stands, where it looks, its height. */
+  quickPlace(position: LngLat, lookAt: LngLat): void {
+    this.position = position; this.lookAt = lookAt
+    try { this.calibration = poseCalibration(this.cameraId, position, lookAt, this.heightM, this.frameSize); this.calibrationMode = 'quick'; this.error = null; if (this.status === 'camera' || this.status === 'idle') this.status = 'calibrating' }
+    catch (e) { this.calibration = null; this.error = (e as Error).message }
+    this.changed()
+  }
+  setHeight(h: number): void { this.heightM = h; if (this.calibrationMode === 'quick' && this.position && this.lookAt) this.quickPlace(this.position, this.lookAt); else this.changed() }
+
+  /** Release the camera entirely: tracks stopped, picture gone, counting stopped. The light goes off. */
+  close(): void {
+    this.stopFlag = true
+    for (const t of this.stream?.getTracks() ?? []) t.stop()
+    this.stream = null
+    this.observations = []; this.lastDetections = []
+    if (this.status !== 'error') this.status = 'idle'
+    this.changed()
+  }
+  get cameraOpen(): boolean { return !!this.stream }
 
   /** A ready-made calibration (demo mode, or one saved earlier). */
   useCalibration(c: CameraCalibration, pairs: CalibrationPair[] = []): void { this.calibration = c; this.pairs = pairs; this.position = c.position ?? this.position; this.changed() }
@@ -85,11 +116,12 @@ export class VisionSession {
    * drawable (the video element) or null; nothing about it is retained.
    */
   async run(detector: ObjectDetector, frames: () => CanvasImageSource | ImageData | null, onObservations: (obs: TrackObservation[], entities: UrbanEntity[]) => void, intervalMs = 150): Promise<void> {
-    if (!this.calibration) { this.fail('calibrate first: four matching points'); return }
+    if (!this.calibration) { this.fail('place the camera first'); return }
     this.pipeline = new CameraPipeline(this.calibration, { minHits: 2, maxMissed: 8 })
     this.stopFlag = false
     this.status = 'loading'; this.changed()
     try { await detector.load() } catch (e) { this.fail(`detector: ${(e as Error).message}`); return }
+    this.detectorId = detector.id
     this.status = 'running'; this.changed()
     let lastTick = performance.now(), fpsAcc = 0, fpsN = 0
     while (!this.stopFlag) {
@@ -99,6 +131,7 @@ export class VisionSession {
         let dets: Detection[] = []
         try { dets = await detector.detect(frame, this.frameSize.width, this.frameSize.height) } catch (e) { this.fail(`detect: ${(e as Error).message}`); return }
         dets = dets.filter((d) => PRIVACY_GUARD.labels.includes(d.label))
+        this.lastDetections = dets
         const now = Date.now()
         const obs = this.pipeline.ingest(dets, now)
         this.observations = obs

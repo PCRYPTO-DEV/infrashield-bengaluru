@@ -8,7 +8,7 @@ import { REGIONS, regionFromSearch } from '../app/regions'
 import { RoadGraph } from '../engine/simulation/roadGraph'
 import type { UrbanEntity } from '../entities/types'
 
-const ORIGIN = REGIONS.ncr.origin
+const ORIGIN = REGIONS.india.origin
 const FRAME = createFrame(ORIGIN)
 
 /** A fixture: one east-west arterial crossing from tile A into its east neighbour B, plus a building in each. */
@@ -88,10 +88,10 @@ describe('OSM chunk builder', () => {
 
 describe('regions', () => {
   it('parses the region from the URL and defaults to NCR', () => {
-    expect(regionFromSearch('?region=bengaluru').id).toBe('ncr') // the made-up demo region is gone
-    expect(regionFromSearch('').id).toBe('ncr')
-    expect(regionFromSearch('?region=nowhere').id).toBe('ncr')
-    expect(REGIONS.ncr.source).toBe('osm')
+    expect(regionFromSearch('?region=bengaluru').id).toBe('india') // the made-up demo region is gone
+    expect(regionFromSearch('').id).toBe('india')
+    expect(regionFromSearch('?region=nowhere').id).toBe('india')
+    expect(REGIONS.india.source).toBe('osm'); expect(regionFromSearch('?region=ncr').id).toBe('india'); expect(regionFromSearch('?place=maharashtra').origin.lat).toBeCloseTo(19.076, 2); expect(regionFromSearch('?lng=80.27&lat=13.08').origin.lng).toBeCloseTo(80.27, 2)
     expect(Object.values(REGIONS).every((r) => r.source === 'osm' && !r.simulation)).toBe(true)
   })
 })

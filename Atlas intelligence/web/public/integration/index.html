@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>City Atlas · integration demo</title>
+<meta name="description" content="A stand-in for the City Atlas app page: Atlas Infinity embedded with embed.js, insights and camera events flowing back to the host.">
+<link rel="icon" href="../favicon.ico">
+<style>
+  :root { --night: #071924; --blue: #0F6FFF; --teal: #00C2A8; --green: #7ED957; }
+  * { box-sizing: border-box }
+  html, body { margin: 0; height: 100%; background: var(--night); color: #eef5f8; font-family: 'DM Sans', 'Helvetica Neue', Arial, sans-serif; }
+  header { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  header img { height: 36px } header h1 { font-size: 16px; letter-spacing: 0.26em; margin: 0; font-weight: 600 } header small { color: var(--teal); letter-spacing: 0.2em; font-size: 9px; text-transform: uppercase; display: block }
+  main { display: grid; grid-template-columns: 1fr 340px; gap: 16px; padding: 16px 20px; height: calc(100% - 61px); }
+  #atlas { border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); min-height: 420px }
+  aside { display: flex; flex-direction: column; gap: 12px; overflow: auto }
+  .card { background: rgba(9,30,45,0.85); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 14px }
+  .card h2 { margin: 0 0 8px; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(238,245,248,0.7) }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px }
+  button { background: var(--blue); color: #fff; border: 0; border-radius: 999px; padding: 7px 12px; font: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer }
+  button.ghost { background: rgba(255,255,255,0.08) }
+  input { flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: inherit; border-radius: 999px; padding: 7px 12px; font: inherit; min-width: 0 }
+  ul { list-style: none; margin: 0; padding: 0 } li { border-top: 1px solid rgba(255,255,255,0.08); padding: 7px 0; font-size: 12.5px; line-height: 1.35 } li small { display: block; color: rgba(238,245,248,0.45); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; margin-top: 2px }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--blue) } .mid .dot { background: #f5a623 } .high .dot { background: #ff5a5f }
+  #answer { font-size: 13px; line-height: 1.45; white-space: pre-wrap } #cam { font-size: 13px }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; height: auto } #atlas { height: 70vh } }
+</style>
+</head>
+<body>
+<header><img src="../brand/symbol-64.png" alt=""><div><h1>CITY ATLAS</h1><small>people · places · possibilities</small></div><span style="margin-left:auto;font-size:11px;color:rgba(238,245,248,0.5)">host page demo · Atlas Infinity inside</span></header>
+<main>
+  <div id="atlas"></div>
+  <aside>
+    <div class="card"><h2>Ask the city</h2><div class="row"><input id="q" placeholder="Why is traffic slow?"><button id="ask">Ask</button></div><div id="answer">—</div></div>
+    <div class="card"><h2>Controls</h2><div class="row"><button class="ghost" data-mode="reality">Map</button><button class="ghost" data-mode="mobility">Traffic</button><button class="ghost" data-mode="risk">Risk</button><button class="ghost" data-mode="ink3d">Ink 3D</button></div><div class="row"><button class="ghost" data-lang="en">English</button><button class="ghost" data-lang="hi">हिंदी</button><button class="ghost" data-theme="day">Day</button><button class="ghost" data-theme="night">Night</button></div><div class="row"><button id="camera">Atlas Vision · camera</button><button class="ghost" id="insights">Insights panel</button></div></div>
+    <div class="card"><h2>Insights received</h2><ul id="list"><li>waiting for readings…</li></ul></div>
+    <div class="card"><h2>Camera</h2><div id="cam">not running</div></div>
+  </aside>
+</main>
+<script src="../embed.js"></script>
+<script>
+  const atlas = AtlasInfinity.mount('#atlas', { lng: 77.2167, lat: 28.6315, zoom: 16.5, mode: 'mobility', lang: 'en', theme: 'day', radius: '16px' })
+  atlas.on('answer', (a) => { document.getElementById('answer').textContent = a.text + '\n\n' + a.facts.map((f) => '· ' + f.statement).join('\n') })
+  atlas.on('insights', (m) => { const ul = document.getElementById('list'); ul.innerHTML = m.items.length ? m.items.map((i) => `<li class="${i.severity >= 0.75 ? 'high' : i.severity >= 0.5 ? 'mid' : ''}"><span class="dot"></span>${i.text}<small>${i.classification} · ${i.source}</small></li>`).join('') : '<li>nothing stands out right now</li>' })
+  atlas.on('camera', (c) => { document.getElementById('cam').textContent = `${c.status} · ${c.people} people · ${c.vehicles} vehicles${c.detector ? ' · ' + c.detector : ''}` })
+  document.getElementById('ask').onclick = () => atlas.ask(document.getElementById('q').value || 'Why is traffic slow?')
+  document.getElementById('q').onkeydown = (e) => { if (e.key === 'Enter') document.getElementById('ask').click() }
+  document.querySelectorAll('[data-mode]').forEach((b) => b.onclick = () => atlas.setMode(b.dataset.mode))
+  document.querySelectorAll('[data-lang]').forEach((b) => b.onclick = () => atlas.setLanguage(b.dataset.lang))
+  document.querySelectorAll('[data-theme]').forEach((b) => b.onclick = () => atlas.setTheme(b.dataset.theme))
+  document.getElementById('camera').onclick = () => atlas.openCamera()
+  document.getElementById('insights').onclick = () => atlas.openTool('insights')
+  window.__host = { atlas }
+</script>
+</body>
+</html>

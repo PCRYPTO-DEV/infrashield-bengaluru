@@ -5,6 +5,9 @@
  *   <script>
  *     const atlas = AtlasInfinity.mount('#atlas', { lng: 77.2167, lat: 28.6315, zoom: 16.5, mode: 'mobility', lang: 'hi', theme: 'day' })
  *     atlas.on('answer', a => console.log(a.text, a.facts))
+ *     atlas.on('insights', m => render(m.items))      // ranked findings for authorities
+ *     atlas.on('camera', m => console.log(m.people, m.vehicles))
+ *     atlas.openCamera()                             // Atlas Vision
  *     atlas.ask('Why is traffic slow?')
  *     atlas.setView(77.2295, 28.6129, 17)
  *   </script>
@@ -32,6 +35,8 @@
     if (opts.mode) q.set('mode', opts.mode)
     if (opts.lang) q.set('lang', opts.lang)
     if (opts.theme) q.set('theme', opts.theme)
+    if (opts.tool) q.set('tool', opts.tool)
+    if (opts.place) q.set('place', opts.place)
     var iframe = document.createElement('iframe')
     iframe.src = base + '/?' + q.toString()
     iframe.allow = 'camera; microphone; geolocation'
@@ -62,6 +67,8 @@
       setMode: function (mode) { send({ type: 'atlas:setMode', mode: mode }); return this },
       setLanguage: function (lang) { send({ type: 'atlas:setLanguage', lang: lang }); return this },
       setTheme: function (theme) { send({ type: 'atlas:setTheme', theme: theme }); return this },
+      openTool: function (tool) { send({ type: 'atlas:openTool', tool: tool }); return this },
+      openCamera: function () { send({ type: 'atlas:openTool', tool: 'camera' }); return this },
       ask: function (question) { send({ type: 'atlas:ask', question: question }); return this },
       zone: function (name, ring) { send({ type: 'atlas:zone', name: name, ring: ring }); return this },
       snapshot: function () { send({ type: 'atlas:snapshot' }); return this },
@@ -69,5 +76,5 @@
     }
   }
 
-  global.AtlasInfinity = { mount: mount, version: '1.0.0' }
+  global.AtlasInfinity = { mount: mount, version: '1.1.0' }
 })(window)

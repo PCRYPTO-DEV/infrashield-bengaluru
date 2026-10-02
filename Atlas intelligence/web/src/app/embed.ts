@@ -1,14 +1,16 @@
-import type { CityAtlas, Theme } from './CityAtlas'
+import type { CityAtlas, Theme, ToolName } from './CityAtlas'
 import type { ViewMode } from '../rendering/layers/modes'
 import type { Language } from '../intelligence/reasoning/claudeExplainer'
 import { lngLatToLocal, localToLngLat } from '../geo/projection/frame'
+import { tr, type StringKey } from '../ui/i18n'
 
 /**
  * The embed interface: how another app (the CityAtlas / Atlas Vision app,
  * or any page) drives Atlas Infinity inside an iframe.
  *
  * URL parameters set the first view:
- *   ?region=ncr&lng=77.2167&lat=28.6315&zoom=16.5&mode=mobility&lang=hi&theme=night&embed=1
+ *   ?lng=77.2167&lat=28.6315&zoom=16.5&mode=mobility&lang=hi&theme=day&tool=camera&embed=1
+ * `tool=camera` opens Atlas Vision (the camera panel) straight away; `place=<state id>` starts in that state.
  * `embed=1` hides the wordmark and region switcher so the host owns the chrome.
  *
  * Messages from the parent (window.postMessage, any origin the host allows):
@@ -16,6 +18,7 @@ import { lngLatToLocal, localToLngLat } from '../geo/projection/frame'
  *   { type: 'atlas:setMode', mode }               reality | mobility | activity | risk | forecast | ink3d
  *   { type: 'atlas:setLanguage', lang }           en | hi
  *   { type: 'atlas:setTheme', theme }             night | day
+ *   { type: 'atlas:openTool', tool }              layers | zones | route | upload | pulse | camera | alerts | insights | null
  *   { type: 'atlas:ask', question }               answered by Ask the City; reply below
  *   { type: 'atlas:zone', name, ring: [{lng,lat}] } draws a watch zone
  *   { type: 'atlas:snapshot' }                    replies with the fact snapshot
@@ -26,17 +29,21 @@ import { lngLatToLocal, localToLngLat } from '../geo/projection/frame'
  *   { type: 'atlas:selection', kind, id, lng, lat }
  *   { type: 'atlas:zoneEvent', zone, kind, description, time }
  *   { type: 'atlas:snapshot', facts }
+ *   { type: 'atlas:camera', status, people, vehicles, detector }   while Atlas Vision counts (never a frame, never a face)
+ *   { type: 'atlas:insights', items: [{ id, kind, severity, text, classification, source, lng, lat }] }  when the ranked findings change
  *   { type: 'atlas:view', lng, lat, zoom }        on every camera change (throttled)
  */
 export interface EmbedOptions { allowedOrigins?: string[] }
 
-export function readEmbedParams(search: string): { lng?: number; lat?: number; zoom?: number; mode?: ViewMode; lang?: Language; theme?: Theme; embed: boolean } {
+const TOOLS: ToolName[] = ['layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'insights']
+export function readEmbedParams(search: string): { lng?: number; lat?: number; zoom?: number; mode?: ViewMode; lang?: Language; theme?: Theme; tool?: ToolName; embed: boolean } {
   const q = new URLSearchParams(search)
   const num = (k: string) => (q.has(k) && Number.isFinite(Number(q.get(k))) ? Number(q.get(k)) : undefined)
   const mode = q.get('mode') as ViewMode | null
   const lang = q.get('lang') as Language | null
   const theme = q.get('theme')
-  return { theme: theme === 'day' || theme === 'night' ? theme : undefined, lng: num('lng'), lat: num('lat'), zoom: num('zoom'), mode: mode && ['reality', 'mobility', 'activity', 'risk', 'forecast', 'ink3d'].includes(mode) ? mode : undefined, lang: lang === 'hi' || lang === 'en' ? lang : undefined, embed: q.get('embed') === '1' }
+  const tool = q.get('tool') as ToolName | null
+  return { tool: tool && TOOLS.includes(tool) ? tool : undefined, theme: theme === 'day' || theme === 'night' ? theme : undefined, lng: num('lng'), lat: num('lat'), zoom: num('zoom'), mode: mode && ['reality', 'mobility', 'activity', 'risk', 'forecast', 'ink3d'].includes(mode) ? mode : undefined, lang: lang === 'hi' || lang === 'en' ? lang : undefined, embed: q.get('embed') === '1' }
 }
 
 export function installEmbed(app: CityAtlas, opts: EmbedOptions = {}): () => void {
@@ -58,6 +65,7 @@ export function installEmbed(app: CityAtlas, opts: EmbedOptions = {}): () => voi
       case 'atlas:setMode': if (typeof m.mode === 'string') app.setMode(m.mode as ViewMode); break
       case 'atlas:setLanguage': if (m.lang === 'en' || m.lang === 'hi') app.setLanguage(m.lang); break
       case 'atlas:setTheme': if (m.theme === 'day' || m.theme === 'night') app.setTheme(m.theme); break
+      case 'atlas:openTool': app.requestTool(m.tool === null ? null : TOOLS.includes(m.tool as ToolName) ? (m.tool as ToolName) : null); break
       case 'atlas:ask': {
         if (typeof m.question !== 'string') break
         const a = await app.ask(m.question)
@@ -74,8 +82,13 @@ export function installEmbed(app: CityAtlas, opts: EmbedOptions = {}): () => voi
   }
   window.addEventListener('message', onMessage)
 
-  let lastView = 0, lastSel = '', lastEvent = ''
+  let lastView = 0, lastSel = '', lastEvent = '', lastCam = '', lastIns = ''
   const unsub = app.subscribe(() => {
+    const v = app.vision
+    const cam = `${v.status}:${v.stats.people}:${v.stats.vehicles}`
+    if (cam !== lastCam) { lastCam = cam; send({ type: 'atlas:camera', status: v.status, people: v.stats.people, vehicles: v.stats.vehicles, detector: v.detectorId }) }
+    const ins = app.insights.map((i) => i.id).join('|')
+    if (ins !== lastIns) { lastIns = ins; send({ type: 'atlas:insights', items: app.insights.map((i) => { const ll = i.point ? localToLngLat(app.frame, i.point) : null; return { id: i.id, kind: i.kind, severity: i.severity, text: tr(app.language, i.key as StringKey, i.vars), classification: i.classification, source: i.source, lng: ll?.lng, lat: ll?.lat } }) }) }
     const now = Date.now()
     if (now - lastView > 500) { lastView = now; const c = localToLngLat(app.frame, app.camera.centre); send({ type: 'atlas:view', lng: c.lng, lat: c.lat, zoom: app.camera.zoom }) }
     const sel = app.selection ? `${app.selection.kind}:${app.selection.id}` : ''

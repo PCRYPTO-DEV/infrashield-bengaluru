@@ -46,7 +46,7 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
         if fixtures is None and settings.warm_radius > 0:
             async def warm_up():
                 await asyncio.sleep(3)
-                o = REGIONS.get(settings.region, REGIONS["ncr"])["origin"]
+                o = REGIONS.get(settings.region, REGIONS["india"])["origin"]
                 await osm.warm(o["lng"], o["lat"], settings.warm_radius)
                 logging.getLogger("atlas.osm").info("warm-up done: %d tiles cached", osm.warmed)
             warm = asyncio.create_task(warm_up())
@@ -66,7 +66,7 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
         return {"ok": True, "region": settings.region, "fixtures": fixtures is not None,
                 "tomtom": bool(settings.tomtom_api_key), "writer": bool(settings.anthropic_api_key),
                 "memory": history.count("flow_readings"), "alerts": bool(alerts.twilio),
-                "osm": {"endpoint": osm.url, "calls": osm.live_calls, "tilesWarmed": osm.warmed, "lastError": osm.last_error}}
+                "osm": {"endpoint": osm.url, "source": "vector-tiles" if osm.vtiles else "overpass", "calls": osm.live_calls + (osm.vtiles.calls if osm.vtiles else 0), "tilesWarmed": osm.warmed, "lastError": osm.last_error or (osm.vtiles.last_error if osm.vtiles else None)}}
 
     @app.get("/api/regions")
     async def regions():
@@ -105,6 +105,9 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
             candidate = WEB_DIST / path
             if path and candidate.is_file():
                 return FileResponse(candidate)
+            # a folder with its own page (e.g. /integration/) is served as that page, not the app
+            if path and (candidate / "index.html").is_file():
+                return FileResponse(candidate / "index.html")
             return FileResponse(WEB_DIST / "index.html")
 
     return app

@@ -55,3 +55,41 @@ function gaussSolve(A: number[][], b: number[]): number[] {
   }
   return M.map((r) => r[n])
 }
+
+
+/**
+ * Quick placement: a calibration from where the camera stands, where it
+ * looks, and how high it is, assuming a level camera with a `hfovDeg` lens
+ * (65° is a typical phone or laptop camera). Four synthetic image points
+ * are projected onto the ground through that pinhole model and solved like
+ * matched points. Less exact than four real matches; the panel says so.
+ */
+export function poseCalibration(cameraId: string, position: LngLat, lookAt: LngLat, heightM: number, frame: { width: number; height: number }, hfovDeg = 65): CameraCalibration {
+  const mLat = 111320, mLng = 111320 * Math.cos((position.lat * Math.PI) / 180)
+  const lx = (lookAt.lng - position.lng) * mLng, ly = (lookAt.lat - position.lat) * mLat
+  const dist = Math.hypot(lx, ly) || 1
+  // camera at (0,0,h) looking at (lx,ly,0): forward f, right r, up u
+  const f = [lx / Math.hypot(dist, heightM), ly / Math.hypot(dist, heightM), -heightM / Math.hypot(dist, heightM)]
+  const r = [f[1] / dist * dist / Math.hypot(f[0], f[1]), -f[0] / dist * dist / Math.hypot(f[0], f[1]), 0]
+  const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]]
+  const fx = (frame.width / 2) / Math.tan((hfovDeg * Math.PI) / 360)
+  const ground = (px: number, py: number): LngLat | null => {
+    const a = (px - frame.width / 2) / fx, b = -(py - frame.height / 2) / fx
+    const d = [f[0] + a * r[0] + b * u[0], f[1] + a * r[1] + b * u[1], f[2] + a * r[2] + b * u[2]]
+    if (d[2] >= -1e-6) return null
+    const t = -heightM / d[2]
+    return { lng: position.lng + (t * d[0]) / mLng, lat: position.lat + (t * d[1]) / mLat }
+  }
+  // rows from the bottom of the image upward until four points hit the ground
+  const pairs: Array<{ px: [number, number]; ground: LngLat }> = []
+  for (const fy of [0.95, 0.8, 0.65, 0.55, 0.5, 0.45]) {
+    for (const fxp of [0.2, 0.8]) {
+      const px: [number, number] = [frame.width * fxp, frame.height * fy]
+      const g = ground(px[0], px[1])
+      if (g) pairs.push({ px, ground: g })
+    }
+    if (pairs.length >= 4) break
+  }
+  if (pairs.length < 4) throw new Error('the camera looks above the ground; lower the look-at point or raise the camera')
+  return { cameraId, homography: solveHomography(pairs), position }
+}

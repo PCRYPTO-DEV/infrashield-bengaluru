@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { CityAtlas } from '../app/CityAtlas'
-import { REGIONS, regionFromSearch } from '../app/regions'
+import { REGIONS, PLACES, regionFromSearch } from '../app/regions'
 import { useAppVersion } from './useApp'
 import { CityView } from './CityView'
 import { Timeline } from './controls/Timeline'
@@ -10,6 +10,9 @@ import { LayersPanel, PulsePanel, ZonesPanel, RoutePanel, UploadPanel, SearchBox
 import { Legend } from './overlays/Legend'
 import { VisionPanel } from './panels/VisionPanel'
 import { AlertsPanel } from './panels/AlertsPanel'
+import { InsightsPanel } from './panels/InsightsPanel'
+import { InsightBubbles } from './overlays/InsightBubbles'
+import { unlockAudio } from './bleep'
 import { MODES } from '../rendering/layers/modes'
 import { formatWorldUri, parseWorldUri } from '../engine/seed/worldSeed'
 import { makeT, type StringKey } from './i18n'
@@ -18,7 +21,7 @@ import { lngLatToLocal } from '../geo/projection/frame'
 import { useEffect } from 'react'
 import { WelcomeCard } from './overlays/WelcomeCard'
 
-type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | null
+type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | null
 
 function seedFromUrl(): string {
   const p = new URLSearchParams(window.location.search)
@@ -36,9 +39,21 @@ function saveDrawing(app: { exportDrawing(): { svg: string; filename: string } }
 export default function App() {
   const [seed, setSeed] = useState(seedFromUrl)
   const [regionId, setRegionId] = useState(() => regionFromSearch(window.location.search).id)
-  const app = useMemo(() => new CityAtlas(seed, REGIONS[regionId]), [seed, regionId])
+  const [placeKey, setPlaceKey] = useState(() => new URLSearchParams(window.location.search).get('place') ?? '')
+  // The region from the URL carries the origin (?place= or ?lng&lat), so the whole of India is one region with a movable frame.
+  const app = useMemo(() => new CityAtlas(seed, regionId === regionFromSearch(window.location.search).id ? regionFromSearch(window.location.search) : REGIONS[regionId]), [seed, regionId, placeKey])
   useAppVersion(app)
-  const [tool, setTool] = useState<Tool>(null)
+  const embedParams = useMemo(() => readEmbedParams(window.location.search), [])
+  const [tool, setTool] = useState<Tool>(embedParams.tool ?? null)
+  // A panel asked for by the host page (embed) or another part of the app.
+  useEffect(() => { if (app.toolRequest !== null || tool !== null) { if (app.toolRequest !== undefined && app.toolRequest !== null) { setTool(app.toolRequest); app.toolRequest = null } } }, [app.toolRequest]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const u = () => unlockAudio(); window.addEventListener('pointerdown', u, { once: true }); window.addEventListener('keydown', u, { once: true }); return () => { window.removeEventListener('pointerdown', u); window.removeEventListener('keydown', u) } }, [])
+  const goPlace = (id: string) => {
+    const c = PLACES.find((x) => x.id === id); if (!c) return
+    try { const url = new URL(window.location.href); url.searchParams.set('place', id); url.searchParams.delete('lng'); url.searchParams.delete('lat'); url.searchParams.delete('world'); window.history.replaceState({}, '', url) } catch { /* sandboxed host */ }
+    app.dispose(); setRegionId('india'); setPlaceKey(id)
+  }
+  const placeNow = placeKey || 'delhi'
   const [seedInput, setSeedInput] = useState(seed)
   const regenerate = () => {
     const s = parseWorldUri(seedInput)?.seed ?? seed
@@ -52,7 +67,7 @@ export default function App() {
   }
   const toggle = (t: Tool) => setTool((cur) => (cur === t ? null : t))
   const T = makeT(app.language)
-  const embed = useMemo(() => readEmbedParams(window.location.search), [])
+  const embed = embedParams
   // The made-up demo city is an engineering demo, shown in the switcher only when asked for (?demo=1).
   const showDemo = useMemo(() => new URLSearchParams(window.location.search).get('demo') === '1', [])
   useEffect(() => {
@@ -65,11 +80,12 @@ export default function App() {
   }, [app, embed])
   return (
     <div className={`ca-app ${app.theme}${embed.embed ? ' ca-embed' : ''}`}>
-      <CityView key={`${regionId}:${seed}`} app={app} />
+      <CityView key={`${regionId}:${seed}:${placeKey}`} app={app} />
       <div className="ca-top">
         <div className="ca-brand"><img src="./brand/symbol-64.png" alt="City Atlas" width={34} height={34} /><div><h1 className="ca-wordmark">ATLAS INFINITY</h1><span className="ca-by">CITY ATLAS · people · places · possibilities</span></div></div>
         <p className="ca-tagline">{T('top.tagline')} · {app.region.name}{district && district !== app.region.name ? ` · ${district}` : ''}</p>
         <div className="ca-regions">{Object.values(REGIONS).filter((r) => !r.demo || showDemo || r.id === regionId).map((r) => <button key={r.id} className={r.id === regionId ? 'active' : ''} onClick={() => switchRegion(r.id)}>{r.name}</button>)}
+          <select className="ca-place-select" title={T('place.title')} value={placeNow} onChange={(e) => goPlace(e.target.value)}>{PLACES.map((c) => <option key={c.id} value={c.id}>{app.language === 'hi' ? c.hi : c.name}</option>)}</select>
           <span className="ca-lang" title="Language · भाषा"><button className={app.language === 'en' ? 'active' : ''} onClick={() => app.setLanguage('en')}>English</button><button className={app.language === 'hi' ? 'active' : ''} onClick={() => app.setLanguage('hi')}>हिंदी</button></span>
           <span className="ca-lang ca-theme" title={T('theme.title')}><button className={app.theme === 'night' ? 'active' : ''} onClick={() => app.setTheme('night')} aria-label={T('theme.night')}>☾ {T('theme.night')}</button><button className={app.theme === 'day' ? 'active' : ''} onClick={() => app.setTheme('day')} aria-label={T('theme.day')}>☀ {T('theme.day')}</button></span></div>
         <div className="ca-seed">
@@ -87,7 +103,7 @@ export default function App() {
       <div className="ca-tools">
         <SearchBox app={app} />
         <div className="ca-toolrow">
-          {(['layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts'] as const).map((t) => <button key={t} className={`ca-tool ${tool === t ? 'active' : ''}`} onClick={() => { toggle(t); app.select(null) }}>{T(`tool.${t}` as StringKey)}</button>)}
+          {(['insights', 'layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts'] as const).map((t) => <button key={t} className={`ca-tool ${tool === t ? 'active' : ''}`} onClick={() => { toggle(t); app.select(null) }}>{T(`tool.${t}` as StringKey)}</button>)}
         </div>
         {tool === 'layers' && <LayersPanel app={app} />}
       </div>
@@ -97,6 +113,8 @@ export default function App() {
       {tool === 'pulse' && !app.selection && <PulsePanel app={app} />}
       {tool === 'camera' && <VisionPanel app={app} />}
       {tool === 'alerts' && <AlertsPanel app={app} />}
+      {tool === 'insights' && <InsightsPanel app={app} />}
+      <InsightBubbles app={app} onOpen={() => setTool('insights')} />
       <InspectorPanel app={app} />
       <AskPanel app={app} />
       <Legend app={app} />

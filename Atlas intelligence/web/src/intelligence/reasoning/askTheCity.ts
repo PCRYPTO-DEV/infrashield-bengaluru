@@ -159,7 +159,8 @@ function gather(intent: Intent, ctx: AskContext, ev: EvidenceItem[], hl: Answer[
       break
     }
     case 'help':
-      push({ id: 'help', classification: 'observed', statement: 'Try: "What\'s happening here?", "Why is traffic slow?", "Show unusual activity", "Where are the dangerous intersections?", "Show activity during the last hour", "What may happen in the next 30 minutes?", "Where should I open a café?"' })
+      if (world.entities.size === 0) push({ id: 'nomap', classification: 'observed', statement: 'The streets for this view have not loaded yet, so there is nothing to answer from. Wait for the map, or move to an area that has loaded.' })
+      else push({ id: 'help', classification: 'observed', statement: 'Try: "What\'s happening here?", "Why is traffic slow?", "Show unusual activity", "Where are the dangerous intersections?", "Show activity during the last hour", "What may happen in the next 30 minutes?", "Where should I open a café?"' })
       break
   }
 }
