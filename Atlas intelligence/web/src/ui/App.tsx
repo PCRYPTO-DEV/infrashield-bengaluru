@@ -16,6 +16,7 @@ import { makeT, type StringKey } from './i18n'
 import { installEmbed, readEmbedParams } from '../app/embed'
 import { lngLatToLocal } from '../geo/projection/frame'
 import { useEffect } from 'react'
+import { WelcomeCard } from './overlays/WelcomeCard'
 
 type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | null
 
@@ -56,19 +57,21 @@ export default function App() {
   const showDemo = useMemo(() => new URLSearchParams(window.location.search).get('demo') === '1', [])
   useEffect(() => {
     if (embed.lang) app.setLanguage(embed.lang)
+    if (embed.theme) app.setTheme(embed.theme)
     if (embed.mode) app.setMode(embed.mode)
     if (embed.lng !== undefined && embed.lat !== undefined) app.camera.setView(lngLatToLocal(app.frame, { lng: embed.lng, lat: embed.lat }), embed.zoom)
     else if (embed.zoom !== undefined) app.camera.setView(app.camera.centre, embed.zoom)
     return installEmbed(app)
   }, [app, embed])
   return (
-    <div className={`ca-app${embed.embed ? ' ca-embed' : ''}`}>
+    <div className={`ca-app ${app.theme}${embed.embed ? ' ca-embed' : ''}`}>
       <CityView key={`${regionId}:${seed}`} app={app} />
       <div className="ca-top">
         <div className="ca-brand"><img src="./brand/symbol-64.png" alt="City Atlas" width={34} height={34} /><div><h1 className="ca-wordmark">ATLAS INFINITY</h1><span className="ca-by">CITY ATLAS · people · places · possibilities</span></div></div>
-        <p className="ca-tagline">{T('top.tagline')} · {app.region.name}{district ? ` · ${district}` : ''}</p>
+        <p className="ca-tagline">{T('top.tagline')} · {app.region.name}{district && district !== app.region.name ? ` · ${district}` : ''}</p>
         <div className="ca-regions">{Object.values(REGIONS).filter((r) => !r.demo || showDemo || r.id === regionId).map((r) => <button key={r.id} className={r.id === regionId ? 'active' : ''} onClick={() => switchRegion(r.id)}>{r.name}</button>)}
-          <span className="ca-lang" title="Language · भाषा"><button className={app.language === 'en' ? 'active' : ''} onClick={() => app.setLanguage('en')}>English</button><button className={app.language === 'hi' ? 'active' : ''} onClick={() => app.setLanguage('hi')}>हिंदी</button></span></div>
+          <span className="ca-lang" title="Language · भाषा"><button className={app.language === 'en' ? 'active' : ''} onClick={() => app.setLanguage('en')}>English</button><button className={app.language === 'hi' ? 'active' : ''} onClick={() => app.setLanguage('hi')}>हिंदी</button></span>
+          <span className="ca-lang ca-theme" title={T('theme.title')}><button className={app.theme === 'night' ? 'active' : ''} onClick={() => app.setTheme('night')} aria-label={T('theme.night')}>☾ {T('theme.night')}</button><button className={app.theme === 'day' ? 'active' : ''} onClick={() => app.setTheme('day')} aria-label={T('theme.day')}>☀ {T('theme.day')}</button></span></div>
         <div className="ca-seed">
           <span>atlas://world/</span>
           <input value={seedInput} onChange={(e) => setSeedInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && regenerate()} />
@@ -98,6 +101,12 @@ export default function App() {
       <AskPanel app={app} />
       <Legend app={app} />
       <Timeline app={app} />
+      {!embed.embed && <WelcomeCard app={app} onAsk={() => { document.querySelector<HTMLInputElement>('.ca-ask input')?.focus() }} />}
+      {app.region.source === 'osm' && app.stats.chunks === 0 && (app.stats.inFlight > 0 || app.realDataError) && !app.pointPick && !app.draw.active && (
+        app.stats.inFlight > 0 && !app.realDataError
+          ? <div className="ca-hint ca-loading">{T('load.streets', { n: app.stats.inFlight })}</div>
+          : <div className="ca-hint ca-failed">{T('load.failed', { why: app.realDataError ?? '' })} · <button className="small" onClick={() => window.location.reload()}>{T('load.retry')}</button></div>
+      )}
       {app.pointPick && <div className="ca-hint">{app.pointPick.label} · <button className="small" onClick={() => app.cancelPick()}>{T('hint.cancel')}</button></div>}
       {app.draw.active && !app.pointPick && <div className="ca-hint">{app.draw.state?.kind === 'route' ? T('hint.route') : T('hint.draw', { k: T(`zone.${app.draw.state?.kind}` as StringKey) })}</div>}
     </div>

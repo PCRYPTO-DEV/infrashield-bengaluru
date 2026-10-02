@@ -45,7 +45,11 @@ export async function handleGenerationAsync(m: GenerateMessage | InkMessage): Pr
     const district = m.tier === 'osm-district'
     const url = `${m.baseUrl ?? ''}/api/tiles/osm/${m.req.key}.json?tier=${district ? 'district' : 'street'}`
     const r = await fetch(url)
-    if (!r.ok) return { type: 'error', id: m.id, message: `osm tile ${m.req.key}: HTTP ${r.status}` }
+    if (!r.ok) {
+      let detail = ''
+      try { detail = String(((await r.json()) as { detail?: string }).detail ?? '') } catch { /* no body */ }
+      return { type: 'error', id: m.id, message: `osm tile ${m.req.key}: HTTP ${r.status}${detail ? ' · ' + detail : ''}` }
+    }
     const tile = (await r.json()) as OsmTile
     const chunk = district ? buildOsmDistrict(m.req, tile) : buildOsmChunk(m.req, tile)
     return { type: 'chunk', id: m.id, chunk }

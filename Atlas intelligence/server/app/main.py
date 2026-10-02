@@ -55,7 +55,8 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
     async def health():
         return {"ok": True, "region": settings.region, "fixtures": fixtures is not None,
                 "tomtom": bool(settings.tomtom_api_key), "writer": bool(settings.anthropic_api_key),
-                "memory": history.count("flow_readings"), "alerts": bool(alerts.twilio)}
+                "memory": history.count("flow_readings"), "alerts": bool(alerts.twilio),
+                "osm": {"endpoint": osm.url, "calls": osm.live_calls, "lastError": osm.last_error}}
 
     @app.get("/api/regions")
     async def regions():

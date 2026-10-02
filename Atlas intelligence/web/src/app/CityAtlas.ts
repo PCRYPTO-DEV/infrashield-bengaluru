@@ -43,6 +43,8 @@ import type { LngLat } from '../geo/coordinates/lngLat'
 import { localToLngLat } from '../geo/projection/frame'
 import type { AgentView } from '../engine/world/WorldModel'
 
+export type Theme = 'day' | 'night'
+
 export const DEFAULT_SEED = REGIONS[DEFAULT_REGION].seed
 /** Base URL of the Atlas server; empty means same origin (Vite proxies /api in dev). */
 export const SERVER_BASE = (import.meta.env?.VITE_ATLAS_SERVER as string | undefined) ?? ''
@@ -93,6 +95,8 @@ export class CityAtlas {
   private realSources: { street: WorldGenerationClient | null; district: WorldGenerationClient | null } = { street: null, district: null }
   /** How many real-data tiles fell back to the procedural city (0 when the region is procedural). */
   get realDataFallbacks(): number { return (this.realSources.street?.fallbacks ?? 0) + (this.realSources.district?.fallbacks ?? 0) }
+  /** Why the last real-data tile failed (server reason included), or null. */
+  get realDataError(): string | null { return this.realSources.street?.lastError ?? this.realSources.district?.lastError ?? null }
   private lastCameraVersion = -1
   private lastReconcile = 0
   private raf = 0
@@ -148,6 +152,7 @@ export class CityAtlas {
   // ---------- lifecycle ----------
   mount(container: HTMLElement): void {
     this.renderer = new CompositeRenderer(container)
+    this.renderer.setTheme(this.theme)
     this.renderer.svg.inkProvider = (c) => this.buildInk(c)
     for (const c of this.world.chunks.values()) this.renderer.addChunk(c)
     for (const c of this.districts.loaded.values()) this.renderer.addDistrict(c)
@@ -405,6 +410,11 @@ export class CityAtlas {
     this.notify()
   }
   setRouteWeights(w: Partial<RouteWeights>): void { this.routeWeights = { ...this.routeWeights, ...w }; if (this.routePick.length === 2) this.computeRoute(this.routePick[0], this.routePick[1]); else this.notify() }
+
+  // ---------- theme ----------
+  /** Day (white paper and ink) is the default; night is the City Atlas deep-night look. Remembered per browser. */
+  theme: Theme = (typeof localStorage !== 'undefined' && (localStorage.getItem('atlas.theme') as Theme | null)) || 'day'
+  setTheme(t: Theme): void { this.theme = t; this.renderer?.setTheme(t); try { localStorage.setItem('atlas.theme', t) } catch { /* private mode */ } this.notify() }
 
   // ---------- language and the AI writer ----------
   language: Language = (typeof localStorage !== 'undefined' && (localStorage.getItem('atlas.language') as Language | null)) || 'en'

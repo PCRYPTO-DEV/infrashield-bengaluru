@@ -42,6 +42,8 @@ export class WorldGenerationClient implements ChunkSource {
 
   /** Count of real-data tiles that could not be fetched (left empty, or filled procedurally only when a demo asks for it). */
   fallbacks = 0
+  /** The last reason a real-data tile could not be fetched, for the screen. */
+  lastError: string | null = null
 
   generate(req: ChunkRequest, signal: AbortSignal): Promise<ChunkData> {
     return new Promise((resolve, reject) => {
@@ -53,6 +55,7 @@ export class WorldGenerationClient implements ChunkSource {
         reject: (e) => {
           if (!fallbackTier || signal.aborted) { reject(e); return }
           this.fallbacks++
+          this.lastError = e.message
           console.warn(e.message)
           // Real data unavailable for this tile. The real product leaves it empty: nothing is ever made up in its place.
           if (!this.fallbackToProcedural) { reject(e); return }

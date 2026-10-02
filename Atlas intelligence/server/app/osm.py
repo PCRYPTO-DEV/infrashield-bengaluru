@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,9 @@ HIGHWAY_CLASS = {
 }
 MAXSPEED_DEFAULT = {"arterial": 13.9, "collector": 11.1, "local": 8.3, "service": 5.5}
 TILE_TTL = 30 * 24 * 3600
+log = logging.getLogger("atlas.osm")
+# How long a mirror that failed is skipped before it is tried again.
+DOWN_SECONDS = 60.0
 
 STREET_QUERY = (
     '[out:json][timeout:25];('
@@ -135,16 +139,22 @@ def normalize(elements: list[dict[str, Any]], fetched_at: float) -> list[dict[st
 class OverpassClient:
     """Rate-limited Overpass access with on-disk caching and a fixtures mode."""
 
-    def __init__(self, cache: Cache, fixtures: Path | None = None, min_interval: float = 1.0, url: str | None = None):
+    def __init__(self, cache: Cache, fixtures: Path | None = None, min_interval: float = 1.0, url: str | None = None, concurrency: int = 2):
         self.cache = cache
         self.fixtures = fixtures
         self.min_interval = min_interval
         # One or more Overpass endpoints, comma separated; the next one is tried when one fails.
         self.urls = [u.strip() for u in (url or settings.overpass_url).split(",") if u.strip()]
         self.url = self.urls[0]
+        # Requests are launched at most one per min_interval, and at most `concurrency` run at once
+        # (the public Overpass servers allow two slots per address). A slow upstream must never
+        # hold every other tile behind it.
         self._lock = asyncio.Lock()
+        self._slots = asyncio.Semaphore(max(1, concurrency))
         self._last = 0.0
+        self._down: dict[str, float] = {}
         self.live_calls = 0
+        self.last_error: str | None = None
 
     async def tile(self, z: int, x: int, y: int, tier: str = "street") -> dict[str, Any]:
         key = f"osm:{tier}:{z}/{x}/{y}"
@@ -167,20 +177,30 @@ class OverpassClient:
                 return json.loads(f.read_text()).get("elements", [])
             raise LookupError(f"no fixture for {key}")
         query = (MAJOR_QUERY if tier == "district" else STREET_QUERY).format(bbox=bbox.overpass())
-        async with self._lock:
-            wait = self.min_interval - (time.monotonic() - self._last)
-            if wait > 0:
-                await asyncio.sleep(wait)
-            self._last = time.monotonic()
-            self.live_calls += 1
+        async with self._slots:
+            async with self._lock:
+                wait = self.min_interval - (time.monotonic() - self._last)
+                if wait > 0:
+                    await asyncio.sleep(wait)
+                self._last = time.monotonic()
+                self.live_calls += 1
             last_error: Exception | None = None
-            for url in self.urls:
+            now = time.monotonic()
+            live = [u for u in self.urls if self._down.get(u, 0.0) <= now] or list(self.urls)
+            for url in live:
+                t0 = time.monotonic()
                 try:
-                    async with httpx.AsyncClient(timeout=40) as client:
+                    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=8.0)) as client:
                         r = await client.post(url, data={"data": query}, headers={"User-Agent": "atlas-infinity/0.2 (OpenStreetMap data for a live city map)"})
                         r.raise_for_status()
                         self.url = url
+                        self._down.pop(url, None)
+                        self.last_error = None
+                        log.info("osm %s via %s in %.1fs", key, url, time.monotonic() - t0)
                         return r.json().get("elements", [])
                 except Exception as e:  # try the next mirror; the caller sees the last error
                     last_error = e
+                    self._down[url] = time.monotonic() + DOWN_SECONDS
+                    self.last_error = f"{url}: {type(e).__name__}: {str(e)[:160]}"
+                    log.warning("osm %s failed via %s after %.1fs: %s: %s", key, url, time.monotonic() - t0, type(e).__name__, str(e)[:200])
             raise last_error or RuntimeError("no Overpass endpoint configured")

@@ -46,6 +46,12 @@ export class StaticSvgRenderer {
     container.appendChild(this.svg)
   }
 
+  /** Night: the ink artwork is inverted with its hues kept (invert + hue-rotate) over the deep-night ground; day: paper and ink as drawn. */
+  setTheme(theme: 'day' | 'night'): void {
+    this.svg.classList.toggle('night', theme === 'night')
+    this.svg.style.background = theme === 'night' ? '#071924' : PALETTE.paper
+  }
+
   addChunk(chunk: ChunkData, lod: Lod): void {
     this.removeChunk(chunk.key)
     const g = document.createElementNS(SVG_NS, 'g')

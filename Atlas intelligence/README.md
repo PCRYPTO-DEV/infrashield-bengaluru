@@ -26,8 +26,8 @@ Three open-source ideas are merged into one product:
 
 ```
 Atlas intelligence/
-  web/        the app (TypeScript · React · Vite · workers)        npm test: 92 tests
-  server/     FastAPI: OSM tiles, TomTom, weather, AI writer, hosting  pytest: 11 tests
+  web/        the app (TypeScript · React · Vite · workers)        npm test: 93 tests
+  server/     FastAPI: OSM tiles, TomTom, weather, AI writer, hosting  pytest: 15 tests
   docs/       architecture, data sources, deployment, integration, Shan Shui study
   render.yaml one-click Render deployment · Dockerfile for anything else
 ```
@@ -69,6 +69,8 @@ server.
 | **Map · Traffic · Busy · Risk · Ahead · Ink 3D** | the six modes (top centre) |
 | **Ask the city** | type or press the mic; answers list the facts they came from |
 | **English / हिंदी** | every label, answer and voice follows the toggle |
+| **Day / Night** | white paper and ink by default; the City Atlas deep-night look one click away (also `?theme=night` and the embed option) |
+| **Embed** | `embed.js` drops the whole map into the City Atlas app on Emergent, or any page, in two minutes ([docs](docs/INTEGRATION.md)) |
 | **Zones** | draw a shape; it counts who goes in and out, including camera dots |
 | **Route** | a route with less risk, with the factors shown |
 | **Camera** | count people and vehicles as moving dots from a phone or laptop camera; Atlas Vision shows the street from the camera's eye as ink lines |

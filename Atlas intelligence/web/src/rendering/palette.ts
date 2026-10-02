@@ -6,14 +6,14 @@
  * only strong hues so the eye reads *certainty*, not category.
  */
 export const PALETTE = {
-  paper: '#f3eee3',
+  paper: '#fbfaf6',
   paperDeep: '#e9e2d3',
   ink: '#2b2a26',
   inkSoft: 'rgba(43,42,38,0.55)',
   inkFaint: 'rgba(43,42,38,0.22)',
   inkHair: 'rgba(43,42,38,0.12)',
   roadCasing: 'rgba(43,42,38,0.35)',
-  roadFill: '#f8f4ea',
+  roadFill: '#ffffff',
   building: '#e6dfcf',
   buildingTall: '#d9d0bb',
   buildingStroke: 'rgba(43,42,38,0.45)',

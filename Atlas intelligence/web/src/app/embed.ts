@@ -1,4 +1,4 @@
-import type { CityAtlas } from './CityAtlas'
+import type { CityAtlas, Theme } from './CityAtlas'
 import type { ViewMode } from '../rendering/layers/modes'
 import type { Language } from '../intelligence/reasoning/claudeExplainer'
 import { lngLatToLocal, localToLngLat } from '../geo/projection/frame'
@@ -8,13 +8,14 @@ import { lngLatToLocal, localToLngLat } from '../geo/projection/frame'
  * or any page) drives Atlas Infinity inside an iframe.
  *
  * URL parameters set the first view:
- *   ?region=ncr&lng=77.2167&lat=28.6315&zoom=16.5&mode=mobility&lang=hi&embed=1
+ *   ?region=ncr&lng=77.2167&lat=28.6315&zoom=16.5&mode=mobility&lang=hi&theme=night&embed=1
  * `embed=1` hides the wordmark and region switcher so the host owns the chrome.
  *
  * Messages from the parent (window.postMessage, any origin the host allows):
  *   { type: 'atlas:setView', lng, lat, zoom? }
  *   { type: 'atlas:setMode', mode }               reality | mobility | activity | risk | forecast | ink3d
  *   { type: 'atlas:setLanguage', lang }           en | hi
+ *   { type: 'atlas:setTheme', theme }             night | day
  *   { type: 'atlas:ask', question }               answered by Ask the City; reply below
  *   { type: 'atlas:zone', name, ring: [{lng,lat}] } draws a watch zone
  *   { type: 'atlas:snapshot' }                    replies with the fact snapshot
@@ -29,12 +30,13 @@ import { lngLatToLocal, localToLngLat } from '../geo/projection/frame'
  */
 export interface EmbedOptions { allowedOrigins?: string[] }
 
-export function readEmbedParams(search: string): { lng?: number; lat?: number; zoom?: number; mode?: ViewMode; lang?: Language; embed: boolean } {
+export function readEmbedParams(search: string): { lng?: number; lat?: number; zoom?: number; mode?: ViewMode; lang?: Language; theme?: Theme; embed: boolean } {
   const q = new URLSearchParams(search)
   const num = (k: string) => (q.has(k) && Number.isFinite(Number(q.get(k))) ? Number(q.get(k)) : undefined)
   const mode = q.get('mode') as ViewMode | null
   const lang = q.get('lang') as Language | null
-  return { lng: num('lng'), lat: num('lat'), zoom: num('zoom'), mode: mode && ['reality', 'mobility', 'activity', 'risk', 'forecast', 'ink3d'].includes(mode) ? mode : undefined, lang: lang === 'hi' || lang === 'en' ? lang : undefined, embed: q.get('embed') === '1' }
+  const theme = q.get('theme')
+  return { theme: theme === 'day' || theme === 'night' ? theme : undefined, lng: num('lng'), lat: num('lat'), zoom: num('zoom'), mode: mode && ['reality', 'mobility', 'activity', 'risk', 'forecast', 'ink3d'].includes(mode) ? mode : undefined, lang: lang === 'hi' || lang === 'en' ? lang : undefined, embed: q.get('embed') === '1' }
 }
 
 export function installEmbed(app: CityAtlas, opts: EmbedOptions = {}): () => void {
@@ -55,6 +57,7 @@ export function installEmbed(app: CityAtlas, opts: EmbedOptions = {}): () => voi
       }
       case 'atlas:setMode': if (typeof m.mode === 'string') app.setMode(m.mode as ViewMode); break
       case 'atlas:setLanguage': if (m.lang === 'en' || m.lang === 'hi') app.setLanguage(m.lang); break
+      case 'atlas:setTheme': if (m.theme === 'day' || m.theme === 'night') app.setTheme(m.theme); break
       case 'atlas:ask': {
         if (typeof m.question !== 'string') break
         const a = await app.ask(m.question)

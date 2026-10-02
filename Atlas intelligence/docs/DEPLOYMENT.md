@@ -66,7 +66,9 @@ The browser additionally loads the camera detector from
 
 ## Verifying a live deployment
 
-- `GET /api/health` → `{"ok": true, "tomtom": true, "writer": true}` when both keys are set.
+- `GET /api/health` → `{"ok": true, "tomtom": true, "writer": true, "osm": {...}}` when both keys are set. `osm.lastError` names the last Overpass failure (and the mirror that failed) when the map stays empty.
+- A log line like `401 Unauthorized ... key=ncr` means the value of `TOMTOM_API_KEY` is wrong (here the region id was pasted into the key field). `ATLAS_REGION` takes `ncr`; `TOMTOM_API_KEY` takes the key from developer.tomtom.com.
+- The first visit to an area waits on Overpass (a few seconds per tile, two tiles at a time); the app shows "Loading streets from OpenStreetMap… n tiles waiting" until the first tiles land, then "Map data could not be loaded: …" with the server's reason if they never do.
 - `GET /api/traffic/status` shows today's TomTom call count.
 - In the app: the timeline badge reads `LIVE · TomTom + Open-Meteo + OpenStreetMap`; clicking a main road shows "Live speed … seen · tomtom"; City pulse → Environment shows the weather; the Ask panel shows "written by claude-opus-5-5".
 

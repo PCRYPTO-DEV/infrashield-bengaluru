@@ -27,6 +27,7 @@ export class CompositeRenderer implements CityRenderer {
     this.canvas.render(state)
   }
 
+  setTheme(theme: 'day' | 'night'): void { this.svg.setTheme(theme); this.canvas.setTheme(theme) }
   resize(width: number, height: number): void { this.canvas.resize(width, height) }
   dispose(): void { this.svg.dispose(); this.canvas.dispose() }
 }

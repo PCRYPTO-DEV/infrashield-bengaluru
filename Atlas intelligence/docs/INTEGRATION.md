@@ -12,17 +12,62 @@ two can be merged later without rework. The decision and its reasons:
 - When the CityAtlas repository is readable, the embed can be replaced by a
   direct import of `CityAtlas` (the composition root) and the React panels.
 
+## The two-minute way (Emergent or any page): `embed.js`
+
+The deployed Atlas serves a drop-in script. No build step, no framework:
+
+```html
+<script src="https://infrashield-bengaluru.onrender.com/embed.js"></script>
+<div id="atlas" style="height: 70vh"></div>
+<script>
+  const atlas = AtlasInfinity.mount('#atlas', {
+    lng: 77.2167, lat: 28.6315, zoom: 16.5,   // Connaught Place
+    mode: 'mobility',                          // reality | mobility | activity | risk | forecast | ink3d
+    lang: 'hi',                                // en | hi
+    theme: 'day',                              // day (white paper, default) | night (City Atlas deep night)
+    radius: '16px',
+  })
+  atlas.on('answer', (a) => console.log(a.text, a.facts))
+  atlas.on('selection', (s) => console.log('tapped', s.kind, s.id, s.lng, s.lat))
+  atlas.ask('Why is traffic slow?')
+  atlas.setView(77.2295, 28.6129, 17)
+  atlas.setTheme?.('night')
+</script>
+```
+
+In a React page (the Emergent build), the same thing as a component:
+
+```jsx
+import { useEffect, useRef } from 'react'
+
+export function AtlasInfinityFrame({ lng, lat, zoom = 16.5, mode = 'mobility', lang = 'en', theme = 'day', onAnswer }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const atlas = window.AtlasInfinity.mount(ref.current, { lng, lat, zoom, mode, lang, theme })
+    if (onAnswer) atlas.on('answer', onAnswer)
+    return () => atlas.destroy()
+  }, [])
+  return <div ref={ref} style={{ height: '70vh', borderRadius: 16, overflow: 'hidden' }} />
+}
+```
+
+Load `embed.js` once in `index.html` (`<script src="https://<atlas-host>/embed.js"></script>`).
+The mount options match the URL parameters below, so a plain iframe works
+too.
+
 ## Embed
 
 ```html
 <iframe
-  src="https://<atlas-host>/?region=ncr&lng=77.2167&lat=28.6315&zoom=16.5&mode=mobility&lang=hi&embed=1"
+  src="https://<atlas-host>/?region=ncr&lng=77.2167&lat=28.6315&zoom=16.5&mode=mobility&lang=hi&theme=day&embed=1"
   allow="camera; microphone"
   style="width:100%;height:100%;border:0"></iframe>
 ```
 
-`embed=1` hides the wordmark, region switcher and seed box; the host owns
-the chrome. `allow="camera; microphone"` is needed for camera counts and
+`embed=1` hides the wordmark, region switcher, seed box and the first-run
+welcome card; the host owns the chrome. `theme=day` is white paper and ink
+(the default); `theme=night` is the City Atlas deep-night look with the same
+Google-style traffic colours. `allow="camera; microphone"` is needed for camera counts and
 voice questions inside the frame.
 
 ## Messages from the host
@@ -32,6 +77,7 @@ const atlas = iframe.contentWindow
 atlas.postMessage({ type: 'atlas:setView', lng: 77.2295, lat: 28.6129, zoom: 17 }, '*')
 atlas.postMessage({ type: 'atlas:setMode', mode: 'ink3d' }, '*')          // reality | mobility | activity | risk | forecast | ink3d
 atlas.postMessage({ type: 'atlas:setLanguage', lang: 'hi' }, '*')         // en | hi
+atlas.postMessage({ type: 'atlas:setTheme', theme: 'night' }, '*')        // day | night
 atlas.postMessage({ type: 'atlas:ask', question: 'Why is traffic slow?' }, '*')
 atlas.postMessage({ type: 'atlas:zone', name: 'Gate 2', ring: [{ lng, lat }, { lng, lat }, { lng, lat }] }, '*')
 atlas.postMessage({ type: 'atlas:snapshot' }, '*')

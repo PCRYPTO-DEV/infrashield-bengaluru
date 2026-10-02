@@ -3,7 +3,7 @@
  *   <script src="https://YOUR-ATLAS-HOST/embed.js"></script>
  *   <div id="atlas" style="height:600px"></div>
  *   <script>
- *     const atlas = AtlasInfinity.mount('#atlas', { lng: 77.2167, lat: 28.6315, zoom: 16.5, mode: 'mobility', lang: 'hi', theme: 'night' })
+ *     const atlas = AtlasInfinity.mount('#atlas', { lng: 77.2167, lat: 28.6315, zoom: 16.5, mode: 'mobility', lang: 'hi', theme: 'day' })
  *     atlas.on('answer', a => console.log(a.text, a.facts))
  *     atlas.ask('Why is traffic slow?')
  *     atlas.setView(77.2295, 28.6129, 17)
@@ -35,7 +35,7 @@
     var iframe = document.createElement('iframe')
     iframe.src = base + '/?' + q.toString()
     iframe.allow = 'camera; microphone; geolocation'
-    iframe.style.cssText = 'width:100%;height:100%;border:0;display:block;background:#071924;border-radius:' + (opts.radius || '0')
+    iframe.style.cssText = 'width:100%;height:100%;border:0;display:block;background:' + (opts.theme === 'night' ? '#071924' : '#fbfaf6') + ';border-radius:' + (opts.radius || '0')
     iframe.title = 'Atlas Infinity'
     el.appendChild(iframe)
 
@@ -61,6 +61,7 @@
       setView: function (lng, lat, zoom) { send({ type: 'atlas:setView', lng: lng, lat: lat, zoom: zoom }); return this },
       setMode: function (mode) { send({ type: 'atlas:setMode', mode: mode }); return this },
       setLanguage: function (lang) { send({ type: 'atlas:setLanguage', lang: lang }); return this },
+      setTheme: function (theme) { send({ type: 'atlas:setTheme', theme: theme }); return this },
       ask: function (question) { send({ type: 'atlas:ask', question: question }); return this },
       zone: function (name, ring) { send({ type: 'atlas:zone', name: name, ring: ring }); return this },
       snapshot: function () { send({ type: 'atlas:snapshot' }); return this },
