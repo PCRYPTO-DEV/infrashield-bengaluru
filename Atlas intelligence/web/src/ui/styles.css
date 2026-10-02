@@ -326,7 +326,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .ca-toolrow.ca-primary { align-items: center; gap: 6px; padding: 4px; }
 .ca-toolrow.ca-primary .ca-search input { box-shadow: none; }
 .ca-changed-btn b { margin-left: 6px; background: var(--brand-blue); color: #fff; border-radius: 999px; padding: 1px 7px; font-size: 10px; }
-.ca-more { background: var(--panel-strong); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow); width: min(640px, calc(100vw - 32px)); }
+.ca-more { position: relative; background: var(--panel-strong); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 40px 10px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow); width: min(640px, calc(100vw - 32px)); z-index: 8; }
+.ca-tools { z-index: 7; }
+.ca-more-close { position: absolute; top: 6px; right: 8px; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel-raised); color: var(--fg-soft); cursor: pointer; font-size: 14px; line-height: 1; }
 .ca-more-group { display: flex; flex-direction: column; gap: 4px; }
 .ca-more-group > span { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg-faint); }
 .ca-more .ca-toolrow { background: none; box-shadow: none; border: none; padding: 0; flex-wrap: wrap; }

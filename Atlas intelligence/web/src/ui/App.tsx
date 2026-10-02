@@ -66,7 +66,14 @@ export default function App() {
   const placeNow = placeKey || 'delhi'
   const cityName = (PLACES.find((c) => c.id === placeNow) ?? PLACES[0])
   const city = app.language === 'hi' ? cityName.hi.split(' · ').pop()! : cityName.name.split(' · ').pop()!
-  const toggle = (t: Tool) => setTool((cur) => (cur === t ? null : t))
+  const toggle = (t: Tool) => { setTool((cur) => (cur === t ? null : t)); setMore(false) }
+  useEffect(() => {
+    if (!more) return
+    const onDown = (e: PointerEvent) => { if (!(e.target as HTMLElement).closest('.ca-tools')) setMore(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMore(false) }
+    document.addEventListener('pointerdown', onDown); document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('pointerdown', onDown); document.removeEventListener('keydown', onKey) }
+  }, [more])
   const T = makeT(app.language)
   useEffect(() => {
     if (embed.lang) app.setLanguage(embed.lang)
@@ -100,8 +107,9 @@ export default function App() {
           <button className={`ca-tool ca-changed-btn ${tool === 'changed' ? 'active' : ''}`} onClick={() => toggle('changed')}>{T('changed.btn')}{app.changes && app.changes.count > 0 && <b>{app.changes.count}</b>}</button>
           <button className={`ca-tool ${more ? 'active' : ''}`} onClick={() => setMore(!more)}>{T('more')} {more ? '▴' : '▾'}</button>
         </div>
-        {more && <div className="ca-more">
-          <div className="ca-more-group"><span>{T('more.modes')}</span><div className="ca-toolrow">{MODES.map((m) => <button key={m.id} className={`ca-tool ${app.mode === m.id ? 'active' : ''}`} title={T(`mode.${m.id}.b` as StringKey)} onClick={() => app.setMode(m.id)}>{T(`mode.${m.id}` as StringKey)}</button>)}</div></div>
+        {more && <div className="ca-more" role="menu">
+          <button className="ca-more-close" aria-label="close" onClick={() => setMore(false)}>×</button>
+          <div className="ca-more-group"><span>{T('more.modes')}</span><div className="ca-toolrow">{MODES.map((m) => <button key={m.id} className={`ca-tool ${app.mode === m.id ? 'active' : ''}`} title={T(`mode.${m.id}.b` as StringKey)} onClick={() => { app.setMode(m.id); setMore(false) }}>{T(`mode.${m.id}` as StringKey)}</button>)}</div></div>
           <div className="ca-more-group"><span>{T('more.tools')}</span><div className="ca-toolrow">{TOOLS.map((t) => <button key={t} className={`ca-tool ${tool === t ? 'active' : ''}`} onClick={() => { toggle(t); app.select(null) }}>{T(`tool.${t}` as StringKey)}</button>)}</div></div>
           {app.mode === 'ink3d' && <div className="ca-more-group"><span>{T('mode.ink3d')}</span><div className="ca-toolrow"><span className="note">{app.camera.zoom < 16 ? T('ink.zoom') : app.inkPending > 0 ? T('ink.drawing', { n: app.inkPending }) : T('ink.ready')}</span><button className="ca-tool" onClick={() => saveDrawing(app)}>{T('ink.save')}</button></div></div>}
           <div className="ca-more-group"><span>{T('tier.plus')}</span><div className="ca-toolrow">{app.tier === 'free' ? <span className="note">{T('tier.locked')}</span> : <><span className="note">{T('tier.open')}</span><button className="ca-tool" onClick={() => app.lock()}>{T('tier.leave')}</button></>}</div></div>
