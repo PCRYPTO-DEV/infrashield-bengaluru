@@ -29,6 +29,8 @@ class Settings:
     # Baseline recorder: flow tiles (z/x/y, comma separated) polled every N minutes so the memory grows even with nobody watching
     baseline_tiles: str = field(default_factory=lambda: os.getenv("ATLAS_BASELINE_TILES", "12/2926/1707"))
     baseline_minutes: int = field(default_factory=lambda: int(os.getenv("ATLAS_BASELINE_MINUTES", "10")))
+    # How many z14 blocks around the region origin to pre-fetch at startup (1 = a 3x3 ring, 144 street tiles). 0 disables.
+    warm_radius: int = field(default_factory=lambda: int(os.getenv("ATLAS_WARM_RADIUS", "1")))
     tomtom_base: str = "https://api.tomtom.com"
     open_meteo_base: str = "https://api.open-meteo.com"
 

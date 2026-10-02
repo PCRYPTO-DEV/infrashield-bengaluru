@@ -17,7 +17,7 @@ import httpx
 
 from .cache import Cache
 from .config import settings
-from .tiles import BBox, tile_bbox
+from .tiles import BBox, lnglat_to_tile, tile_bbox
 
 HIGHWAY_CLASS = {
     "motorway": "arterial", "trunk": "arterial", "primary": "arterial",
@@ -28,6 +28,10 @@ HIGHWAY_CLASS = {
 MAXSPEED_DEFAULT = {"arterial": 13.9, "collector": 11.1, "local": 8.3, "service": 5.5}
 TILE_TTL = 30 * 24 * 3600
 log = logging.getLogger("atlas.osm")
+# One Overpass query covers a whole block of tiles (z14 for street tiles: 16 of them; z11 for district
+# tiles: 16 of those), and every tile in the block is cached from that one answer. A screen that needs
+# 40 street tiles then costs 3 or 4 queries instead of 40.
+BLOCK_ZOOM = {"street": 14, "district": 11}
 # How long a mirror that failed is skipped before it is tried again.
 DOWN_SECONDS = 60.0
 
@@ -145,6 +149,18 @@ def normalize(elements: list[dict[str, Any]], fetched_at: float) -> list[dict[st
     return out
 
 
+def intersects(el: dict[str, Any], b: BBox) -> bool:
+    """Does this Overpass element touch the bbox? Nodes by position; ways by the bbox of their geometry."""
+    if "lat" in el:
+        return b.south <= el["lat"] <= b.north and b.west <= el["lon"] <= b.east
+    g = el.get("geometry")
+    if not g:
+        return False
+    lats = [p["lat"] for p in g]
+    lons = [p["lon"] for p in g]
+    return not (max(lats) < b.south or min(lats) > b.north or max(lons) < b.west or min(lons) > b.east)
+
+
 class OverpassClient:
     """Rate-limited Overpass access with on-disk caching and a fixtures mode."""
 
@@ -162,30 +178,88 @@ class OverpassClient:
         self._slots = asyncio.Semaphore(max(1, concurrency))
         self._last = 0.0
         self._down: dict[str, float] = {}
+        self._blocks: dict[str, asyncio.Future] = {}
         self.live_calls = 0
         self.last_error: str | None = None
+        self.warmed = 0
 
     async def tile(self, z: int, x: int, y: int, tier: str = "street") -> dict[str, Any]:
         key = f"osm:{tier}:{z}/{x}/{y}"
         cached = self.cache.get(key)
         if cached is not None:
             return cached
+        if self.fixtures is None:
+            bz = BLOCK_ZOOM[tier]
+            if z > bz:
+                try:
+                    await self._block(tier, z, bz, x >> (z - bz), y >> (z - bz))
+                    cached = self.cache.get(key)
+                    if cached is not None:
+                        return cached
+                except Exception as e:  # a block too big or too slow: fall back to this one tile
+                    log.warning("osm block for %s failed (%s: %s); fetching the single tile", key, type(e).__name__, str(e)[:120])
         bbox = tile_bbox(z, x, y)
         elements = await self._elements(bbox, tier, key)
-        now = time.time()
+        return self._store(z, x, y, tier, bbox, elements, time.time())
+
+    def _store(self, z: int, x: int, y: int, tier: str, bbox: BBox, elements: list[dict[str, Any]], now: float) -> dict[str, Any]:
+        key = f"osm:{tier}:{z}/{x}/{y}"
         result = {"key": f"{z}/{x}/{y}", "tier": tier,
                   "bounds": {"west": bbox.west, "south": bbox.south, "east": bbox.east, "north": bbox.north},
                   "entities": normalize(elements, now), "fetchedAt": int(now * 1000), "source": "openstreetmap"}
         self.cache.set(key, result, TILE_TTL, now)
         return result
 
-    async def _elements(self, bbox: BBox, tier: str, key: str) -> list[dict[str, Any]]:
+    async def _block(self, tier: str, z: int, bz: int, bx: int, by: int) -> None:
+        """Fetch one block and cache every z-tile inside it. Concurrent callers share one fetch."""
+        bkey = f"{tier}:{bz}/{bx}/{by}"
+        fut = self._blocks.get(bkey)
+        if fut is None:
+            fut = asyncio.get_running_loop().create_future()
+            self._blocks[bkey] = fut
+            try:
+                bbox = tile_bbox(bz, bx, by)
+                t0 = time.monotonic()
+                elements = await self._elements(bbox, tier, f"osm:{bkey}", timeout_s=60)
+                now = time.time()
+                n = 1 << (z - bz)
+                for dy in range(n):
+                    for dx in range(n):
+                        x, y = bx * n + dx, by * n + dy
+                        tb = tile_bbox(z, x, y)
+                        self._store(z, x, y, tier, tb, [el for el in elements if intersects(el, tb)], now)
+                self.warmed += n * n
+                log.info("osm block %s: %d elements -> %d tiles in %.1fs", bkey, len(elements), n * n, time.monotonic() - t0)
+                fut.set_result(None)
+            except Exception as e:
+                fut.set_exception(e)
+            finally:
+                self._blocks.pop(bkey, None)
+        await asyncio.shield(fut)
+
+    async def warm(self, lng: float, lat: float, radius_blocks: int = 1) -> None:
+        """Pre-fetch the street blocks around a point (and the district block over it) so the first visitor never waits."""
+        for tier, r in (("district", 0), ("street", radius_blocks)):
+            bz = BLOCK_ZOOM[tier]
+            cx, cy = lnglat_to_tile(lng, lat, bz)
+            z = 13 if tier == "district" else 16
+            for by in range(cy - r, cy + r + 1):
+                for bx in range(cx - r, cx + r + 1):
+                    n = 1 << (z - bz)
+                    if self.cache.get(f"osm:{tier}:{z}/{bx * n}/{by * n}") is not None:
+                        continue
+                    try:
+                        await self._block(tier, z, bz, bx, by)
+                    except Exception as e:
+                        log.warning("warm %s %d/%d/%d: %s", tier, bz, bx, by, e)
+
+    async def _elements(self, bbox: BBox, tier: str, key: str, timeout_s: int = 25) -> list[dict[str, Any]]:
         if self.fixtures is not None:
             f = self.fixtures / (key.replace(":", "_").replace("/", "_") + ".json")
             if f.exists():
                 return json.loads(f.read_text()).get("elements", [])
             raise LookupError(f"no fixture for {key}")
-        query = (MAJOR_QUERY if tier == "district" else STREET_QUERY).format(bbox=bbox.overpass())
+        query = (MAJOR_QUERY if tier == "district" else STREET_QUERY).format(bbox=bbox.overpass()).replace("[timeout:25]", f"[timeout:{timeout_s}]")
         async with self._slots:
             async with self._lock:
                 wait = self.min_interval - (time.monotonic() - self._last)
@@ -199,7 +273,7 @@ class OverpassClient:
             for url in live:
                 t0 = time.monotonic()
                 try:
-                    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=8.0)) as client:
+                    async with httpx.AsyncClient(timeout=httpx.Timeout(timeout_s + 30.0, connect=8.0)) as client:
                         r = await client.post(url, data={"data": query}, headers={"User-Agent": "atlas-infinity/0.2 (OpenStreetMap data for a live city map)"})
                         r.raise_for_status()
                         self.url = url
