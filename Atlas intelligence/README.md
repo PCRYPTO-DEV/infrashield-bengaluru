@@ -105,6 +105,7 @@ model is ever loaded.
 ## Docs
 
 - [What the decks promise and where the product stands](docs/DECK_COVERAGE.md)
+- [Launch deck (PowerPoint)](docs/City_Atlas_Launch.pptx), built by `docs/deck/build_launch_deck.js` from real product screenshots and the brand colours
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): the whole system, the ln merge, the data flow
 - [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md): OpenStreetMap, TomTom, Open-Meteo, cameras, the AI writer; quotas and caching
