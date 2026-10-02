@@ -40,6 +40,8 @@ class History:
         c.execute("CREATE TABLE IF NOT EXISTS air_readings (ts REAL NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, eu_aqi REAL, us_aqi REAL, pm25 REAL, pm10 REAL, no2 REAL, o3 REAL)")
         c.execute("CREATE INDEX IF NOT EXISTS air_ts ON air_readings (lat, lng, ts)")
         c.execute("CREATE TABLE IF NOT EXISTS cell_daily (h3 TEXT NOT NULL, day TEXT NOT NULL, score REAL, vector TEXT, PRIMARY KEY (h3, day))")
+        c.execute("CREATE TABLE IF NOT EXISTS crime_reports (id TEXT PRIMARY KEY, ts REAL NOT NULL, kind TEXT NOT NULL, description TEXT, lng REAL NOT NULL, lat REAL NOT NULL, reporter TEXT)")
+        c.execute("CREATE INDEX IF NOT EXISTS rep_ts ON crime_reports (ts)")
         c.commit()
         self.listeners: list[Any] = []
 
@@ -100,6 +102,29 @@ class History:
         with self._lock:
             row = self._conn.execute("SELECT ts, eu_aqi, pm25 FROM air_readings WHERE lat = ? AND lng = ? AND ts BETWEEN ? AND ? ORDER BY ABS(ts - ?) LIMIT 1", (round(lat, 2), round(lng, 2), target - 5400, target + 5400, target)).fetchone()
         return {"ts": row[0], "euAqi": row[1], "pm25": row[2]} if row else None
+
+    # ---- what people report: crimes and unsafe moments, kept for a day, never verified by the app ----
+    def record_report(self, kind: str, description: str, lng: float, lat: float, reporter: str, ts: float | None = None) -> dict[str, Any]:
+        import uuid
+        ts = time.time() if ts is None else ts
+        rid = uuid.uuid4().hex[:12]
+        with self._lock:
+            self._conn.execute("INSERT INTO crime_reports VALUES (?,?,?,?,?,?,?)", (rid, ts, kind, description, lng, lat, reporter))
+            self._conn.commit()
+        row = {"id": rid, "ts": ts, "kind": kind, "description": description, "lng": lng, "lat": lat}
+        self._notify("report", {"id": rid, "kind": kind, "lng": lng, "lat": lat, "ts": ts})
+        return row
+
+    def reports_in_bbox(self, west: float, south: float, east: float, north: float, since_s: float = 86400, now: float | None = None, limit: int = 200) -> list[dict[str, Any]]:
+        now = time.time() if now is None else now
+        with self._lock:
+            rows = self._conn.execute("SELECT id, ts, kind, description, lng, lat FROM crime_reports WHERE ts >= ? AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? ORDER BY ts DESC LIMIT ?", (now - since_s, west, east, south, north, limit)).fetchall()
+        return [{"id": r[0], "ts": r[1], "kind": r[2], "description": r[3], "lng": r[4], "lat": r[5]} for r in rows]
+
+    def reports_today_by(self, reporter: str, now: float | None = None) -> int:
+        now = time.time() if now is None else now
+        with self._lock:
+            return int(self._conn.execute("SELECT COUNT(*) FROM crime_reports WHERE reporter = ? AND ts >= ?", (reporter, now - 86400)).fetchone()[0])
 
     def save_cell_day(self, h3: str, day: str, score: float | None, vector: str) -> None:
         with self._lock:

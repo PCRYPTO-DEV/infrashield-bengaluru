@@ -34,6 +34,7 @@ import { SnapshotRecorder } from '../engine/simulation/snapshotRecorder'
 import { TimeMachine, type TimeKind } from '../data/realtime/timeMachine'
 import { parseIntent } from '../intelligence/reasoning/intentParser'
 import { saveItem } from './saved'
+import { fetchReports, postReport, type CrimeReport, type ReportKind } from '../data/adapters/reportsAdapter'
 import { inkDocument } from '../rendering/svg/inkSvg'
 import { ClaudeExplainer, type Language } from '../intelligence/reasoning/claudeExplainer'
 import type { EvidenceItem } from '../intelligence/reasoning/evidence'
@@ -53,7 +54,7 @@ import { tr, type StringKey } from '../ui/i18n'
 import type { IntelligenceState } from '../intelligence/types'
 
 export type Theme = 'day' | 'night'
-export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'sites' | 'scenario' | 'saved'
+export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'sites' | 'scenario' | 'saved' | 'report'
 
 export const DEFAULT_SEED = REGIONS[DEFAULT_REGION].seed
 /** Base URL of the Atlas server; empty means same origin (Vite proxies /api in dev). */
@@ -140,6 +141,7 @@ export class CityAtlas {
     // Warm the streets around this origin on the server right away (a state just chosen): by the time the reader pans, tiles are there.
     if (real && typeof window !== 'undefined') { const o = region.origin; void fetch(`${SERVER_BASE}/api/warm?lng=${o.lng}&lat=${o.lat}`).catch(() => {}) }
     this.feeds?.subscribe(() => this.onFeeds())
+    if (this.feeds) this.feeds.onReport = () => void this.loadReports(true)
     this.sim = new SimulationClient(80)
     this.intel = new IntelligencePipeline(this.world)
     this.zones = new ZoneEngine(this.world.unitPerMetre, this.frame.groundScale)
@@ -209,6 +211,7 @@ export class CityAtlas {
       if (this.camera.zoom < 15.4) this.districts.update(view, this.camera.centre)
       this.feeds?.setView(view)
       if (ts.mode !== 'live') this.syncTimeMachine()
+      void this.loadReports()
     }
     if (ts.mode === 'historical' && this.region.simulation) {
       // Replay: show the recorded frame for this instant; the simulation is not consulted.
@@ -229,7 +232,7 @@ export class CityAtlas {
   }
 
   worldState(wallClock: number, lod = this.lodController.lod(this.camera.zoom)): WorldState {
-    return { time: this.temporal.current.timestamp, wallClock, temporal: this.temporal.current, camera: this.camera, lod, mode: this.mode, layers: this.layers, world: this.world, intel: this.intel.state, zones: this.zones.list(), selection: this.selection, highlights: this.highlights, route: this.route, routePick: this.routePick, drawing: this.draw.state, hover: this.hover }
+    return { time: this.temporal.current.timestamp, wallClock, temporal: this.temporal.current, camera: this.camera, lod, mode: this.mode, layers: this.layers, world: this.world, intel: this.intel.state, zones: this.zones.list(), selection: this.selection, highlights: this.highlights, route: this.route, routePick: this.routePick, drawing: this.draw.state, hover: this.hover, reports: this.reportPoints() }
   }
 
   private lastSnapshot: SimSnapshot | null = null
@@ -403,6 +406,7 @@ export class CityAtlas {
     return out
   }
   lngLatOf(p: WorldPoint): LngLat { return localToLngLat(this.frame, p) }
+  localOf(ll: LngLat): WorldPoint { return lngLatToLocal(this.frame, ll) }
 
   // ---------- interaction API (used by UI) ----------
   setMode(mode: ViewMode): void { this.mode = mode; this.layers = modeDefaults(mode); this.notify() }
@@ -486,6 +490,35 @@ export class CityAtlas {
     this.notify()
   }
   clearScenarioRoute(): void { this.applyRouteChoice(); this.notify() }
+  // ---------- just reported: people's crime reports, kept a day, pink on the map ----------
+  reports: CrimeReport[] = []
+  private reportsKey = ''
+  private reportsAt = 0
+  /** Reports for the view on screen: on a view change, every minute, and at once when the stream says someone reported. */
+  async loadReports(force = false): Promise<void> {
+    if (!this.feeds) return
+    const v = this.camera.viewBounds()
+    const sw = this.lngLatOf({ x: v.minX, y: v.maxY }), ne = this.lngLatOf({ x: v.maxX, y: v.minY })
+    const pad = 0.01
+    const bbox = { west: Math.min(sw.lng, ne.lng) - pad, south: Math.min(sw.lat, ne.lat) - pad, east: Math.max(sw.lng, ne.lng) + pad, north: Math.max(sw.lat, ne.lat) + pad }
+    const key = [bbox.west, bbox.south, bbox.east, bbox.north].map((x) => x.toFixed(2)).join(',')
+    const now = Date.now()
+    if (!force && key === this.reportsKey && now - this.reportsAt < 60_000) return
+    this.reportsKey = key; this.reportsAt = now
+    try {
+      const r = await fetchReports(SERVER_BASE, bbox)
+      this.reports = r.items
+      this.notify()
+    } catch { /* the layer is optional; the last list stays */ }
+  }
+  /** Send a report; it comes back to everyone (this browser included) through the stream. */
+  async reportCrime(kind: ReportKind, description: string, ll: LngLat): Promise<CrimeReport> {
+    const r = await postReport(SERVER_BASE, { kind, description, lng: ll.lng, lat: ll.lat })
+    if (!this.reports.some((x) => x.id === r.id)) { this.reports = [r, ...this.reports]; this.notify() }
+    return r
+  }
+  reportPoints(): WorldPoint[] { return this.reports.map((r) => lngLatToLocal(this.frame, { lng: r.lng, lat: r.lat })) }
+
   /** Saved areas and projects live in this browser; the version lets panels refresh. */
   savedVersion = 0
   save(item: Parameters<typeof saveItem>[0]): void { saveItem(item); this.savedVersion++; this.notify() }

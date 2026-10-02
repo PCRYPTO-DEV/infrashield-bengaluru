@@ -109,6 +109,8 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
     register_memory(app, history)
     from .timemachine import register as register_timemachine
     register_timemachine(app, history)
+    from .reports import register as register_reports
+    register_reports(app, history)
     register_alerts(app, alerts)
     cells = CellModel(osm, history, None, air)
     app.state.cells = cells

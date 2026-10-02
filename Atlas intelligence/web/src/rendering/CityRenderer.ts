@@ -25,6 +25,8 @@ export interface WorldState {
   zones: MonitoringZone[]
   selection: Selection | null
   highlights: { points: WorldPoint[]; entityIds: string[]; agentIds: number[]; rings?: WorldPoint[][] }
+  /** people's crime reports in view (pink markers) */
+  reports?: WorldPoint[]
   route: RouteResult | null
   routePick: WorldPoint[]
   drawing: DrawState | null

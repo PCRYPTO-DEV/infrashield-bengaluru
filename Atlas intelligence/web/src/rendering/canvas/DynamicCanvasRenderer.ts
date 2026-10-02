@@ -150,6 +150,13 @@ export class DynamicCanvasRenderer {
     // ---- drawing in progress ----
     if (s.drawing) this.drawDrawing(ctx, s, px)
 
+    // ---- just reported: a pink pin with a slow pulse, visible at every zoom ----
+    for (const p of s.reports ?? []) {
+      if (!inView(p, 60)) continue
+      const pulse = 0.5 + 0.5 * Math.sin(s.wallClock / 700)
+      ctx.beginPath(); ctx.arc(p.x, p.y, (10 + pulse * 6) * px, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,45,149,0.18)'; ctx.fill()
+      ctx.beginPath(); ctx.arc(p.x, p.y, 5 * px, 0, Math.PI * 2); ctx.fillStyle = '#ff2d95'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * px; ctx.stroke()
+    }
     // ---- highlights from Ask ----
     for (const p of s.highlights.points) {
       const pulse = 0.5 + 0.5 * Math.sin(s.wallClock / 500)

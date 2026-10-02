@@ -18,6 +18,7 @@ import { ComparePanel } from './panels/ComparePanel'
 import { SiteFinderPanel } from './panels/SiteFinderPanel'
 import { ScenarioPanel } from './panels/ScenarioPanel'
 import { SavedPanel } from './panels/SavedPanel'
+import { ReportPanel } from './panels/ReportPanel'
 import { Home } from './overlays/Home'
 import { AroundYou } from './overlays/AroundYou'
 import { unlockAudio } from './bleep'
@@ -28,8 +29,8 @@ import { installEmbed, readEmbedParams } from '../app/embed'
 import { lngLatToLocal } from '../geo/projection/frame'
 import type { PlaceState } from '../data/adapters/placeAdapter'
 
-type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'changed' | 'compare' | 'sites' | 'scenario' | 'saved' | null
-const TOOLS = ['insights', 'layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'compare', 'sites', 'scenario', 'saved'] as const
+type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'changed' | 'compare' | 'sites' | 'scenario' | 'saved' | 'report' | null
+const TOOLS = ['insights', 'layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'compare', 'sites', 'scenario', 'saved', 'report'] as const
 
 function seedFromUrl(): string {
   const p = new URLSearchParams(window.location.search)
@@ -103,7 +104,7 @@ export default function App() {
     return installEmbed(app)
   }, [app, embed])
   const addCompare = (name: string, st: PlaceState) => { setCompare((c) => (c.some((x) => x.state.cell === st.cell) || c.length >= 3 ? c : [...c, { name, state: st }])); setTool('compare') }
-  const sidePanel = tool === 'zones' || tool === 'route' || tool === 'upload' || tool === 'pulse' || tool === 'sites' || tool === 'scenario' || tool === 'saved'
+  const sidePanel = tool === 'zones' || tool === 'route' || tool === 'upload' || tool === 'pulse' || tool === 'sites' || tool === 'scenario' || tool === 'saved' || tool === 'report'
   const cardOverList = (tool === 'sites' || tool === 'saved') && !!app.placePoint
   return (
     <div className={`ca-app ${app.theme}${embed.embed ? ' ca-embed' : ''}`}>
@@ -125,6 +126,7 @@ export default function App() {
           <SearchBox app={app} />
           <select className="ca-place-select" title={T('place.goto')} value={placeNow} onChange={(e) => goPlace(e.target.value)}>{placeKey.startsWith('ll:') && <option value="">{cityName.name}</option>}{PLACES.map((c) => <option key={c.id} value={c.id}>{app.language === 'hi' ? c.hi : c.name}</option>)}</select>
           <button className={`ca-tool ca-changed-btn ${tool === 'changed' ? 'active' : ''}`} onClick={() => toggle('changed')}>{T('changed.btn')}{app.changes && app.changes.count > 0 && <b>{app.changes.count}</b>}</button>
+          <button className={`ca-tool ca-report-btn ${tool === 'report' ? 'active' : ''}`} onClick={() => { toggle('report'); app.select(null) }} title={T('rep.title')}>{T('rep.btn')}{app.reports.length > 0 && <b>{app.reports.length}</b>}</button>
           <button className={`ca-tool ${more ? 'active' : ''}`} onClick={() => setMore(!more)}>{T('more')} {more ? '▴' : '▾'}</button>
         </div>
         {more && <div className="ca-more" role="menu">
@@ -146,6 +148,7 @@ export default function App() {
       {/* list panels stay mounted (their results survive) while a place card opened from them is on top */}
       {tool === 'sites' && !app.selection && <div className="ca-keep" hidden={cardOverList}><SiteFinderPanel app={app} /></div>}
       {tool === 'scenario' && !app.selection && <ScenarioPanel app={app} />}
+      {tool === 'report' && !app.selection && <ReportPanel app={app} />}
       {tool === 'saved' && !app.selection && <div className="ca-keep" hidden={cardOverList}><SavedPanel app={app} /></div>}
       {tool === 'camera' && <VisionPanel app={app} />}
       {tool === 'alerts' && <AlertsPanel app={app} />}
@@ -154,7 +157,7 @@ export default function App() {
       {tool === 'compare' && <ComparePanel app={app} places={compare} onRemove={(i) => setCompare((c) => c.filter((_, j) => j !== i))} />}
       {(!sidePanel || cardOverList) && tool !== 'changed' && tool !== 'compare' && !app.selection && <PlaceCard app={app} onCompare={addCompare} />}
       <InspectorPanel app={app} />
-      <InsightBubbles app={app} onOpen={() => setTool('insights')} />
+      <InsightBubbles app={app} onOpen={() => setTool('insights')} onReport={() => setTool('report')} />
 
       {/* 4. Ask Atlas, 5. legend pill, 6. time bar */}
       <AskPanel app={app} />

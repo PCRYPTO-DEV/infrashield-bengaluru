@@ -101,6 +101,8 @@ export class LiveFeeds {
   edgeSegment = new Map<string, string>()
   /** While the time machine shows another instant, polls keep fetching but do not touch the world. */
   frozen = false
+  /** Someone just reported something (SSE): the app refreshes the reports layer. */
+  onReport: (() => void) | null = null
   private lastIncidents: UrbanEntity[] = []
   private lastUsualAt = 0
   private lastFlowAt = 0
@@ -127,6 +129,7 @@ export class LiveFeeds {
       es.onerror = () => { this.streamState = 'error'; this.changed() }
       es.addEventListener('flow', (e) => this.onStreamEvent('flow', JSON.parse((e as MessageEvent).data)))
       es.addEventListener('incidents', (e) => this.onStreamEvent('incidents', JSON.parse((e as MessageEvent).data)))
+      es.addEventListener('report', () => this.onReport?.())
     } catch { this.stream = null }
   }
   /** A reading just landed on the server: fetch it now (the server answers from its cache, so this is instant). */

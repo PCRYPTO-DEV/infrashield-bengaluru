@@ -79,6 +79,7 @@ server.
 | **English / हिंदी** | every label, answer and voice follows the toggle |
 | **Day / Night** | white paper and ink by default; the City Atlas deep-night look one click away (also `?theme=night` and the embed option) |
 | **Embed** | `embed.js` drops the whole map into the City Atlas app on Emergent, or any page, in two minutes ([docs](docs/INTEGRATION.md)) |
+| **Just reported** | a pink Report button: say what happened, where and a few words; it pops up as a pink comic callout for everyone looking at that place, for one day, marked as a person's report the app does not verify (112 first in an emergency) |
 | **Zones** | draw a shape; it counts who goes in and out, including camera dots |
 | **Route** | From → To anywhere in India with live traffic; options with time, delay and the incidents seen near each; the one with strictly fewer incidents is marked |
 | **Camera** | count people and vehicles as moving dots from a phone or laptop camera; Atlas Vision shows the street from the camera's eye as ink lines |

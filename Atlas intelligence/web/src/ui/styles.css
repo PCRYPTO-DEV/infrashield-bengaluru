@@ -26,7 +26,7 @@
   --fg-faint: rgba(238, 245, 248, 0.42);
   --accent: #2f85ff;
   --accent-ink: #ffffff;
-  --observed: #7ed957; --derived: #00c2a8; --predicted: #b7a6ff; --simulated: #ff9f43; --risk: #ff5a5f; --activity: #ffb347;
+  --observed: #7ed957; --derived: #00c2a8; --predicted: #b7a6ff; --simulated: #ff9f43; --risk: #ff5a5f; --activity: #ffb347; --pink: #ff2d95;
   --derived-soft: rgba(0, 194, 168, 0.25);
   --selection: #2f85ff;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
@@ -44,7 +44,7 @@
   --fg-faint: rgba(11, 31, 44, 0.4);
   --accent: #0f6fff;
   --accent-ink: #ffffff;
-  --observed: #0b1f2c; --derived: #0a9c88; --predicted: #6f66a3; --simulated: #c26b1a; --risk: #d23c2c; --activity: #c98a2e;
+  --observed: #0b1f2c; --derived: #0a9c88; --predicted: #6f66a3; --simulated: #c26b1a; --risk: #d23c2c; --activity: #c98a2e; --pink: #ff2d95;
   --derived-soft: rgba(10, 156, 136, 0.22);
   --selection: #0f6fff;
   --shadow: 0 8px 24px rgba(7, 25, 36, 0.14);
@@ -309,6 +309,19 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .ca-bubble::after { content: ''; position: absolute; left: -2px; bottom: -14px; width: 0; height: 0; border-left: 2px solid transparent; border-right: 12px solid transparent; border-top: 14px solid var(--brand-blue); }
 .ca-bubble.sev-mid { border-color: var(--traffic-slow); } .ca-bubble.sev-mid::after { border-top-color: var(--traffic-slow); }
 .ca-bubble.sev-high { border-color: var(--risk); } .ca-bubble.sev-high::after { border-top-color: var(--risk); }
+.ca-bubble.crime { border-color: var(--pink); background: color-mix(in srgb, var(--pink) 14%, var(--panel-strong)); border-width: 3px; border-radius: 18px 18px 18px 4px; font-weight: 700; }
+.ca-bubble.crime::after { border-top-color: var(--pink); }
+.ca-bubble.crime .ca-bubble-meta { color: var(--pink); }
+.ca-report-btn { border-color: var(--pink) !important; color: var(--pink) !important; font-weight: 700 !important; }
+.ca-report-btn.active, .ca-report-btn:hover { background: var(--pink) !important; color: #fff !important; }
+.ca-report-btn b { background: var(--pink); color: #fff; border-radius: 999px; padding: 0 6px; margin-left: 6px; font-size: 10px; }
+.ca-chip.pink, .ca-chips button.active.pink { border-color: var(--pink); color: var(--pink); }
+.ca-rep-112 { color: var(--pink); font-weight: 600; }
+.ca-rep-text { width: 100%; box-sizing: border-box; margin: 8px 0 6px; font: inherit; font-size: 12.5px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--panel-raised); color: var(--fg); resize: vertical; }
+.ca-rep-send { background: var(--pink) !important; border-color: var(--pink) !important; color: #fff !important; margin-top: 6px; }
+.ca-rep-list { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ca-rep-list button { width: 100%; text-align: left; background: var(--panel-raised); border: 1px solid var(--line); border-left: 3px solid var(--pink); border-radius: var(--radius-s); padding: 6px 10px; font-size: 12.5px; cursor: pointer; color: var(--fg); }
+.ca-rep-list small { display: block; color: var(--fg-faint); }
 .ca-bubble.pop { animation: ca-pop 0.55s cubic-bezier(0.2, 1.6, 0.4, 1); }
 @keyframes ca-pop { 0% { transform: translate(14px, calc(-100% - 14px)) scale(0.2); opacity: 0 } 60% { transform: translate(14px, calc(-100% - 14px)) scale(1.12); opacity: 1 } 100% { transform: translate(14px, calc(-100% - 14px)) scale(1) } }
 .ca-bubble-txt { display: block; }
