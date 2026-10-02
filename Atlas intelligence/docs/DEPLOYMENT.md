@@ -9,7 +9,7 @@ serves the built web app from `web/dist` with a single-page fallback.
 |---|---|---|
 | `TOMTOM_API_KEY` | for live traffic | TomTom developer key. Never commit it; rotate a key that was ever pasted into a chat. |
 | `ANTHROPIC_API_KEY` | for the AI writer | Anthropic API key. Without it the template writer answers. |
-| `ATLAS_REGION` | no | `ncr` (default) or `bengaluru` |
+| `ATLAS_REGION` | no | `ncr` (the only region so far) |
 | `ATLAS_DATA_DIR` | no | where the SQLite cache lives (default `server/data`) |
 | `TOMTOM_DAILY_BUDGET` | no | calls per UTC day before the server stops asking TomTom (default 2000) |
 | `ATLAS_FIXTURES` | no | folder of recorded responses; runs offline |
@@ -52,9 +52,8 @@ The browser additionally loads the camera detector from
 - `GET /api/traffic/status` shows today's TomTom call count.
 - In the app: the timeline badge reads `LIVE · TomTom + Open-Meteo + OpenStreetMap`; clicking a main road shows "Live speed … seen · tomtom"; City pulse → Environment shows the weather; the Ask panel shows "written by claude-opus-5-5".
 
-## Static demo build
+## Static builds
 
-`VITE_DEFAULT_REGION=bengaluru npm --prefix web run build` produces a build
-that starts on the procedural city, for hosts with no server (the simulated
-demo artifact). Real data, the AI writer and the camera detector need the
-server or the network; everything else works offline.
+The web app needs the server for every tile and feed; a static build on
+its own shows an empty map with "tiles have no map data". Always deploy the
+server with the built app in front of it.

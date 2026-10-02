@@ -49,11 +49,13 @@ function gather(intent: Intent, ctx: AskContext, ev: EvidenceItem[], hl: Answer[
   const push = (e: EvidenceItem) => ev.push(e)
   switch (intent.kind) {
     case 'whats_happening': {
-      let vehicles = 0, peds = 0
+      let vehicles = 0, peds = 0, seenV = 0, seenP = 0
       for (const a of world.agents.values()) if (inFocus(a)) { if (a.kind === 'vehicle') vehicles++; else peds++ }
-      push({ id: 'pop', classification: 'simulated', statement: `${vehicles} vehicles and ${peds} pedestrians are in the area right now`, source: 'atlas.simulation' })
+      for (const a of world.observedAgents.values()) if (inFocus(a)) { if (a.kind === 'vehicle') seenV++; else seenP++ }
+      if (vehicles + peds > 0) push({ id: 'pop', classification: 'simulated', statement: `${vehicles} vehicles and ${peds} pedestrians are in the area right now (made up by the demo)`, source: 'atlas.simulation' })
+      if (seenV + seenP > 0) push({ id: 'seen', classification: 'observed', statement: `A camera sees ${seenP} people and ${seenV} vehicles right now`, source: 'camera' })
       if (intel.flow) push({ id: 'flow', classification: 'derived', statement: `Mean speed is ${Math.round(intel.flow.meanSpeedRatio * 100)}% of free-flow; ${Math.round(intel.flow.congestedShare * 100)}% of segments are congested`, confidence: 0.8 })
-      for (const inc of world.activeIncidents(time).filter((i) => inFocus(i.point)).slice(0, 4)) { push({ id: inc.entity.id, classification: 'simulated', statement: `Active ${inc.props.kind}: ${inc.props.description} (severity ${inc.props.severity})`, location: inc.point, entityIds: [inc.entity.id] }); hl.points.push(inc.point); hl.entityIds.push(inc.entity.id) }
+      for (const inc of world.activeIncidents(time).filter((i) => inFocus(i.point)).slice(0, 4)) { push({ id: inc.entity.id, classification: inc.entity.evidence.classification, source: inc.entity.evidence.source, statement: `Active ${inc.props.kind}: ${inc.props.description} (severity ${inc.props.severity})`, location: inc.point, entityIds: [inc.entity.id] }); hl.points.push(inc.point); hl.entityIds.push(inc.entity.id) }
       for (const h of (intel.activity?.hotspots ?? []).filter(inFocus).slice(0, 3)) { push({ id: `hot:${h.x}`, classification: 'derived', statement: `Activity hotspot (index ${h.score.toFixed(2)}): ${h.reason}`, location: h, confidence: 0.7 }); hl.points.push(h) }
       for (const a of intel.anomalies.filter((x) => inFocus(x.location)).slice(0, 3)) { push({ id: a.id, classification: 'derived', statement: `${a.type.replace('_', ' ')}: ${a.explanation}`, location: a.location, confidence: a.confidence }); hl.points.push(a.location) }
       break
@@ -77,8 +79,8 @@ function gather(intent: Intent, ctx: AskContext, ev: EvidenceItem[], hl: Answer[
         push({ id: roadId, classification: 'derived', statement: `${r.name}: congestion ${r.cong.toFixed(2)}${r.observed ? ' from live TomTom speeds' : ` with ${r.count} simulated vehicles`}${inc ? `; an active ${inc.kind} is on this road (${inc.description})` : ''}`, entityIds: [roadId], confidence: r.observed ? 0.85 : 0.75 })
         hl.entityIds.push(roadId)
       }
-      const signals = [...world.entities.values()].filter((e) => e.entity.type === 'traffic_signal' && inFocus(e.local[0])).length
-      push({ id: 'signals', classification: 'simulated', statement: `${signals} signalised intersections in view impose cyclic stops (60–90 s cycles)` })
+      const signalEntities = [...world.entities.values()].filter((e) => e.entity.type === 'traffic_signal' && inFocus(e.local[0]))
+      if (signalEntities.length) { const observedSignals = signalEntities[0].entity.evidence.classification === 'observed'; push({ id: 'signals', classification: observedSignals ? 'observed' : 'simulated', source: signalEntities[0].entity.evidence.source, statement: observedSignals ? `${signalEntities.length} traffic lights in view (positions from OpenStreetMap) stop traffic in turns` : `${signalEntities.length} traffic lights in view stop traffic in turns (made up by the demo)` }) }
       break
     }
     case 'unusual': {
@@ -120,7 +122,7 @@ function gather(intent: Intent, ctx: AskContext, ev: EvidenceItem[], hl: Answer[
       push({ id: 'conf', classification: 'predicted', statement: `Forecast horizon ${f.horizonsMin[idx]} min, model confidence ${Math.round(f.confidence[idx] * 100)}%`, confidence: f.confidence[idx] })
       if (!rising.length) push({ id: 'stable', classification: 'predicted', statement: 'No segment in view is projected to worsen materially', confidence: f.confidence[idx] })
       for (const r of rising.slice(0, 5)) push({ id: r.road, classification: 'predicted', statement: `${r.road}: congestion ${r.now.toFixed(2)} → ${r.later.toFixed(2)} projected`, confidence: f.confidence[idx] })
-      for (const inc of world.activeIncidents(time).filter((i) => inFocus(i.point) && i.props.endTime > time)) push({ id: inc.entity.id, classification: 'simulated', statement: `${inc.props.kind} expected to clear at ${new Date(inc.props.endTime).toISOString().slice(11, 16)} UTC`, location: inc.point })
+      for (const inc of world.activeIncidents(time).filter((i) => inFocus(i.point) && i.props.endTime > time)) push({ id: inc.entity.id, classification: inc.entity.evidence.classification, source: inc.entity.evidence.source, statement: `${inc.props.kind} expected to clear at ${new Date(inc.props.endTime).toISOString().slice(11, 16)} UTC`, location: inc.point })
       caveats.push('Forecasts extrapolate recent trends; confidence decays with horizon.')
       break
     }

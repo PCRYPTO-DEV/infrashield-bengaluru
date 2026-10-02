@@ -26,20 +26,28 @@ export function cityPulse(world: WorldModel, intel: IntelligenceState, time: num
   }
   const anomalies = intel.anomalies
   const highSeverity = anomalies.filter((a) => a.severity >= 0.6).length
-  const cls: EvidenceMetadata['classification'] = 'simulated'
+  // Moving things: made up only in the demo; seen when a camera reports them; otherwise there is no source and nothing is claimed.
+  const movingCls: EvidenceMetadata['classification'] | null = world.agents.size > 0 ? 'simulated' : world.observedAgents.size > 0 ? 'observed' : null
+  const cls: EvidenceMetadata['classification'] = movingCls ?? 'observed'
+  const seenV = [...world.observedAgents.values()].filter((a) => a.kind === 'vehicle').length, seenP = world.observedAgents.size - seenV
+  const vehiclesShown: number | string = movingCls === null ? 'no feed' : movingCls === 'observed' ? seenV : vehicles
+  const pedestriansShown: number | string = movingCls === null ? 'no feed' : movingCls === 'observed' ? seenP : pedestrians
+  const incidentCls: EvidenceMetadata['classification'] = incidents.length ? incidents[0].entity.evidence.classification : 'observed'
+  const firstRoad = [...world.entities.values()].find((e) => e.entity.type === 'road')
+  const mapCls: EvidenceMetadata['classification'] = firstRoad ? firstRoad.entity.evidence.classification : 'observed'
   const categories: PulseCategory[] = [
     { id: 'mobility', label: 'Mobility', index: flow ? Math.max(0, Math.min(1, flow.meanSpeedRatio)) : null, measurements: [
-      { label: 'Vehicles in view', value: vehicles, evidence: cls },
+      { label: 'Vehicles in view', value: vehiclesShown, evidence: cls },
       { label: 'Mean speed / free-flow', value: flow ? flow.meanSpeedRatio.toFixed(2) : 'n/a', evidence: 'derived' },
       { label: 'Congested segments', value: flow ? `${Math.round(flow.congestedShare * 100)}%` : 'n/a', evidence: 'derived' },
     ] },
     { id: 'activity', label: 'Activity', index: activity ? activity.overall : null, measurements: [
-      { label: 'Pedestrians in view', value: pedestrians, evidence: cls },
+      { label: 'Pedestrians in view', value: pedestriansShown, evidence: cls },
       { label: 'Active cells', value: density ? density.cells.size : 0, evidence: 'derived' },
       { label: 'Hotspots', value: activity ? activity.hotspots.length : 0, evidence: 'derived' },
     ] },
     { id: 'safety', label: 'Safety signals', index: Math.max(0, 1 - 0.12 * incidents.length - 0.05 * highSeverity), measurements: [
-      { label: 'Active incidents', value: incidents.length, evidence: cls },
+      { label: 'Active incidents', value: incidents.length, evidence: incidentCls },
       { label: 'Anomalies (all)', value: anomalies.length, evidence: 'derived' },
       { label: 'Anomalies (severity ≥ 0.6)', value: highSeverity, evidence: 'derived' },
       { label: 'Risk hotspots', value: intel.risk?.hotspots.length ?? 0, evidence: 'derived' },
@@ -57,11 +65,11 @@ export function cityPulse(world: WorldModel, intel: IntelligenceState, time: num
           { label: 'Air quality feed', value: 'not connected', evidence: 'observed' },
         ] },
     { id: 'infrastructure', label: 'Infrastructure', index: Math.max(0, Math.min(1, 1 - construction / Math.max(1, roads) * 4)), measurements: [
-      { label: 'Road segments loaded', value: roads, evidence: cls },
-      { label: 'Signalised intersections', value: signals, evidence: cls },
-      { label: 'Buildings', value: buildings, evidence: cls },
-      { label: 'Transit stops', value: transit, evidence: cls },
-      { label: 'Construction sites', value: construction, evidence: cls },
+      { label: 'Road segments loaded', value: roads, evidence: mapCls },
+      { label: 'Signalised intersections', value: signals, evidence: mapCls },
+      { label: 'Buildings', value: buildings, evidence: mapCls },
+      { label: 'Transit stops', value: transit, evidence: mapCls },
+      { label: 'Construction sites', value: construction, evidence: mapCls },
     ] },
   ]
   return { time, categories }

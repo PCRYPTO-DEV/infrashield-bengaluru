@@ -5,6 +5,11 @@ import type { AgentView } from '../../engine/world/WorldModel'
 import type { WorldPoint } from '../../geo/projection/mercator'
 import type { IncidentProperties } from '../../entities/types'
 
+/** Google Maps colour code for congestion: green, orange, red, dark red. */
+export function trafficColour(congestion: number): string {
+  return congestion < 0.25 ? PALETTE.trafficFree : congestion < 0.5 ? PALETTE.trafficSlow : congestion < 0.8 ? PALETTE.trafficCongested : PALETTE.trafficJammed
+}
+
 /**
  * High-frequency layer: agents, traces, predictions, overlays, zones,
  * selection. Draws in world units through a single transform so geometry
@@ -221,10 +226,11 @@ export class DynamicCanvasRenderer {
       ctx.beginPath(); ctx.moveTo(ep.a.x, ep.a.y); ctx.lineTo(ep.b.x, ep.b.y)
       // observed flow is solid; simulation-derived flow is lighter and dashed so the two never read the same
       const alpha = f.observed ? 1 : 0.55
-      ctx.strokeStyle = c > 0.6 ? `rgba(181,73,58,${((0.3 + c * 0.5) * alpha).toFixed(2)})` : `rgba(47,127,134,${((0.2 + c * 0.5) * alpha).toFixed(2)})`
-      ctx.lineWidth = (f.observed ? 3 + c * 4 : 2 + f.count * 0.6) * px
+      ctx.strokeStyle = trafficColour(c)
+      ctx.globalAlpha = alpha
+      ctx.lineWidth = (f.observed ? 3.5 + c * 3 : 2 + f.count * 0.6) * px
       if (!f.observed) ctx.setLineDash([5 * px, 4 * px])
-      ctx.stroke(); ctx.setLineDash([])
+      ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1
     }
   }
 
@@ -235,7 +241,7 @@ export class DynamicCanvasRenderer {
       const v = vals[idx]; if (v < 0.3) continue
       const e = g.edge(edgeId); const ep = e && g.endpoints(e); if (!e || !ep || !inView(ep.a, 50)) continue
       ctx.beginPath(); ctx.moveTo(ep.a.x, ep.a.y); ctx.lineTo(ep.b.x, ep.b.y)
-      ctx.strokeStyle = `rgba(111,102,163,${(0.2 + v * 0.5).toFixed(2)})`; ctx.lineWidth = (3 + v * 6) * px; ctx.setLineDash([6 * px, 4 * px]); ctx.stroke(); ctx.setLineDash([])
+      ctx.strokeStyle = trafficColour(v); ctx.globalAlpha = 0.45 + v * 0.3; ctx.lineWidth = (3 + v * 6) * px; ctx.setLineDash([6 * px, 4 * px]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.font = `${12 * this.dpr}px Georgia, serif`; ctx.fillStyle = PALETTE.predicted

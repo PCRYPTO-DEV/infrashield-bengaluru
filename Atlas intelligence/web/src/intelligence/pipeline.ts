@@ -32,11 +32,11 @@ export class IntelligencePipeline {
     try {
       const ctx = this.context(snapshot.time)
       const flow = await TrafficFlowAnalyzer.process(snapshot, ctx)
-      const density = await DensityAnalyzer.process({ agents: this.world.agents.values(), time: snapshot.time }, ctx)
+      const density = await DensityAnalyzer.process({ agents: this.world.allAgents(), time: snapshot.time }, ctx)
       this.history.flows.push(flow); if (this.history.flows.length > this.history.maxLength) this.history.flows.shift()
       this.history.densities.push(density); if (this.history.densities.length > this.history.maxLength) this.history.densities.shift()
       const activity = await UrbanActivityAnalyzer.process({ density, flow, time: snapshot.time }, ctx)
-      const anomalies = await AnomalyDetector.process({ time: snapshot.time, agents: this.world.agents.values(), flow, density, zones }, ctx)
+      const anomalies = await AnomalyDetector.process({ time: snapshot.time, agents: this.world.allAgents(), flow, density, zones }, ctx)
       const risk = await RouteRiskAnalyzer.process({ flow, density, time: snapshot.time }, ctx)
       const forecast = await CongestionForecaster.process({ flow }, ctx)
       const predictions = new Map<number, Awaited<ReturnType<typeof MovementPredictor.process>>>()

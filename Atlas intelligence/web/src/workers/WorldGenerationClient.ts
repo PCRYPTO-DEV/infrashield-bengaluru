@@ -15,7 +15,7 @@ export class WorldGenerationClient implements ChunkSource {
   private next = 0
   private rr = 0
 
-  constructor(size = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1)), private tier: GenerationTier = 'street', shared?: Port[], private baseUrl = '') {
+  constructor(size = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1)), private tier: GenerationTier = 'street', shared?: Port[], private baseUrl = '', private fallbackToProcedural = false) {
     if (shared) { this.workers = shared; this.attach(); return }
     for (let i = 0; i < size; i++) {
       this.workers.push(createPort(() => new Worker(new URL('./worldGeneration.worker.ts', import.meta.url), { type: 'module' }), (m) => handleGenerationAsync(m as GenerateMessage)))
@@ -38,9 +38,9 @@ export class WorldGenerationClient implements ChunkSource {
   }
 
   /** A second client sharing this pool (e.g. the district tier). */
-  fork(tier: GenerationTier, baseUrl = ''): WorldGenerationClient { return new WorldGenerationClient(0, tier, this.workers, baseUrl) }
+  fork(tier: GenerationTier, baseUrl = '', fallbackToProcedural = false): WorldGenerationClient { return new WorldGenerationClient(0, tier, this.workers, baseUrl, fallbackToProcedural) }
 
-  /** Count of real-data tiles that failed and fell back to the procedural city. */
+  /** Count of real-data tiles that could not be fetched (left empty, or filled procedurally only when a demo asks for it). */
   fallbacks = 0
 
   generate(req: ChunkRequest, signal: AbortSignal): Promise<ChunkData> {
@@ -51,10 +51,11 @@ export class WorldGenerationClient implements ChunkSource {
       const job: Job = {
         resolve,
         reject: (e) => {
-          // Real data unavailable for this tile: show the procedural city there, labelled simulated, and count it.
           if (!fallbackTier || signal.aborted) { reject(e); return }
           this.fallbacks++
           console.warn(e.message)
+          // Real data unavailable for this tile. The real product leaves it empty: nothing is ever made up in its place.
+          if (!this.fallbackToProcedural) { reject(e); return }
           const id2 = (++this.next) * 4 + TIER_INDEX[fallbackTier]
           this.jobs.set(id2, { resolve, reject })
           this.workers[this.rr++ % this.workers.length].postMessage({ type: 'generate', id: id2, req, tier: fallbackTier })

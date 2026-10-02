@@ -6,8 +6,9 @@ happen next, and how sure are we?* It says, for every object on screen, how it
 knows: **seen**, **worked out**, **a guess**, or **made up**.
 
 First region: **Delhi NCR**, with real streets and buildings from
-OpenStreetMap and live traffic from TomTom. A seeded procedural city
-(Bengaluru demo) is the fallback and the offline demo.
+OpenStreetMap and live traffic from TomTom. Nothing on the map is made up:
+where no data exists, the map stays empty and says so. (The procedural
+city generator survives in the engine for tests only.)
 
 Three open-source ideas are merged into one product:
 

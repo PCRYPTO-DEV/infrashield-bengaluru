@@ -17,7 +17,10 @@ const S = {
   'top.regenerate': ['new city', 'नया शहर'],
   'badge.osm': ['real streets · OpenStreetMap', 'असली सड़कें · OpenStreetMap'],
   'badge.simworld': ['made-up city', 'नकली शहर'],
-  'badge.simtraffic': ['traffic is simulated', 'ट्रैफ़िक नकली है'],
+  'badge.simtraffic': ['traffic is made up (demo)', 'ट्रैफ़िक बनावटी है (डेमो)'],
+  'badge.notraffic': ['no live traffic feed yet', 'अभी लाइव ट्रैफ़िक नहीं'],
+  'badge.demo': ['DEMO · made-up city, not data', 'डेमो · बनावटी शहर, डेटा नहीं'],
+  'badge.realonly': ['real data only · nothing is made up', 'सिर्फ़ असली डेटा · कुछ भी बनावटी नहीं'],
   'badge.livetraffic': ['live traffic · TomTom', 'लाइव ट्रैफ़िक · TomTom'],
   'badge.derived': ['numbers are worked out', 'आँकड़े हिसाब से निकाले गए'],
   'badge.fallback': ['{n} tiles have no map data', '{n} टुकड़ों का नक्शा नहीं मिला'],
@@ -83,6 +86,7 @@ const S = {
   'legend.derived': ['worked out from data · soft colour', 'डेटा से निकाला · हल्का रंग'],
   'legend.predicted': ['a guess about the future · dashed', 'भविष्य का अनुमान · टूटी लकीर'],
   'legend.simulated': ['made up by the simulation · purple when ahead of now', 'सिमुलेशन का बनाया · आगे के समय में बैंगनी'],
+  'legend.traffic': ['traffic · green, orange, red, dark red (like Google Maps); dashed when only a guess', 'ट्रैफ़िक · हरा, नारंगी, लाल, गहरा लाल (Google Maps जैसा); अनुमान हो तो टूटी लकीर'],
   'legend.risk': ['accident or risk · rings', 'हादसा या ख़तरा · गोल घेरे'],
   // timeline
   'time.live': ['LIVE', 'लाइव'],
@@ -93,6 +97,7 @@ const S = {
   'time.now': ['now', 'अभी'],
   'time.behind': ['catching up… {n} s behind', 'पीछे है… {n} सेकंड'],
   'time.right': ['2 hours ahead · a guess', '2 घंटे आगे · अनुमान'],
+  'time.nofuture': ['the future is not simulated for real data', 'असली डेटा के लिए भविष्य नहीं बनाया जाता'],
   // inspector
   'insp.title': ['Details', 'जानकारी'],
   'insp.gone': ['This one left the loaded area.', 'यह लोड किए इलाक़े से बाहर चला गया।'],

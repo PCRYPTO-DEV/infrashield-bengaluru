@@ -112,8 +112,8 @@ export class CityAtlas {
     this.world = new WorldModel(this.frame)
     this.gen = new WorldGenerationClient()
     const real = region.source === 'osm'
-    const streetSource = real ? this.gen.fork('osm', SERVER_BASE) : this.gen
-    const districtSource = this.gen.fork(real ? 'osm-district' : 'district', SERVER_BASE)
+    const streetSource = real ? this.gen.fork('osm', SERVER_BASE, region.simulation) : this.gen
+    const districtSource = this.gen.fork(real ? 'osm-district' : 'district', SERVER_BASE, region.simulation)
     this.chunks = new CityChunkManager(streetSource, { frame: this.frame, globalSeed: this.seed, datasetVersion: DATASET_VERSION, prefetchPad: 1, unloadPad: 3, maxChunks: 64, concurrency: real ? 2 : 3, budget: 42 })
     this.districts = new CityChunkManager(districtSource, { frame: this.frame, globalSeed: this.seed, datasetVersion: DATASET_VERSION, prefetchPad: 1, unloadPad: 2, maxChunks: 160, concurrency: real ? 1 : 2, chunkZoom: DISTRICT_ZOOM, budget: 120 })
     this.realSources = { street: real ? streetSource : null, district: real ? districtSource : null }
@@ -234,7 +234,9 @@ export class CityAtlas {
   private onChunkLoaded(c: ChunkData): void {
     this.world.addChunk(c)
     this.renderer?.addChunk(c)
-    this.sim.addChunk({ key: c.key, graph: c.graph, meta: c.meta, incidents: c.entities.filter((e) => e.type === 'incident').map((e) => ({ id: e.id, props: e.properties as IncidentProperties })) })
+    // Real regions never get a made-up population or made-up incidents: the simulation only carries observed flow and live incidents.
+    const sim = this.region.simulation
+    this.sim.addChunk({ key: c.key, graph: c.graph, meta: sim ? c.meta : { ...c.meta, vehicleBudget: 0, pedestrianBudget: 0 }, incidents: sim ? c.entities.filter((e) => e.type === 'incident').map((e) => ({ id: e.id, props: e.properties as IncidentProperties })) : [] })
     this.notify()
   }
   private onChunkUnloaded(key: string): void { this.world.removeChunk(key); this.renderer?.removeChunk(key); this.sim.removeChunk(key); this.notify() }
@@ -253,12 +255,12 @@ export class CityAtlas {
   /** Live feed status for the UI. */
   get liveStatus(): { live: boolean; label: string; detail: string } {
     const f = this.feeds
-    if (!f) return { live: false, label: 'simulated feed', detail: 'Procedural region: traffic and incidents are simulated.' }
+    if (!f) return { live: false, label: 'demo · made-up city', detail: 'Engine demo: this city, its traffic and its incidents are made up. It is not data.' }
     const parts: string[] = []
     if (f.status.flow === 'open') parts.push('TomTom')
     if (f.status.weather === 'open') parts.push('Open-Meteo')
     const live = parts.length > 0
-    const label = live ? `${parts.join(' + ')} + OpenStreetMap` : f.status.flow === 'error' ? 'feeds unavailable · simulated' : 'connecting feeds'
+    const label = live ? `${parts.join(' + ')} + OpenStreetMap` : f.status.flow === 'error' ? 'no live traffic feed' : 'connecting feeds'
     const detail = `flow ${f.status.flow} · incidents ${f.status.incidents} · weather ${f.status.weather}${f.dailyBudget ? ` · TomTom ${f.callsToday}/${f.dailyBudget} today` : ''}${f.lastError ? ` · ${f.lastError}` : ''}`
     return { live, label, detail }
   }
@@ -406,11 +408,11 @@ export class CityAtlas {
     f.push({ id: 'region', classification: 'observed', statement: `Region: ${this.region.name}. Map time: ${new Date(t.timestamp).toUTCString()} (${t.mode}${t.paused ? ', paused' : ''}). Streets and buildings come from ${this.region.source === 'osm' ? 'OpenStreetMap (real)' : 'a seeded procedural city (not a real place)'}.`, source: this.region.source })
     f.push({ id: 'view', classification: 'observed', statement: `The view covers about ${Math.round((this.camera.viewBounds().maxX - this.camera.viewBounds().minX) / upm)} m across; ${w.chunks.size} map tiles are loaded${this.districtNames.size ? `; district names in view: ${[...new Set(this.districtNames.values())].slice(0, 6).join(', ')}` : ''}.` })
     const ls = this.liveStatus
-    f.push({ id: 'feeds', classification: ls.live ? 'observed' : 'simulated', statement: ls.live ? `Live feeds: ${ls.label}. ${ls.detail}` : `No live feed: traffic and incidents are simulated. ${ls.detail}`, source: ls.live ? 'tomtom' : 'atlas.simulation' })
+    f.push({ id: 'feeds', classification: ls.live ? 'observed' : this.region.simulation ? 'simulated' : 'derived', statement: ls.live ? `Live feeds: ${ls.label}. ${ls.detail}` : this.region.simulation ? `Engine demo: this city and its traffic are made up. ${ls.detail}` : `No live traffic feed right now, so road speeds are unknown. ${ls.detail}`, source: ls.live ? 'tomtom' : this.region.simulation ? 'atlas.simulation' : 'atlas' })
     if (w.weather) f.push({ id: 'weather', classification: 'observed', statement: `Weather now: ${w.weather.description ?? 'unknown'}${w.weather.temperatureC != null ? `, ${Math.round(w.weather.temperatureC)} °C` : ''}${w.weather.precipitationMm ? `, ${w.weather.precipitationMm} mm rain` : ''}${w.weather.windKmh != null ? `, wind ${Math.round(w.weather.windKmh)} km/h` : ''}.`, source: w.weather.source })
     let vehicles = 0, peds = 0
     for (const a of w.agents.values()) { if (a.kind === 'vehicle') vehicles++; else peds++ }
-    f.push({ id: 'agents', classification: 'simulated', statement: `${vehicles} vehicles and ${peds} pedestrians are moving on the loaded streets.`, source: 'atlas.simulation' })
+    if (vehicles + peds > 0) f.push({ id: 'agents', classification: 'simulated', statement: `${vehicles} vehicles and ${peds} pedestrians are moving on the loaded streets (made up by the demo).`, source: 'atlas.simulation' })
     if (w.observedAgents.size) f.push({ id: 'camera', classification: 'observed', statement: `A camera is counting right now: ${[...w.observedAgents.values()].filter((a) => a.kind === 'pedestrian').length} people and ${[...w.observedAgents.values()].filter((a) => a.kind === 'vehicle').length} vehicles in its view.`, source: `camera:${this.vision.cameraId}` })
     const flow = this.intel.state.flow
     if (flow) {

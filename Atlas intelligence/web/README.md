@@ -20,9 +20,9 @@ npm test           # vitest
 npm run build      # typecheck + production bundle
 ```
 
-Open `http://localhost:5174/?world=atlas://world/bengaluru-2026` — any
-seed string produces a different, reproducible city anchored on the Bengaluru
-demo region.
+Open `http://localhost:5174/?region=ncr` with the server running on port
+8000 (Vite proxies `/api`). Every tile is real OpenStreetMap data; nothing is
+made up on the map.
 
 ## The honesty model
 

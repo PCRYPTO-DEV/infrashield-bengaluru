@@ -83,9 +83,10 @@ describe('OSM chunk builder', () => {
 
 describe('regions', () => {
   it('parses the region from the URL and defaults to NCR', () => {
-    expect(regionFromSearch('?region=bengaluru').id).toBe('bengaluru')
+    expect(regionFromSearch('?region=bengaluru').id).toBe('ncr') // the made-up demo region is gone
     expect(regionFromSearch('').id).toBe('ncr')
     expect(regionFromSearch('?region=nowhere').id).toBe('ncr')
     expect(REGIONS.ncr.source).toBe('osm')
+    expect(Object.values(REGIONS).every((r) => r.source === 'osm' && !r.simulation)).toBe(true)
   })
 })

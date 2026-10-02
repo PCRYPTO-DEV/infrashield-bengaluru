@@ -45,7 +45,7 @@ export const TrafficFlowAnalyzer: IntelligenceModule<SimSnapshot, FlowReport> = 
       congestedShare: n ? congested / n : 0,
       vehicleCount: vehicles,
       observedEdges,
-      evidence: { classification: 'derived', source: observedEdges > 0 ? `${ctx.world.observedFlowMeta?.source ?? 'feed'}+atlas.simulation` : snapshot.classification === 'simulated' ? 'atlas.simulation' : 'feed', model: 'traffic-flow/2', timestamp: snapshot.time, confidence: observedEdges > 0 ? 0.85 : 0.8 },
+      evidence: { classification: 'derived', source: observedEdges > 0 ? `${ctx.world.observedFlowMeta?.source ?? 'feed'}${vehicles > 0 ? '+atlas.simulation' : ''}` : vehicles > 0 ? 'atlas.simulation' : 'none', model: 'traffic-flow/2', timestamp: snapshot.time, confidence: observedEdges > 0 ? 0.85 : 0.8 },
     }
   },
 }

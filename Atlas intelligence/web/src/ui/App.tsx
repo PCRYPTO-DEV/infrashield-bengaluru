@@ -51,6 +51,8 @@ export default function App() {
   const toggle = (t: Tool) => setTool((cur) => (cur === t ? null : t))
   const T = makeT(app.language)
   const embed = useMemo(() => readEmbedParams(window.location.search), [])
+  // The made-up demo city is an engineering demo, shown in the switcher only when asked for (?demo=1).
+  const showDemo = useMemo(() => new URLSearchParams(window.location.search).get('demo') === '1', [])
   useEffect(() => {
     if (embed.lang) app.setLanguage(embed.lang)
     if (embed.mode) app.setMode(embed.mode)
@@ -64,14 +66,14 @@ export default function App() {
       <div className="ca-top">
         <h1 className="ca-wordmark">ATLAS INFINITY</h1>
         <p className="ca-tagline">{T('top.tagline')} · {app.region.name}{district ? ` · ${district}` : ''}</p>
-        <div className="ca-regions">{Object.values(REGIONS).map((r) => <button key={r.id} className={r.id === regionId ? 'active' : ''} onClick={() => switchRegion(r.id)}>{r.name}</button>)}
+        <div className="ca-regions">{Object.values(REGIONS).filter((r) => !r.demo || showDemo || r.id === regionId).map((r) => <button key={r.id} className={r.id === regionId ? 'active' : ''} onClick={() => switchRegion(r.id)}>{r.name}</button>)}
           <span className="ca-lang" title="Language · भाषा"><button className={app.language === 'en' ? 'active' : ''} onClick={() => app.setLanguage('en')}>English</button><button className={app.language === 'hi' ? 'active' : ''} onClick={() => app.setLanguage('hi')}>हिंदी</button></span></div>
         <div className="ca-seed">
           <span>atlas://world/</span>
           <input value={seedInput} onChange={(e) => setSeedInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && regenerate()} />
           <button onClick={regenerate}>{T('top.regenerate')}</button>
         </div>
-        <div>{app.region.source === 'osm' ? <span className="ca-badge observed">{T('badge.osm')}</span> : <span className="ca-badge simulated">{T('badge.simworld')}</span>} {app.liveStatus.live ? <span className="ca-badge observed" style={{ marginLeft: 4 }}>{T('badge.livetraffic')}</span> : <span className="ca-badge simulated" style={{ marginLeft: 4 }}>{T('badge.simtraffic')}</span>} <span className="ca-badge derived" style={{ marginLeft: 4 }}>{T('badge.derived')}</span>{app.realDataFallbacks > 0 && <span className="ca-badge simulated" style={{ marginLeft: 4 }}>{T('badge.fallback', { n: app.realDataFallbacks })}</span>}</div>
+        <div>{app.region.source === 'osm' ? <span className="ca-badge observed">{T('badge.osm')}</span> : <span className="ca-badge simulated">{T('badge.demo')}</span>} {app.liveStatus.live ? <span className="ca-badge observed" style={{ marginLeft: 4 }}>{T('badge.livetraffic')}</span> : app.region.simulation ? <span className="ca-badge simulated" style={{ marginLeft: 4 }}>{T('badge.simtraffic')}</span> : <span className="ca-badge derived" style={{ marginLeft: 4 }}>{T('badge.notraffic')}</span>} {!app.region.simulation && <span className="ca-badge observed" style={{ marginLeft: 4 }}>{T('badge.realonly')}</span>}{app.realDataFallbacks > 0 && <span className="ca-badge derived" style={{ marginLeft: 4 }}>{T('badge.fallback', { n: app.realDataFallbacks })}</span>}</div>
       </div>
       <div className="ca-modes">{MODES.map((m) => <button key={m.id} className={app.mode === m.id ? 'active' : ''} title={T(`mode.${m.id}.b` as StringKey)} onClick={() => app.setMode(m.id)}>{T(`mode.${m.id}` as StringKey)}</button>)}</div>
       {app.mode === 'ink3d' && <div className="ca-inkbar">

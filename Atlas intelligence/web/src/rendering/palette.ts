@@ -33,6 +33,12 @@ export const PALETTE = {
   simulated: '#8a5a86',
   simulatedSoft: 'rgba(138,90,134,0.14)',
 
+  /** Traffic, the Google Maps way: green, orange, red, dark red */
+  trafficFree: '#2e9e4f',
+  trafficSlow: '#f5a623',
+  trafficCongested: '#e03c31',
+  trafficJammed: '#8f1b1b',
+
   /** Signals */
   risk: '#b5493a',
   riskSoft: 'rgba(181,73,58,0.16)',

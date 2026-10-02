@@ -8,16 +8,18 @@ export interface Region {
   origin: LngLat
   seed: string
   source: RegionSource
+  /** true only for the engine demo: a made-up city with made-up traffic. Real regions never simulate data. */
+  simulation: boolean
+  demo?: boolean
   /** IANA zone, used for time-of-day analytics */
   timezone: string
   /** UTC offset hours used by analysers that only need a coarse local hour */
   utcOffsetHours: number
 }
 
-/** Regions mirror server/app/regions.py. */
+/** Regions mirror server/app/regions.py. Every region is real data; nothing is made up. */
 export const REGIONS: Record<string, Region> = {
-  ncr: { id: 'ncr', name: 'Delhi NCR', origin: { lng: 77.2167, lat: 28.6315 }, seed: 'ncr-2026', source: 'osm', timezone: 'Asia/Kolkata', utcOffsetHours: 5.5 },
-  bengaluru: { id: 'bengaluru', name: 'Bengaluru demo', origin: { lng: 77.6101, lat: 12.9719 }, seed: 'bengaluru-2026', source: 'procedural', timezone: 'Asia/Kolkata', utcOffsetHours: 5.5 },
+  ncr: { id: 'ncr', name: 'Delhi NCR', origin: { lng: 77.2167, lat: 28.6315 }, seed: 'ncr-2026', source: 'osm', simulation: false, timezone: 'Asia/Kolkata', utcOffsetHours: 5.5 },
 }
 
 /** Build-time override (VITE_DEFAULT_REGION) lets a static demo build start on the procedural city. */
