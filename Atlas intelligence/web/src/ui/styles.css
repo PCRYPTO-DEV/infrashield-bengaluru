@@ -422,6 +422,25 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .ca-saved-item > b { min-width: 28px; font-family: var(--mono); color: var(--brand-blue); }
 .ca-saved-item > span { display: flex; flex-direction: column; }
 .ca-saved-item small { color: var(--fg-faint); }
+/* site finder (Pro): tiles, verdict cards */
+.ca-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0 4px; }
+.ca-tile { text-align: left; background: var(--panel-raised); border: 1px solid var(--line); border-radius: var(--radius-s); padding: 9px 10px; cursor: pointer; color: var(--fg); display: flex; flex-direction: column; gap: 2px; }
+.ca-tile:hover { border-color: var(--brand-blue); }
+.ca-tile.active { border-color: var(--brand-blue); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-blue) 25%, transparent); }
+.ca-tile b { font-size: 13px; }
+.ca-tile small { font-size: 10.5px; color: var(--fg-faint); line-height: 1.3; }
+.ca-spot { background: var(--panel-raised); border: 1px solid var(--line); border-radius: var(--radius-s); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.ca-spot.active { border-color: var(--brand-blue); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-blue) 25%, transparent); }
+.ca-spot-head { display: flex; align-items: center; gap: 10px; }
+.ca-spot-n { width: 26px; height: 26px; border-radius: 50%; background: var(--brand-blue); color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 13px; flex: 0 0 auto; }
+.ca-spot-head b { font-size: 13px; }
+.ca-spot-bar { flex: 1; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--fg) 8%, transparent); overflow: hidden; }
+.ca-spot-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--brand-teal), var(--brand-blue)); }
+.ca-spot-pct { font-family: var(--mono); font-size: 11px; color: var(--fg-soft); min-width: 64px; text-align: right; }
+.ca-spot p { margin: 0; font-size: 12.5px; line-height: 1.45; }
+.ca-spot p.unknown { color: var(--fg-faint); font-size: 11.5px; }
+.ca-spot .ca-row { margin: 2px 0 0; }
+.ca-spot .ca-row .primary { padding: 5px 12px; font-size: 11px; }
 /* site finder (Pro) */
 .ca-sites-list { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .ca-site { display: flex; gap: 10px; width: 100%; text-align: left; background: var(--panel-raised); border: 1px solid var(--line); border-radius: var(--radius-s); padding: 8px 10px; cursor: pointer; color: var(--fg); }

@@ -413,7 +413,11 @@ export class CityAtlas {
   toggleLayer(key: keyof LayerFlags): void { this.layers = { ...this.layers, [key]: !this.layers[key] }; this.notify() }
   select(sel: Selection | null): void { this.selection = sel; this.notify() }
   setHover(sel: Selection | null): void { if (JSON.stringify(sel) !== JSON.stringify(this.hover)) { this.hover = sel; this.notify() } }
-  clearHighlights(): void { this.highlights = { points: [], entityIds: [], agentIds: [], rings: [] }; this.route = null; this.routePick = []; this.notify() }
+  clearHighlights(): void { this.highlights = { points: [], entityIds: [], agentIds: [], rings: [], pins: [] }; this.route = null; this.routePick = []; this.notify() }
+  /** Numbered pins (lng/lat) on the map, e.g. the site finder's best spots. */
+  setPins(pins: Array<{ lng: number; lat: number; label: string }>): void { this.highlights = { ...this.highlights, pins: pins.map((p) => ({ point: lngLatToLocal(this.frame, { lng: p.lng, lat: p.lat }), label: p.label })) }; this.notify() }
+  /** What Ask Atlas understood the person wants to open; the site finder starts from it. */
+  sitesIntent: string | null = null
   /** Outline cells (lng/lat rings) on the map, e.g. the site finder's candidates. */
   setRings(rings: number[][][]): void { this.highlights = { ...this.highlights, rings: rings.map((r) => r.map((p) => lngLatToLocal(this.frame, { lng: p[0], lat: p[1] }))) }; this.notify() }
 
@@ -738,6 +742,7 @@ export class CityAtlas {
         : (hi ? 'स्क्रीन पर किसी सेल में अभी काफ़ी डेटा नहीं है। जहाँ सड़कें लोड हैं वहाँ ज़ूम करें।' : 'No cell on screen has enough data yet. Zoom to streets the map has loaded and ask again.')
     } catch (e) { summary = (hi ? 'साइट फ़ाइंडर अभी जवाब नहीं दे सका: ' : 'The site finder could not answer right now: ') + (e as Error).message }
     this.setRings(rings)
+    this.sitesIntent = purpose
     this.requestTool('sites')
     return { question, intent: 'site_selection', summary, classification: 'derived', evidence: facts, highlights: { points: facts.map((f) => f.location!).filter(Boolean), entityIds: [], agentIds: [] }, caveats: [hi ? 'स्कोर उन्हीं असली जगह-आयामों से बने हैं; "डेटा नहीं" की जगह अनुमान नहीं रखा जाता।' : 'Scores come from the same real place dimensions as the place card; "no data" is never replaced by a guess.'], writer: 'template' } as Answer
   }

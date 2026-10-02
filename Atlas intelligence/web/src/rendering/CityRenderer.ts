@@ -24,7 +24,7 @@ export interface WorldState {
   intel: IntelligenceState
   zones: MonitoringZone[]
   selection: Selection | null
-  highlights: { points: WorldPoint[]; entityIds: string[]; agentIds: number[]; rings?: WorldPoint[][] }
+  highlights: { points: WorldPoint[]; entityIds: string[]; agentIds: number[]; rings?: WorldPoint[][]; pins?: Array<{ point: WorldPoint; label: string }> }
   /** people's crime reports in view (pink markers) */
   reports?: WorldPoint[]
   route: RouteResult | null

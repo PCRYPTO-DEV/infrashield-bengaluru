@@ -163,6 +163,13 @@ export class DynamicCanvasRenderer {
       ctx.beginPath(); ctx.arc(p.x, p.y, (8 + pulse * 4) * px, 0, Math.PI * 2); ctx.strokeStyle = this.c.selection; ctx.lineWidth = 1.5 * px; ctx.stroke()
     }
     for (const id of s.highlights.entityIds) this.outlineEntity(ctx, s, id, this.c.selection, px)
+    for (const [i, pin] of (s.highlights.pins ?? []).entries()) {
+      // a numbered pin: the first is the pick, the rest follow
+      const r = (i === 0 ? 15 : 12) * px
+      ctx.beginPath(); ctx.arc(pin.point.x, pin.point.y - r, r, 0, Math.PI * 2); ctx.fillStyle = i === 0 ? '#0F6FFF' : this.c.paper; ctx.fill(); ctx.strokeStyle = '#0F6FFF'; ctx.lineWidth = 2 * px; ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(pin.point.x - 5 * px, pin.point.y - r * 0.4); ctx.lineTo(pin.point.x, pin.point.y + 2 * px); ctx.lineTo(pin.point.x + 5 * px, pin.point.y - r * 0.4); ctx.closePath(); ctx.fillStyle = '#0F6FFF'; ctx.fill()
+      ctx.fillStyle = i === 0 ? '#ffffff' : '#0F6FFF'; ctx.font = `700 ${(i === 0 ? 14 : 12) * px}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(pin.label, pin.point.x, pin.point.y - r); ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic'
+    }
     for (const ring of s.highlights.rings ?? []) {
       if (ring.length < 3) continue
       ctx.beginPath(); ring.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath()
