@@ -15,7 +15,12 @@ export function InsightBubbles({ app, onOpen, onReport }: { app: CityAtlas; onOp
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const withPoint = app.insights.filter((i) => i.point && !dismissed.has(i.id)).slice(0, 4)
   // people's reports: pink, and they stay for the day (the server forgets them after 24 h)
-  const reports = app.reports.filter((r) => !dismissed.has(r.id)).slice(0, 12)
+  // the comic callout pops for a new report and leaves after a while; the pink skull on the map stays for the day
+  const [tick, setTick] = useState(0)
+  useEffect(() => { const id = setInterval(() => setTick((t) => t + 1), 2000); return () => clearInterval(id) }, [])
+  const firstSeen = useRef(new Map<string, number>())
+  const reports = app.reports.filter((r) => { if (dismissed.has(r.id)) return false; let t = firstSeen.current.get(r.id); if (t === undefined) { t = Date.now(); firstSeen.current.set(r.id, t) } return Date.now() - t < 12_000 }).slice(0, 6)
+  void tick
   useEffect(() => {
     const now = withPoint.filter((i) => !seen.current.has(i.id))
     const newReports = reports.filter((r) => !seen.current.has(r.id))

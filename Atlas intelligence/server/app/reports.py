@@ -34,10 +34,12 @@ def _reporter(request: Request) -> str:
 
 
 def shape(r: dict[str, Any], now: float) -> dict[str, Any]:
-    return {**r, "ageMin": int(max(0, now - r["ts"]) // 60), "evidence": {"classification": "observed", "source": "a person using City Atlas · not verified", "timestamp": int(r["ts"] * 1000), "confidence": 0.5}}
+    news = r.get("source") == "news"
+    src = f"{r.get('publisher') or 'news'} · place approximate from the headline" if news else "a person using City Atlas · not verified"
+    return {**r, "source": r.get("source") or "person", "ageMin": int(max(0, now - r["ts"]) // 60), "evidence": {"classification": "observed", "source": src, "timestamp": int(r["ts"] * 1000), "confidence": 0.6 if news else 0.5}}
 
 
-def register(app: FastAPI, history: History) -> None:
+def register(app: FastAPI, history: History, news: Any = None) -> None:
     @app.post("/api/reports")
     def create(body: ReportIn, request: Request) -> dict[str, Any]:
         if body.kind not in KINDS:
@@ -50,7 +52,7 @@ def register(app: FastAPI, history: History) -> None:
         return shape(r, now)
 
     @app.get("/api/reports")
-    def list_reports(bbox: str = Query(..., max_length=80), since: float = Query(KEEP_S, ge=60, le=KEEP_S)) -> dict[str, Any]:
+    async def list_reports(bbox: str = Query(..., max_length=80), since: float = Query(KEEP_S, ge=60, le=KEEP_S)) -> dict[str, Any]:
         try:
             w, s, e, n = (float(v) for v in bbox.split(","))
         except ValueError as exc:
@@ -58,5 +60,14 @@ def register(app: FastAPI, history: History) -> None:
         if not (w < e and s < n) or (e - w) * (n - s) > MAX_BBOX_DEG2:
             raise HTTPException(400, "bbox is empty or too large")
         now = time.time()
+        news_note = None
+        if news is not None:
+            try:
+                st = await news.refresh((w + e) / 2, (s + n) / 2)
+                if st and st.get("city"):
+                    news_note = {"city": st["city"], "unplaced": news.unplaced.get(st["city"], 0), "error": st.get("error")}
+            except Exception as exc:  # the feed is optional
+                news_note = {"error": str(exc)}
         items = [shape(r, now) for r in history.reports_in_bbox(w, s, e, n, since_s=since, now=now)]
-        return {"items": items, "count": len(items), "keptForS": KEEP_S, "note": "Reports come from people using City Atlas and are not verified. In an emergency call 112.", "computedAt": int(now * 1000)}
+        return {"items": items, "count": len(items), "keptForS": KEEP_S, "news": news_note,
+                "note": "Reports come from people using City Atlas (not verified) and from crime headlines in the news for this city (place approximate). In an emergency call 112.", "computedAt": int(now * 1000)}

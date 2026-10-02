@@ -325,6 +325,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .ca-report-btn b { background: var(--pink); color: #fff; border-radius: 999px; padding: 0 6px; margin-left: 6px; font-size: 10px; }
 .ca-chip.pink, .ca-chips button.active.pink { border-color: var(--pink); color: var(--pink); }
 .ca-rep-112 { color: var(--pink); font-weight: 600; }
+.ca-skull-tip { position: absolute; z-index: 7; max-width: 280px; background: var(--panel-strong); border: 2px solid var(--pink); border-radius: 12px; padding: 8px 12px; font-size: 12.5px; line-height: 1.4; box-shadow: var(--shadow); pointer-events: none; color: var(--fg); }
+.ca-skull-tip b { color: var(--pink); }
+.ca-skull-tip > span { color: var(--fg-faint); margin-left: 6px; font-size: 11px; }
+.ca-skull-tip p { margin: 4px 0; }
+.ca-skull-tip small { display: block; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pink); }
+.ca-skull-tip small.ca-skull-link { text-transform: none; letter-spacing: 0; color: var(--fg-faint); margin-top: 2px; }
+.ca-rep-list button.news { border-left-color: var(--brand-blue); }
 .ca-rep-text { width: 100%; box-sizing: border-box; margin: 8px 0 6px; font: inherit; font-size: 12.5px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--panel-raised); color: var(--fg); resize: vertical; }
 .ca-rep-send { background: var(--pink) !important; border-color: var(--pink) !important; color: #fff !important; margin-top: 6px; }
 .ca-rep-list { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }

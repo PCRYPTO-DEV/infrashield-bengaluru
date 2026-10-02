@@ -158,6 +158,14 @@ export default function App() {
       {(!sidePanel || cardOverList) && tool !== 'changed' && tool !== 'compare' && !app.selection && <PlaceCard app={app} onCompare={addCompare} />}
       <InspectorPanel app={app} />
       <InsightBubbles app={app} onOpen={() => setTool('insights')} onReport={() => setTool('report')} />
+      {app.reportHover && (() => { const r = app.reportHover.report; const when = r.ageMin < 60 ? T('rep.min', { n: r.ageMin }) : T('rep.hr', { n: Math.round(r.ageMin / 60) }); return (
+        <div className="ca-skull-tip" style={{ left: Math.min(app.reportHover.x + 14, window.innerWidth - 300), top: Math.max(8, app.reportHover.y - 12) }} lang={app.language === 'hi' ? 'hi' : 'en'}>
+          <b>☠ {T(`rep.k.${r.kind}` as StringKey)}</b> <span>{when}</span>
+          {r.description && <p>{r.description}</p>}
+          <small>{r.source === 'news' ? `${T('rep.news.meta')}${r.publisher ? ` · ${r.publisher}` : ''}${r.precisionM ? ` · ±${Math.round(r.precisionM)} m` : ''}` : T('rep.meta')}</small>
+          {r.url && <small className="ca-skull-link">{T('rep.news.open')}</small>}
+        </div>
+      ) })()}
 
       {/* 4. Ask Atlas, 5. legend pill, 6. time bar */}
       <AskPanel app={app} />

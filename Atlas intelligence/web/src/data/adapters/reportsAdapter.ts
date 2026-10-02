@@ -4,9 +4,11 @@ export const REPORT_KINDS: ReportKind[] = ['theft', 'snatching', 'harassment', '
 
 export interface CrimeReport {
   id: string; ts: number; kind: ReportKind; description: string; lng: number; lat: number; ageMin: number
+  /** who said so: a person in the app, or a crime headline in the news (placed approximately) */
+  source: 'person' | 'news'; url?: string | null; precisionM?: number | null; publisher?: string | null
   evidence: { classification: 'observed'; source: string; timestamp: number; confidence: number }
 }
-export interface ReportList { items: CrimeReport[]; count: number; keptForS: number; note: string; computedAt: number }
+export interface ReportList { items: CrimeReport[]; count: number; keptForS: number; note: string; computedAt: number; news?: { city?: string; unplaced?: number; error?: string | null } | null }
 
 export async function fetchReports(base: string, bbox: { west: number; south: number; east: number; north: number }, fetchImpl: typeof fetch = (...a) => fetch(...a)): Promise<ReportList> {
   const r = await fetchImpl(`${base}/api/reports?bbox=${bbox.west.toFixed(4)},${bbox.south.toFixed(4)},${bbox.east.toFixed(4)},${bbox.north.toFixed(4)}`)

@@ -42,6 +42,11 @@ class History:
         c.execute("CREATE TABLE IF NOT EXISTS cell_daily (h3 TEXT NOT NULL, day TEXT NOT NULL, score REAL, vector TEXT, PRIMARY KEY (h3, day))")
         c.execute("CREATE TABLE IF NOT EXISTS crime_reports (id TEXT PRIMARY KEY, ts REAL NOT NULL, kind TEXT NOT NULL, description TEXT, lng REAL NOT NULL, lat REAL NOT NULL, reporter TEXT)")
         c.execute("CREATE INDEX IF NOT EXISTS rep_ts ON crime_reports (ts)")
+        for col, typ in (("source", "TEXT"), ("url", "TEXT"), ("precision_m", "REAL"), ("publisher", "TEXT")):
+            try:
+                c.execute(f"ALTER TABLE crime_reports ADD COLUMN {col} {typ}")
+            except sqlite3.OperationalError:
+                pass  # already there
         c.commit()
         self.listeners: list[Any] = []
 
@@ -104,22 +109,28 @@ class History:
         return {"ts": row[0], "euAqi": row[1], "pm25": row[2]} if row else None
 
     # ---- what people report: crimes and unsafe moments, kept for a day, never verified by the app ----
-    def record_report(self, kind: str, description: str, lng: float, lat: float, reporter: str, ts: float | None = None) -> dict[str, Any]:
+    def record_report(self, kind: str, description: str, lng: float, lat: float, reporter: str, ts: float | None = None, source: str = "person", url: str | None = None, precision_m: float | None = None, publisher: str | None = None) -> dict[str, Any]:
         import uuid
         ts = time.time() if ts is None else ts
         rid = uuid.uuid4().hex[:12]
         with self._lock:
-            self._conn.execute("INSERT INTO crime_reports VALUES (?,?,?,?,?,?,?)", (rid, ts, kind, description, lng, lat, reporter))
+            self._conn.execute("INSERT INTO crime_reports (id, ts, kind, description, lng, lat, reporter, source, url, precision_m, publisher) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (rid, ts, kind, description, lng, lat, reporter, source, url, precision_m, publisher))
             self._conn.commit()
-        row = {"id": rid, "ts": ts, "kind": kind, "description": description, "lng": lng, "lat": lat}
-        self._notify("report", {"id": rid, "kind": kind, "lng": lng, "lat": lat, "ts": ts})
+        row = {"id": rid, "ts": ts, "kind": kind, "description": description, "lng": lng, "lat": lat, "source": source, "url": url, "precisionM": precision_m, "publisher": publisher}
+        self._notify("report", {"id": rid, "kind": kind, "lng": lng, "lat": lat, "ts": ts, "source": source})
         return row
+
+    def has_report_url(self, url: str) -> bool:
+        if not url:
+            return False
+        with self._lock:
+            return self._conn.execute("SELECT 1 FROM crime_reports WHERE url = ? LIMIT 1", (url,)).fetchone() is not None
 
     def reports_in_bbox(self, west: float, south: float, east: float, north: float, since_s: float = 86400, now: float | None = None, limit: int = 200) -> list[dict[str, Any]]:
         now = time.time() if now is None else now
         with self._lock:
-            rows = self._conn.execute("SELECT id, ts, kind, description, lng, lat FROM crime_reports WHERE ts >= ? AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? ORDER BY ts DESC LIMIT ?", (now - since_s, west, east, south, north, limit)).fetchall()
-        return [{"id": r[0], "ts": r[1], "kind": r[2], "description": r[3], "lng": r[4], "lat": r[5]} for r in rows]
+            rows = self._conn.execute("SELECT id, ts, kind, description, lng, lat, source, url, precision_m, publisher FROM crime_reports WHERE ts >= ? AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? ORDER BY ts DESC LIMIT ?", (now - since_s, west, east, south, north, limit)).fetchall()
+        return [{"id": r[0], "ts": r[1], "kind": r[2], "description": r[3], "lng": r[4], "lat": r[5], "source": r[6] or "person", "url": r[7], "precisionM": r[8], "publisher": r[9]} for r in rows]
 
     def reports_today_by(self, reporter: str, now: float | None = None) -> int:
         now = time.time() if now is None else now

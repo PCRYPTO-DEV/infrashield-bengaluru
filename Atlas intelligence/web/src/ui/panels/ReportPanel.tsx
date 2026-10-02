@@ -29,6 +29,7 @@ export function ReportPanel({ app }: { app: CityAtlas }) {
     <div className="ca-panel ca-side ca-report">
       <h3>{T('rep.title')}</h3>
       <p className="note ca-rep-112">{T('rep.112')}</p>
+      <p className="note">{T('rep.skulls')}</p>
       <p className="note">{T('rep.help')}</p>
       <div className="ca-chips">{REPORT_KINDS.map((k) => <button key={k} className={`ca-chip ${kind === k ? 'active pink' : ''}`} onClick={() => setKind(k)}>{T(`rep.k.${k}` as StringKey)}</button>)}</div>
       <textarea className="ca-rep-text" value={text} maxLength={200} rows={2} placeholder={T('rep.text.ph')} onChange={(e) => setText(e.target.value)} />
@@ -42,7 +43,8 @@ export function ReportPanel({ app }: { app: CityAtlas }) {
       {err && <p className="note" style={{ color: 'var(--risk)' }}>{err}</p>}
       <h4>{T('rep.today', { n: nearby.length })}</h4>
       {nearby.length === 0 && <p className="note">{T('rep.today.none')}</p>}
-      <ul className="ca-rep-list">{nearby.slice(0, 12).map((r) => <li key={r.id}><button onClick={() => app.flyToLngLat(r.lng, r.lat, 16.5)}><b>{T(`rep.k.${r.kind}` as StringKey)}</b> · {r.ageMin < 60 ? T('rep.min', { n: r.ageMin }) : T('rep.hr', { n: Math.round(r.ageMin / 60) })}{r.description ? <small>{r.description}</small> : null}</button></li>)}</ul>
+      <ul className="ca-rep-list">{nearby.slice(0, 14).map((r) => <li key={r.id}><button className={r.source === 'news' ? 'news' : ''} onClick={() => app.flyToLngLat(r.lng, r.lat, 16.5)}>☠ <b>{T(`rep.k.${r.kind}` as StringKey)}</b> · {r.ageMin < 60 ? T('rep.min', { n: r.ageMin }) : T('rep.hr', { n: Math.round(r.ageMin / 60) })}{r.source === 'news' && r.publisher ? ` · ${r.publisher}` : ''}{r.description ? <small>{r.description}</small> : null}</button></li>)}</ul>
+      {app.reportsNews?.city && <p className="note">{T('rep.news.city', { c: app.reportsNews.city, n: app.reportsNews.unplaced ?? 0 })}</p>}
       <p className="note"><span className="ca-badge observed">{T.cls('observed')}</span> {T('rep.source')}</p>
     </div>
   )

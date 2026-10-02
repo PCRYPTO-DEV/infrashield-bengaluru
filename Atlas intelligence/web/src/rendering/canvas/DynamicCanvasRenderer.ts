@@ -150,12 +150,17 @@ export class DynamicCanvasRenderer {
     // ---- drawing in progress ----
     if (s.drawing) this.drawDrawing(ctx, s, px)
 
-    // ---- just reported: a pink pin with a slow pulse, visible at every zoom ----
-    for (const p of s.reports ?? []) {
-      if (!inView(p, 60)) continue
-      const pulse = 0.5 + 0.5 * Math.sin(s.wallClock / 700)
-      ctx.beginPath(); ctx.arc(p.x, p.y, (10 + pulse * 6) * px, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,45,149,0.18)'; ctx.fill()
-      ctx.beginPath(); ctx.arc(p.x, p.y, 5 * px, 0, Math.PI * 2); ctx.fillStyle = '#ff2d95'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * px; ctx.stroke()
+    // ---- just reported: a pink skull on the spot; news stories also get a dashed ring for how approximate the place is ----
+    for (const r of s.reports ?? []) {
+      const p = r.point
+      if (!inView(p, 80)) continue
+      if (r.precisionM) { ctx.beginPath(); ctx.arc(p.x, p.y, r.precisionM * upm, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(255,45,149,0.55)'; ctx.lineWidth = 1.5 * px; ctx.setLineDash([6 * px, 5 * px]); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = 'rgba(255,45,149,0.06)'; ctx.fill() }
+      const pulse = r.fresh ? 0.5 + 0.5 * Math.sin(s.wallClock / 250) : 0
+      const size = (18 + pulse * 6) * px
+      ctx.beginPath(); ctx.arc(p.x, p.y, size * 0.75, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,45,149,0.18)'; ctx.fill()
+      ctx.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.lineWidth = 4 * px; ctx.strokeStyle = '#ffffff'; ctx.strokeText('\u2620', p.x, p.y); ctx.fillStyle = '#ff2d95'; ctx.fillText('\u2620', p.x, p.y)
+      ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic'
     }
     // ---- highlights from Ask ----
     for (const p of s.highlights.points) {

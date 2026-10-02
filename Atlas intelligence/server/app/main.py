@@ -110,7 +110,10 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
     from .timemachine import register as register_timemachine
     register_timemachine(app, history)
     from .reports import register as register_reports
-    register_reports(app, history)
+    from .news import NewsCrime
+    news = NewsCrime(history, app.state.tomtom, fixtures)
+    app.state.news = news
+    register_reports(app, history, news)
     register_alerts(app, alerts)
     cells = CellModel(osm, history, None, air)
     app.state.cells = cells

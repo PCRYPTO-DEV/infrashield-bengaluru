@@ -424,6 +424,7 @@ export class CityAtlas {
   pointerClick(sx: number, sy: number): void {
     const p = this.camera.screenToWorld({ x: sx, y: sy })
     if (this.pointPick) { const pick = this.pointPick; this.pointPick = null; pick.cb(p, localToLngLat(this.frame, p)); this.notify(); return }
+    if (this.reportHover) { const r = this.reportHover.report; if (r.url) window.open(r.url, '_blank', 'noopener'); else this.requestTool('report'); return }
     if (this.draw.active) {
       const res = this.draw.click(p)
       if (res) this.finishShape(res)
@@ -438,6 +439,7 @@ export class CityAtlas {
   pointerMove(sx: number, sy: number): void {
     const p = this.camera.screenToWorld({ x: sx, y: sy })
     if (this.draw.active) { this.draw.move(p); return }
+    if (this.hoverReport(sx, sy)) { this.setHover(null); return }
     this.setHover(hitTest(this.world, this.camera, { x: sx, y: sy }, this.lodController.lod(this.camera.zoom)))
   }
   finishDrawing(): void { const r = this.draw.finish(); if (r) this.finishShape(r) }
@@ -496,6 +498,7 @@ export class CityAtlas {
   clearScenarioRoute(): void { this.applyRouteChoice(); this.notify() }
   // ---------- just reported: people's crime reports, kept a day, pink on the map ----------
   reports: CrimeReport[] = []
+  reportsNews: { city?: string; unplaced?: number; error?: string | null } | null = null
   private reportsKey = ''
   private reportsAt = 0
   /** Reports for the view on screen: on a view change, every minute, and at once when the stream says someone reported. */
@@ -512,6 +515,7 @@ export class CityAtlas {
     try {
       const r = await fetchReports(SERVER_BASE, bbox)
       this.reports = r.items
+      this.reportsNews = r.news ?? null
       this.notify()
     } catch { /* the layer is optional; the last list stays */ }
   }
@@ -521,7 +525,18 @@ export class CityAtlas {
     if (!this.reports.some((x) => x.id === r.id)) { this.reports = [r, ...this.reports]; this.notify() }
     return r
   }
-  reportPoints(): WorldPoint[] { return this.reports.map((r) => lngLatToLocal(this.frame, { lng: r.lng, lat: r.lat })) }
+  reportPoints(): Array<{ point: WorldPoint; precisionM?: number | null; fresh?: boolean }> { const now = Date.now(); return this.reports.map((r) => ({ point: lngLatToLocal(this.frame, { lng: r.lng, lat: r.lat }), precisionM: r.precisionM ?? null, fresh: now - this.reportSeenAt(r.id) < 10_000 })) }
+  private reportFirstSeen = new Map<string, number>()
+  private reportSeenAt(id: string): number { let t = this.reportFirstSeen.get(id); if (t === undefined) { t = Date.now(); this.reportFirstSeen.set(id, t) } return t }
+  /** The skull under the pointer, for the hover card. */
+  reportHover: { report: CrimeReport; x: number; y: number } | null = null
+  private hoverReport(sx: number, sy: number): boolean {
+    let best: CrimeReport | null = null, bd = 16
+    for (const r of this.reports) { const sp = this.camera.worldToScreen(lngLatToLocal(this.frame, { lng: r.lng, lat: r.lat })); const d = Math.hypot(sp.x - sx, sp.y - sy); if (d < bd) { bd = d; best = r } }
+    const next = best ? { report: best, x: sx, y: sy } : null
+    if ((next?.report.id ?? null) !== (this.reportHover?.report.id ?? null) || (next && this.reportHover && (Math.abs(next.x - this.reportHover.x) > 2 || Math.abs(next.y - this.reportHover.y) > 2))) { this.reportHover = next; this.notify() }
+    return !!best
+  }
 
   /** Saved areas and projects live in this browser; the version lets panels refresh. */
   savedVersion = 0
