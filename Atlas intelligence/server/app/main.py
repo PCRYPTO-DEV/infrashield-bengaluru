@@ -42,6 +42,9 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
                             logging.getLogger("atlas.baseline").warning("baseline %s: %s", t, e)
                     await asyncio.sleep(max(60, settings.baseline_minutes * 60))
             task = asyncio.create_task(baseline())
+        hot_task = None
+        if fixtures is None and settings.tomtom_api_key:
+            hot_task = asyncio.create_task(app.state.hot_poller())
         warm = None
         if fixtures is None and settings.warm_radius > 0:
             async def warm_up():
@@ -55,6 +58,8 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
             task.cancel()
         if warm:
             warm.cancel()
+        if hot_task:
+            hot_task.cancel()
 
     app = FastAPI(title="Atlas Infinity", version="0.2.0", lifespan=lifespan)
     app.state.cache = cache
@@ -66,6 +71,7 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
         return {"ok": True, "region": settings.region, "fixtures": fixtures is not None,
                 "tomtom": bool(settings.tomtom_api_key), "writer": bool(settings.anthropic_api_key),
                 "memory": history.count("flow_readings"), "alerts": bool(alerts.twilio),
+                "live": {"hotTiles": len(app.state.hot.hot()), "subscribers": len(app.state.broadcast.queues)},
                 "osm": {"endpoint": osm.url, "source": "vector-tiles" if osm.vtiles else "overpass", "calls": osm.live_calls + (osm.vtiles.calls if osm.vtiles else 0), "tilesWarmed": osm.warmed, "lastError": osm.last_error or (osm.vtiles.last_error if osm.vtiles else None)}}
 
     @app.get("/api/regions")
@@ -97,6 +103,9 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
     from .tiles import BBox
     register_tomtom(app, cache, fixtures, history)
     air = register_air(app, cache, fixtures, history)
+    from .live import register as register_live
+    broadcast, hot = register_live(app, history, app.state.tomtom, osm, fixtures is not None)
+    app.state.tomtom.hot = hot
     register_memory(app, history)
     register_alerts(app, alerts)
     cells = CellModel(osm, history, None, air)

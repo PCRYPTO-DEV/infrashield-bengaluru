@@ -69,6 +69,7 @@ class History:
         with self._lock:
             self._conn.executemany("INSERT INTO incident_readings VALUES (?,?,?,?,?,?,?)", rows)
             self._conn.commit()
+        self._notify("incidents", {"ts": ts, "count": len(rows)})
         return len(rows)
 
     def record_camera(self, camera: str, people: int, vehicles: int, lng: float | None, lat: float | None, ts: float | None = None) -> None:

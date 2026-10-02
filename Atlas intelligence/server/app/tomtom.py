@@ -47,6 +47,7 @@ class TomTomClient:
         self.base = base or settings.tomtom_base
         self.live_calls = 0
         self.history = None  # set by the app: every fresh reading is remembered
+        self.hot = None  # set by the live module: tiles with a recent viewer
 
     # ---- budget ----
     def _day_key(self) -> str:
@@ -80,10 +81,11 @@ class TomTomClient:
             return r.content if binary else r.json()
 
     # ---- flow tiles ----
-    async def flow_tile(self, z: int, x: int, y: int) -> dict[str, Any]:
+    async def flow_tile(self, z: int, x: int, y: int, max_age: float | None = None) -> dict[str, Any]:
+        """A flow tile from the cache (FLOW_TTL), or fresh when the cached one is older than `max_age` seconds."""
         key = f"tomtom:flow:{z}/{x}/{y}"
         cached = self.cache.get(key)
-        if cached is not None:
+        if cached is not None and (max_age is None or (self.cache.age(key) or 0) <= max_age):
             return cached
         pbf = await self._get(f"/traffic/map/4/tile/flow/{FLOW_STYLE}/{z}/{x}/{y}.pbf", {}, f"tomtom_flow_{z}_{x}_{y}.pbf", binary=True)
         now = time.time()
@@ -109,10 +111,10 @@ class TomTomClient:
         return result
 
     # ---- incidents ----
-    async def incidents(self, bbox: str) -> dict[str, Any]:
+    async def incidents(self, bbox: str, max_age: float | None = None) -> dict[str, Any]:
         key = f"tomtom:incidents:{bbox}"
         cached = self.cache.get(key)
-        if cached is not None:
+        if cached is not None and (max_age is None or (self.cache.age(key) or 0) <= max_age):
             return cached
         data = await self._get("/traffic/services/5/incidentDetails", {"bbox": bbox, "fields": INCIDENT_FIELDS, "language": "en-GB", "timeValidityFilter": "present"}, f"tomtom_incidents_{bbox.replace(',', '_')}.json")
         now = time.time()
@@ -226,6 +228,8 @@ def register(app: FastAPI, cache: Cache, fixtures: Path | None, history=None) ->
     async def flow(z: int, x: int, y: int):
         if not 8 <= z <= 16:
             raise HTTPException(400, "flow tiles are served for zoom 8..16")
+        if getattr(client, "hot", None) is not None:
+            client.hot.touch(f"{z}/{x}/{y}")
         return await client.flow_tile(z, x, y)
 
     @app.get("/api/traffic/segment")
@@ -236,6 +240,8 @@ def register(app: FastAPI, cache: Cache, fixtures: Path | None, history=None) ->
     @app.get("/api/traffic/incidents")
     @guard
     async def incidents(bbox: str = Query(..., pattern=r"^-?\d+(\.\d+)?,-?\d+(\.\d+)?,-?\d+(\.\d+)?,-?\d+(\.\d+)?$")):
+        if getattr(client, "hot", None) is not None:
+            client.hot.touch_bbox(bbox)
         return await client.incidents(bbox)
 
     @app.get("/api/traffic/status")

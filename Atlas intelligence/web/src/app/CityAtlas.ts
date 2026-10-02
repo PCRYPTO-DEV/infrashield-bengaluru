@@ -124,10 +124,12 @@ export class CityAtlas {
     const real = region.source === 'osm'
     const streetSource = real ? this.gen.fork('osm', SERVER_BASE, region.simulation) : this.gen
     const districtSource = this.gen.fork(real ? 'osm-district' : 'district', SERVER_BASE, region.simulation)
-    this.chunks = new CityChunkManager(streetSource, { frame: this.frame, globalSeed: this.seed, datasetVersion: DATASET_VERSION, prefetchPad: 1, unloadPad: 3, maxChunks: 64, concurrency: real ? 2 : 3, budget: 42 })
+    this.chunks = new CityChunkManager(streetSource, { frame: this.frame, globalSeed: this.seed, datasetVersion: DATASET_VERSION, prefetchPad: real ? 2 : 1, unloadPad: 3, maxChunks: 96, concurrency: real ? 3 : 3, budget: 42 })
     this.districts = new CityChunkManager(districtSource, { frame: this.frame, globalSeed: this.seed, datasetVersion: DATASET_VERSION, prefetchPad: 1, unloadPad: 2, maxChunks: 160, concurrency: real ? 1 : 2, chunkZoom: DISTRICT_ZOOM, budget: 120 })
     this.realSources = { street: real ? streetSource : null, district: real ? districtSource : null }
     this.feeds = real && typeof window !== 'undefined' ? new LiveFeeds(this.world, { baseUrl: SERVER_BASE }) : null
+    // Warm the streets around this origin on the server right away (a state just chosen): by the time the reader pans, tiles are there.
+    if (real && typeof window !== 'undefined') { const o = region.origin; void fetch(`${SERVER_BASE}/api/warm?lng=${o.lng}&lat=${o.lat}`).catch(() => {}) }
     this.feeds?.subscribe(() => this.onFeeds())
     this.sim = new SimulationClient(80)
     this.intel = new IntelligencePipeline(this.world)
@@ -275,7 +277,7 @@ export class CityAtlas {
     if (f.status.weather === 'open') parts.push('Open-Meteo')
     const live = parts.length > 0
     const label = live ? `${parts.join(' + ')} + OpenStreetMap` : f.status.flow === 'error' ? 'no live traffic feed' : 'connecting feeds'
-    const detail = `flow ${f.status.flow} · incidents ${f.status.incidents} · weather ${f.status.weather}${f.dailyBudget ? ` · TomTom ${f.callsToday}/${f.dailyBudget} today` : ''}${f.lastError ? ` · ${f.lastError}` : ''}`
+    const detail = `stream ${f.streamState} · flow ${f.status.flow} · incidents ${f.status.incidents} · weather ${f.status.weather}${f.dailyBudget ? ` · TomTom ${f.callsToday}/${f.dailyBudget} today` : ''}${f.lastError ? ` · ${f.lastError}` : ''}`
     return { live, label, detail }
   }
 

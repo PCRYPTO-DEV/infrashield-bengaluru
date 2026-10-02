@@ -111,8 +111,31 @@ export class LiveFeeds {
   subscribe(fn: () => void): () => void { this.listeners.add(fn); return () => this.listeners.delete(fn) }
   private changed(): void { for (const l of this.listeners) l() }
 
+  /** The server's live stream: every fresh reading arrives as an event and is applied at once; timers are only the fallback. */
+  private stream: EventSource | null = null
+  streamState: 'off' | 'open' | 'error' = 'off'
+  private openStream(): void {
+    const ES = (globalThis as unknown as { EventSource?: typeof EventSource }).EventSource
+    if (!ES || this.stream) return
+    try {
+      const es = new ES(`${this.opts.baseUrl}/api/stream`)
+      this.stream = es
+      es.onopen = () => { this.streamState = 'open'; this.changed() }
+      es.onerror = () => { this.streamState = 'error'; this.changed() }
+      es.addEventListener('flow', (e) => this.onStreamEvent('flow', JSON.parse((e as MessageEvent).data)))
+      es.addEventListener('incidents', (e) => this.onStreamEvent('incidents', JSON.parse((e as MessageEvent).data)))
+    } catch { this.stream = null }
+  }
+  /** A reading just landed on the server: fetch it now (the server answers from its cache, so this is instant). */
+  onStreamEvent(kind: string, msg: { tile?: string }): void {
+    if (!this.view) return
+    if (kind === 'flow' && msg.tile && this.flowKeys(this.view).includes(msg.tile)) void this.pollFlow(true)
+    if (kind === 'incidents') void this.pollIncidents(true)
+  }
+
   open(): void {
     this.status = { flow: 'connecting', incidents: 'connecting', weather: 'connecting' }
+    this.openStream()
     this.timers.push(setInterval(() => void this.pollFlow(true), this.opts.flowIntervalMs ?? 60_000))
     this.timers.push(setInterval(() => void this.pollIncidents(true), this.opts.incidentIntervalMs ?? 60_000))
     this.timers.push(setInterval(() => void this.pollWeather(), this.opts.weatherIntervalMs ?? 600_000))
@@ -120,7 +143,7 @@ export class LiveFeeds {
     void this.pollWeather(); void this.pollStatus()
   }
 
-  close(): void { for (const t of this.timers) clearInterval(t); this.timers = []; this.status = { flow: 'closed', incidents: 'closed', weather: 'closed' }; this.changed() }
+  close(): void { for (const t of this.timers) clearInterval(t); this.timers = []; this.stream?.close(); this.stream = null; this.streamState = 'off'; this.status = { flow: 'closed', incidents: 'closed', weather: 'closed' }; this.changed() }
 
   /** Call on camera change; polls immediately when the covered tiles change. */
   setView(view: WorldBounds): void {

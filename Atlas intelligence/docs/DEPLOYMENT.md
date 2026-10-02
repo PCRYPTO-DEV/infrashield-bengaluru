@@ -68,6 +68,12 @@ docker run -p 8000:8000 -e TOMTOM_API_KEY=... -e ANTHROPIC_API_KEY=... -v atlas-
 The browser additionally loads the camera detector from
 `cdn.jsdelivr.net` when the camera panel is opened.
 
+## Live without lag
+
+- `GET /api/stream` is a server-sent event stream: every flow tile the server reads, every incident list, camera count and zone event is pushed to every open browser, which fetches the fresh reading at once (the server answers from its cache). Timers are only the fallback.
+- The server keeps **hot tiles** (flow tiles viewed in the last 10 minutes) refreshed itself, on an interval that spends at most 60% of what is left of the TomTom daily budget: one hot tile refreshes every 72 s on the free tier, three every 216 s, and so on (`GET /api/live/status` shows the set and the interval). Minute-level refresh across many tiles needs a paid TomTom tier; raise `TOMTOM_DAILY_BUDGET` to match.
+- Streets around a chosen state are warmed on the server the moment the state is picked (`GET /api/warm?lng&lat`), and the browser prefetches two rings of tiles beyond the view.
+
 ## Verifying a live deployment
 
 - `GET /api/health` → `{"ok": true, "tomtom": true, "writer": true, "osm": {...}}` when both keys are set. `osm.lastError` names the last Overpass failure (and the mirror that failed) when the map stays empty.
