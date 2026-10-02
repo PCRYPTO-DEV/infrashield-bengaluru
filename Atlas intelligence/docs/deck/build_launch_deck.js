@@ -2,12 +2,12 @@
 const pptxgen = require('pptxgenjs')
 const fs = require('fs')
 const path = require('path')
-const { applyTheme } = require('/root/.claude/skills/synced/06ecdaca-38d7-4f57-8024-a936d88d4781_ebbc0742-7f6a-4eb8-9fd5-1a6eba4c9558/pptx/scripts/apply_theme.js')
+const { applyTheme } = require(process.env.DECK_THEME_HELPER || path.join(__dirname, 'apply_theme.js'))
 
 const HERE = __dirname
-const SHOTS = path.join(HERE, '..')          // product screenshots from the headless runs
-const AD = path.join(HERE, '..', 'ad')       // branded photographs (when the host is reachable)
-const LOGO = path.join(HERE, '..', 'logo')
+const SHOTS = process.env.DECK_SHOTS || path.join(HERE, 'shots')   // product screenshots from the headless runs
+const AD = process.env.DECK_AD || path.join(HERE, 'photos')       // full-bleed photographs raw-1/2/3.jpg (generated with Higgsfield)
+const LOGO = process.env.DECK_LOGO || path.join(HERE, 'logo')     // must hold city-atlas-horizontal-transparent.png
 const has = (p) => fs.existsSync(p)
 
 const THEME = {
@@ -243,7 +243,7 @@ pres.addSection({ title: 'Under the hood' })
 }
 
 ;(async () => {
-  const out = path.join(HERE, 'City_Atlas_Launch.pptx')
+  const out = process.env.DECK_OUT || path.join(HERE, 'City_Atlas_Launch.pptx')
   await pres.writeFile({ fileName: out })
   await applyTheme(out, THEME)
   console.log('wrote', out)
