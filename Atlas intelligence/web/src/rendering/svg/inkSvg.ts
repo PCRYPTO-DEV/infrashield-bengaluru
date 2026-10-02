@@ -133,8 +133,8 @@ function greenGround(ring: Pt[], kind?: string): string {
 
 /** One mapped tree in 3D: a trunk of about 4 m and a canopy at its top, in the same oblique projection as the buildings. */
 function tree3d(x: number, y: number, upm: number): string {
-  const top = inkProject(x, y, 4 * upm)
-  const r = 2.8 * upm
+  const top = inkProject(x, y, 5 * upm)
+  const r = 4.5 * upm
   return `<path d="M${x.toFixed(1)} ${y.toFixed(1)}L${top.x.toFixed(1)} ${top.y.toFixed(1)}" stroke="${PALETTE.foliageInk}" stroke-width="${(0.7 * upm).toFixed(2)}" fill="none"/>` +
     `<circle class="ca-tree" cx="${top.x.toFixed(1)}" cy="${top.y.toFixed(1)}" r="${r.toFixed(1)}" fill="${PALETTE.foliage}" stroke="${PALETTE.foliageInk}" stroke-width="${(0.5 * upm).toFixed(2)}"/>` +
     `<circle cx="${(top.x - r * 0.45).toFixed(1)}" cy="${(top.y + r * 0.2).toFixed(1)}" r="${(r * 0.65).toFixed(1)}" fill="${PALETTE.foliage}" stroke="${PALETTE.foliageInk}" stroke-width="${(0.4 * upm).toFixed(2)}"/>`

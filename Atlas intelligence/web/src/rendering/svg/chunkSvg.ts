@@ -40,7 +40,7 @@ export function greenFill(kind?: string): string {
 
 /** One mapped tree as a small canopy mark. */
 export function tree2d(x: number, y: number): string {
-  return `<circle class="ca-tree" cx="${f(x)}" cy="${f(y)}" r="2.6" fill="${PALETTE.foliage}" stroke="${PALETTE.foliageInk}" stroke-width="0.6"/>`
+  return `<circle class="ca-tree" cx="${f(x)}" cy="${f(y)}" r="3.6" fill="${PALETTE.foliage}" stroke="${PALETTE.foliageInk}" stroke-width="0.6"/>`
 }
 
 /** Names of the larger green areas, at their centre. */
