@@ -36,6 +36,9 @@ class History:
         c.execute("CREATE INDEX IF NOT EXISTS cam_ts ON camera_counts (camera, ts)")
         c.execute("CREATE TABLE IF NOT EXISTS zone_events (ts REAL NOT NULL, zone TEXT NOT NULL, kind TEXT NOT NULL, description TEXT, lng REAL, lat REAL)")
         c.execute("CREATE INDEX IF NOT EXISTS zone_ts ON zone_events (zone, ts)")
+        c.execute("CREATE TABLE IF NOT EXISTS air_readings (ts REAL NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, eu_aqi REAL, us_aqi REAL, pm25 REAL, pm10 REAL, no2 REAL, o3 REAL)")
+        c.execute("CREATE INDEX IF NOT EXISTS air_ts ON air_readings (lat, lng, ts)")
+        c.execute("CREATE TABLE IF NOT EXISTS cell_daily (h3 TEXT NOT NULL, day TEXT NOT NULL, score REAL, vector TEXT, PRIMARY KEY (h3, day))")
         c.commit()
         self.listeners: list[Any] = []
 
@@ -81,6 +84,51 @@ class History:
             self._conn.execute("INSERT INTO zone_events VALUES (?,?,?,?,?,?)", (ts, zone, kind, description, lng, lat))
             self._conn.commit()
         self._notify("zone", {"zone": zone, "kind": kind, "description": description, "ts": ts})
+
+    def record_air(self, lat: float, lng: float, r: dict[str, Any], ts: float | None = None) -> None:
+        ts = time.time() if ts is None else ts
+        with self._lock:
+            self._conn.execute("INSERT INTO air_readings VALUES (?,?,?,?,?,?,?,?,?)", (ts, lat, lng, r.get("euAqi"), r.get("usAqi"), r.get("pm25"), r.get("pm10"), r.get("no2"), r.get("o3")))
+            self._conn.commit()
+
+    def air_before(self, lat: float, lng: float, before_s: float, now: float | None = None) -> dict[str, Any] | None:
+        """The reading nearest to `before_s` ago for this (rounded) spot, within a 3 h window."""
+        now = time.time() if now is None else now
+        target = now - before_s
+        with self._lock:
+            row = self._conn.execute("SELECT ts, eu_aqi, pm25 FROM air_readings WHERE lat = ? AND lng = ? AND ts BETWEEN ? AND ? ORDER BY ABS(ts - ?) LIMIT 1", (round(lat, 2), round(lng, 2), target - 5400, target + 5400, target)).fetchone()
+        return {"ts": row[0], "euAqi": row[1], "pm25": row[2]} if row else None
+
+    def save_cell_day(self, h3: str, day: str, score: float | None, vector: str) -> None:
+        with self._lock:
+            self._conn.execute("INSERT OR REPLACE INTO cell_daily VALUES (?,?,?,?)", (h3, day, score, vector))
+            self._conn.commit()
+
+    def cell_days(self, h3: str, limit: int = 30) -> list[tuple[str, float | None, str]]:
+        with self._lock:
+            return self._conn.execute("SELECT day, score, vector FROM cell_daily WHERE h3 = ? ORDER BY day DESC LIMIT ?", (h3, limit)).fetchall()
+
+    def flow_in_bbox(self, west: float, south: float, east: float, north: float, within_s: float = 900, now: float | None = None) -> list[dict[str, Any]]:
+        """Latest level per segment whose midpoint lies in the bbox, if recorded within `within_s`."""
+        now = time.time() if now is None else now
+        with self._lock:
+            rows = self._conn.execute("SELECT segment, level, ts, road_type, lng, lat FROM flow_readings WHERE ts >= ? AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? ORDER BY ts ASC", (now - within_s, west, east, south, north)).fetchall()
+        latest: dict[str, dict[str, Any]] = {}
+        for seg, lvl, ts, rt, lng, lat in rows:
+            latest[seg] = {"segment": seg, "level": lvl, "ts": ts, "roadType": rt, "lng": lng, "lat": lat}
+        return list(latest.values())
+
+    def incidents_in_bbox(self, west: float, south: float, east: float, north: float, since_s: float = 7200, now: float | None = None) -> list[dict[str, Any]]:
+        now = time.time() if now is None else now
+        with self._lock:
+            rows = self._conn.execute("SELECT id, MAX(ts), kind, severity, lng, lat, description, MIN(ts) FROM incident_readings WHERE ts >= ? AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? GROUP BY id", (now - since_s, west, east, south, north)).fetchall()
+        return [{"id": r[0], "ts": r[1], "kind": r[2], "severity": r[3], "lng": r[4], "lat": r[5], "description": r[6], "firstSeen": r[7]} for r in rows]
+
+    def camera_in_bbox(self, west: float, south: float, east: float, north: float, within_s: float = 900, now: float | None = None) -> list[dict[str, Any]]:
+        now = time.time() if now is None else now
+        with self._lock:
+            rows = self._conn.execute("SELECT camera, MAX(ts), people, vehicles, lng, lat FROM camera_counts WHERE ts >= ? AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? GROUP BY camera", (now - within_s, west, east, south, north)).fetchall()
+        return [{"camera": r[0], "ts": r[1], "people": r[2], "vehicles": r[3], "lng": r[4], "lat": r[5]} for r in rows]
 
     def subscribe(self, fn: Any) -> None:
         self.listeners.append(fn)

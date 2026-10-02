@@ -40,7 +40,7 @@ def test_street_tier_decodes_roads_buildings_green_and_stations():
             assert b.south - 1e-6 <= g["lat"] <= b.north + 1e-6 and b.west - 1e-6 <= g["lon"] <= b.east + 1e-6
     out = normalize(els, 1000.0)
     types = {e["type"] for e in out}
-    assert types == {"road", "building", "park", "transit"}
+    assert types == {"road", "building", "park", "transit", "path"}
     bld = next(e for e in out if e["type"] == "building")
     assert bld["properties"]["floors"] == 5 and bld["evidence"]["classification"] == "observed" and bld["evidence"]["source"] == "openstreetmap"
     park = next(e for e in out if e["properties"].get("name") == "Central Park")

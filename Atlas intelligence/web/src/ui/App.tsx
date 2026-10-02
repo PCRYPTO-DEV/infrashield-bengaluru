@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CityAtlas } from '../app/CityAtlas'
 import { REGIONS, PLACES, regionFromSearch } from '../app/regions'
 import { useAppVersion } from './useApp'
@@ -12,16 +12,20 @@ import { VisionPanel } from './panels/VisionPanel'
 import { AlertsPanel } from './panels/AlertsPanel'
 import { InsightsPanel } from './panels/InsightsPanel'
 import { InsightBubbles } from './overlays/InsightBubbles'
+import { PlaceCard } from './panels/PlaceCard'
+import { WhatChanged } from './panels/WhatChanged'
+import { ComparePanel } from './panels/ComparePanel'
+import { Home } from './overlays/Home'
 import { unlockAudio } from './bleep'
 import { MODES } from '../rendering/layers/modes'
-import { formatWorldUri, parseWorldUri } from '../engine/seed/worldSeed'
+import { parseWorldUri } from '../engine/seed/worldSeed'
 import { makeT, type StringKey } from './i18n'
 import { installEmbed, readEmbedParams } from '../app/embed'
 import { lngLatToLocal } from '../geo/projection/frame'
-import { useEffect } from 'react'
-import { WelcomeCard } from './overlays/WelcomeCard'
+import type { PlaceState } from '../data/adapters/placeAdapter'
 
-type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | null
+type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'changed' | 'compare' | null
+const TOOLS = ['insights', 'layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'compare'] as const
 
 function seedFromUrl(): string {
   const p = new URLSearchParams(window.location.search)
@@ -36,17 +40,22 @@ function saveDrawing(app: { exportDrawing(): { svg: string; filename: string } }
   setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
 
+/**
+ * The surface stays almost impossibly simple: the City Atlas mark, Ask Atlas, search,
+ * What changed?, the time bar and the map. Everything else appears contextually under More.
+ */
 export default function App() {
-  const [seed, setSeed] = useState(seedFromUrl)
+  const [seed] = useState(seedFromUrl)
   const [regionId, setRegionId] = useState(() => regionFromSearch(window.location.search).id)
   const [placeKey, setPlaceKey] = useState(() => new URLSearchParams(window.location.search).get('place') ?? '')
   // The region from the URL carries the origin (?place= or ?lng&lat), so the whole of India is one region with a movable frame.
   const app = useMemo(() => new CityAtlas(seed, regionId === regionFromSearch(window.location.search).id ? regionFromSearch(window.location.search) : REGIONS[regionId]), [seed, regionId, placeKey])
   useAppVersion(app)
-  const embedParams = useMemo(() => readEmbedParams(window.location.search), [])
-  const [tool, setTool] = useState<Tool>(embedParams.tool ?? null)
-  // A panel asked for by the host page (embed) or another part of the app.
-  useEffect(() => { if (app.toolRequest !== null || tool !== null) { if (app.toolRequest !== undefined && app.toolRequest !== null) { setTool(app.toolRequest); app.toolRequest = null } } }, [app.toolRequest]) // eslint-disable-line react-hooks/exhaustive-deps
+  const embed = useMemo(() => readEmbedParams(window.location.search), [])
+  const [tool, setTool] = useState<Tool>(embed.tool ?? null)
+  const [more, setMore] = useState(false)
+  const [compare, setCompare] = useState<Array<{ name: string; state: PlaceState }>>([])
+  useEffect(() => { if (app.toolRequest) { setTool(app.toolRequest); app.toolRequest = null } }, [app.toolRequest]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const u = () => unlockAudio(); window.addEventListener('pointerdown', u, { once: true }); window.addEventListener('keydown', u, { once: true }); return () => { window.removeEventListener('pointerdown', u); window.removeEventListener('keydown', u) } }, [])
   const goPlace = (id: string) => {
     const c = PLACES.find((x) => x.id === id); if (!c) return
@@ -54,59 +63,50 @@ export default function App() {
     app.dispose(); setRegionId('india'); setPlaceKey(id)
   }
   const placeNow = placeKey || 'delhi'
-  const [seedInput, setSeedInput] = useState(seed)
-  const regenerate = () => {
-    const s = parseWorldUri(seedInput)?.seed ?? seed
-    try { const url = new URL(window.location.href); url.searchParams.set('world', formatWorldUri(s)); window.history.replaceState({}, '', url) } catch { /* sandboxed host: keep the seed in page state only */ }
-    app.dispose(); setSeed(s)
-  }
-  const district = [...app.world.chunks.values()][0]?.meta.districtName
-  const switchRegion = (id: string) => {
-    try { const url = new URL(window.location.href); url.searchParams.set('region', id); url.searchParams.delete('world'); window.history.replaceState({}, '', url) } catch { /* sandboxed host */ }
-    app.dispose(); setRegionId(id); setSeed(REGIONS[id].seed); setSeedInput(REGIONS[id].seed)
-  }
+  const cityName = (PLACES.find((c) => c.id === placeNow) ?? PLACES[0])
+  const city = app.language === 'hi' ? cityName.hi.split(' · ').pop()! : cityName.name.split(' · ').pop()!
   const toggle = (t: Tool) => setTool((cur) => (cur === t ? null : t))
   const T = makeT(app.language)
-  const embed = embedParams
-  // The made-up demo city is an engineering demo, shown in the switcher only when asked for (?demo=1).
-  const showDemo = useMemo(() => new URLSearchParams(window.location.search).get('demo') === '1', [])
   useEffect(() => {
     if (embed.lang) app.setLanguage(embed.lang)
     if (embed.theme) app.setTheme(embed.theme)
-    if (embed.mode) app.setMode(embed.mode)
     if (embed.lng !== undefined && embed.lat !== undefined) app.camera.setView(lngLatToLocal(app.frame, { lng: embed.lng, lat: embed.lat }), embed.zoom)
     else if (embed.zoom !== undefined) app.camera.setView(app.camera.centre, embed.zoom)
     return installEmbed(app)
   }, [app, embed])
+  const addCompare = (name: string, st: PlaceState) => { setCompare((c) => (c.some((x) => x.state.cell === st.cell) || c.length >= 3 ? c : [...c, { name, state: st }])); setTool('compare') }
+  const sidePanel = tool === 'zones' || tool === 'route' || tool === 'upload' || tool === 'pulse'
   return (
     <div className={`ca-app ${app.theme}${embed.embed ? ' ca-embed' : ''}`}>
       <CityView key={`${regionId}:${seed}:${placeKey}`} app={app} />
+
+      {/* 1. the mark, with language and theme */}
       <div className="ca-top">
-        <div className="ca-brand"><img src="./brand/symbol-64.png" alt="City Atlas" width={34} height={34} /><div><h1 className="ca-wordmark">ATLAS INFINITY</h1><span className="ca-by">CITY ATLAS · people · places · possibilities</span></div></div>
-        <p className="ca-tagline">{T('top.tagline')} · {app.region.name}{district && district !== app.region.name ? ` · ${district}` : ''}</p>
-        <div className="ca-regions">{Object.values(REGIONS).filter((r) => !r.demo || showDemo || r.id === regionId).map((r) => <button key={r.id} className={r.id === regionId ? 'active' : ''} onClick={() => switchRegion(r.id)}>{r.name}</button>)}
-          <select className="ca-place-select" title={T('place.title')} value={placeNow} onChange={(e) => goPlace(e.target.value)}>{PLACES.map((c) => <option key={c.id} value={c.id}>{app.language === 'hi' ? c.hi : c.name}</option>)}</select>
-          <span className="ca-lang" title="Language · भाषा"><button className={app.language === 'en' ? 'active' : ''} onClick={() => app.setLanguage('en')}>English</button><button className={app.language === 'hi' ? 'active' : ''} onClick={() => app.setLanguage('hi')}>हिंदी</button></span>
-          <span className="ca-lang ca-theme" title={T('theme.title')}><button className={app.theme === 'night' ? 'active' : ''} onClick={() => app.setTheme('night')} aria-label={T('theme.night')}>☾ {T('theme.night')}</button><button className={app.theme === 'day' ? 'active' : ''} onClick={() => app.setTheme('day')} aria-label={T('theme.day')}>☀ {T('theme.day')}</button></span></div>
-        <div className="ca-seed">
-          <span>atlas://world/</span>
-          <input value={seedInput} onChange={(e) => setSeedInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && regenerate()} />
-          <button onClick={regenerate}>{T('top.regenerate')}</button>
+        <div className="ca-brand"><img src="./brand/symbol-64.png" alt="City Atlas" width={34} height={34} /><div><h1 className="ca-wordmark">CITY ATLAS</h1><span className="ca-by">{app.tier === 'plus' ? 'PLUS · ' : ''}{T('top.tagline')} · {city}</span></div>
+          <span className="ca-lang" title="Language · भाषा"><button className={app.language === 'en' ? 'active' : ''} onClick={() => app.setLanguage('en')}>EN</button><button className={app.language === 'hi' ? 'active' : ''} onClick={() => app.setLanguage('hi')}>हि</button></span>
+          <span className="ca-lang ca-theme" title={T('theme.title')}><button className={app.theme === 'night' ? 'active' : ''} onClick={() => app.setTheme('night')} aria-label={T('theme.night')}>☾</button><button className={app.theme === 'day' ? 'active' : ''} onClick={() => app.setTheme('day')} aria-label={T('theme.day')}>☀</button></span>
         </div>
-        <div>{app.region.source === 'osm' ? <span className="ca-badge observed">{T('badge.osm')}</span> : <span className="ca-badge simulated">{T('badge.demo')}</span>} {app.liveStatus.live ? <span className="ca-badge observed" style={{ marginLeft: 4 }}>{T('badge.livetraffic')}</span> : app.region.simulation ? <span className="ca-badge simulated" style={{ marginLeft: 4 }}>{T('badge.simtraffic')}</span> : <span className="ca-badge derived" style={{ marginLeft: 4 }}>{T('badge.notraffic')}</span>} {!app.region.simulation && <span className="ca-badge observed" style={{ marginLeft: 4 }}>{T('badge.realonly')}</span>}{app.realDataFallbacks > 0 && <span className="ca-badge derived" style={{ marginLeft: 4 }}>{T('badge.fallback', { n: app.realDataFallbacks })}</span>}</div>
+        {more && <div className="ca-badges">{app.region.source === 'osm' ? <span className="ca-badge observed">{T('badge.osm')}</span> : <span className="ca-badge simulated">{T('badge.demo')}</span>} {app.liveStatus.live ? <span className="ca-badge observed">{T('badge.livetraffic')}</span> : <span className="ca-badge derived">{T('badge.notraffic')}</span>} <span className="ca-badge observed">{T('badge.realonly')}</span>{app.realDataFallbacks > 0 && <span className="ca-badge derived">{T('badge.fallback', { n: app.realDataFallbacks })}</span>}</div>}
       </div>
-      <div className="ca-modes">{MODES.map((m) => <button key={m.id} className={app.mode === m.id ? 'active' : ''} title={T(`mode.${m.id}.b` as StringKey)} onClick={() => app.setMode(m.id)}>{T(`mode.${m.id}` as StringKey)}</button>)}</div>
-      {app.mode === 'ink3d' && <div className="ca-inkbar">
-        <span>{app.camera.zoom < 16 ? T('ink.zoom') : app.inkPending > 0 ? T('ink.drawing', { n: app.inkPending }) : T('ink.ready')}</span>
-        <button onClick={() => saveDrawing(app)}>{T('ink.save')}</button>
-      </div>}
+
+      {/* 2. search, what changed, more */}
       <div className="ca-tools">
-        <SearchBox app={app} />
-        <div className="ca-toolrow">
-          {(['insights', 'layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts'] as const).map((t) => <button key={t} className={`ca-tool ${tool === t ? 'active' : ''}`} onClick={() => { toggle(t); app.select(null) }}>{T(`tool.${t}` as StringKey)}</button>)}
+        <div className="ca-toolrow ca-primary">
+          <SearchBox app={app} />
+          <select className="ca-place-select" title={T('place.goto')} value={placeNow} onChange={(e) => goPlace(e.target.value)}>{PLACES.map((c) => <option key={c.id} value={c.id}>{app.language === 'hi' ? c.hi : c.name}</option>)}</select>
+          <button className={`ca-tool ca-changed-btn ${tool === 'changed' ? 'active' : ''}`} onClick={() => toggle('changed')}>{T('changed.btn')}{app.changes && app.changes.count > 0 && <b>{app.changes.count}</b>}</button>
+          <button className={`ca-tool ${more ? 'active' : ''}`} onClick={() => setMore(!more)}>{T('more')} {more ? '▴' : '▾'}</button>
         </div>
+        {more && <div className="ca-more">
+          <div className="ca-more-group"><span>{T('more.modes')}</span><div className="ca-toolrow">{MODES.map((m) => <button key={m.id} className={`ca-tool ${app.mode === m.id ? 'active' : ''}`} title={T(`mode.${m.id}.b` as StringKey)} onClick={() => app.setMode(m.id)}>{T(`mode.${m.id}` as StringKey)}</button>)}</div></div>
+          <div className="ca-more-group"><span>{T('more.tools')}</span><div className="ca-toolrow">{TOOLS.map((t) => <button key={t} className={`ca-tool ${tool === t ? 'active' : ''}`} onClick={() => { toggle(t); app.select(null) }}>{T(`tool.${t}` as StringKey)}</button>)}</div></div>
+          {app.mode === 'ink3d' && <div className="ca-more-group"><span>{T('mode.ink3d')}</span><div className="ca-toolrow"><span className="note">{app.camera.zoom < 16 ? T('ink.zoom') : app.inkPending > 0 ? T('ink.drawing', { n: app.inkPending }) : T('ink.ready')}</span><button className="ca-tool" onClick={() => saveDrawing(app)}>{T('ink.save')}</button></div></div>}
+          <div className="ca-more-group"><span>{T('tier.plus')}</span><div className="ca-toolrow">{app.tier === 'free' ? <span className="note">{T('tier.locked')}</span> : <><span className="note">{T('tier.open')}</span><button className="ca-tool" onClick={() => app.lock()}>{T('tier.leave')}</button></>}</div></div>
+        </div>}
         {tool === 'layers' && <LayersPanel app={app} />}
       </div>
+
+      {/* 3. contextual panels */}
       {tool === 'zones' && !app.selection && <ZonesPanel app={app} />}
       {tool === 'route' && !app.selection && <RoutePanel app={app} />}
       {tool === 'upload' && !app.selection && <UploadPanel app={app} />}
@@ -114,12 +114,16 @@ export default function App() {
       {tool === 'camera' && <VisionPanel app={app} />}
       {tool === 'alerts' && <AlertsPanel app={app} />}
       {tool === 'insights' && <InsightsPanel app={app} />}
-      <InsightBubbles app={app} onOpen={() => setTool('insights')} />
+      {tool === 'changed' && <WhatChanged app={app} />}
+      {tool === 'compare' && <ComparePanel app={app} places={compare} onRemove={(i) => setCompare((c) => c.filter((_, j) => j !== i))} />}
+      {!sidePanel && tool !== 'changed' && tool !== 'compare' && !app.selection && <PlaceCard app={app} onCompare={addCompare} />}
       <InspectorPanel app={app} />
+      <InsightBubbles app={app} onOpen={() => setTool('insights')} />
+
+      {/* 4. Ask Atlas, 5. legend pill, 6. time bar */}
       <AskPanel app={app} />
       <Legend app={app} />
       <Timeline app={app} />
-      {!embed.embed && <WelcomeCard app={app} onAsk={() => { document.querySelector<HTMLInputElement>('.ca-ask input')?.focus() }} />}
       {app.region.source === 'osm' && app.stats.chunks === 0 && (app.stats.inFlight > 0 || app.realDataError) && !app.pointPick && !app.draw.active && (
         app.stats.inFlight > 0 && !app.realDataError
           ? <div className="ca-hint ca-loading">{T('load.streets', { n: app.stats.inFlight })}</div>
@@ -127,6 +131,7 @@ export default function App() {
       )}
       {app.pointPick && <div className="ca-hint">{app.pointPick.label} · <button className="small" onClick={() => app.cancelPick()}>{T('hint.cancel')}</button></div>}
       {app.draw.active && !app.pointPick && <div className="ca-hint">{app.draw.state?.kind === 'route' ? T('hint.route') : T('hint.draw', { k: T(`zone.${app.draw.state?.kind}` as StringKey) })}</div>}
+      {!embed.embed && <Home app={app} city={city} onChanged={() => setTool('changed')} onAsk={() => document.querySelector<HTMLInputElement>('.ca-ask input')?.focus()} />}
     </div>
   )
 }

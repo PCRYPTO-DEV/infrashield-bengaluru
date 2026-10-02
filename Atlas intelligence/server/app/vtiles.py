@@ -23,7 +23,13 @@ MAX_ZOOM = 14
 
 # OpenMapTiles transportation classes -> the OSM highway tag the normaliser classifies
 ROAD_CLASS = {"motorway": "motorway", "trunk": "trunk", "primary": "primary", "secondary": "secondary", "tertiary": "tertiary",
-              "minor": "residential", "service": "service", "motorway_construction": None, "path": None, "track": None, "rail": None, "transit": None}
+              "minor": "residential", "service": "service", "motorway_construction": None, "path": "footway", "track": None, "rail": None, "transit": None}
+# OpenMapTiles poi classes that matter for a place card; the normaliser keeps them as `poi` entities
+POI_KINDS = {"hospital": "hospital", "doctors": "clinic", "dentist": "clinic", "pharmacy": "pharmacy", "school": "school", "college": "college", "university": "university",
+             "kindergarten": "school", "police": "police", "fire_station": "fire_station", "grocery": "grocery", "shop": "shop", "clothing_store": "shop",
+             "supermarket": "grocery", "bank": "bank", "atm": "bank", "bus": "bus_stop", "park": "park", "playground": "playground", "sports_centre": "sports",
+             "stadium": "sports", "cinema": "leisure", "theatre": "leisure", "restaurant": "food", "cafe": "food", "fast_food": "food", "fuel": "fuel", "charging_station": "ev_charging",
+             "post_office": "civic", "townhall": "civic", "library": "civic", "place_of_worship": "worship"}
 GREEN = {  # (layer, class/subclass) -> tags
     "park": {"leisure": "park"}, "national_park": {"leisure": "nature_reserve"}, "nature_reserve": {"leisure": "nature_reserve"},
     "wood": {"natural": "wood"}, "forest": {"natural": "wood"}, "grass": {"landuse": "grass"}, "grassland": {"natural": "grassland"},
@@ -193,12 +199,19 @@ def decode_tile(pbf: bytes, b: BBox, tier: str) -> list[dict[str, Any]]:
             for j, ring in enumerate(rings(feat["geometry"])):
                 if len(ring) >= 4:
                     out.append(way(layer_name, i * 10 + j, feat, ring, ext, tags))
-    # --- stations
+    # --- stations and the other points of interest
     poi = layers.get("poi")
     if poi:
         for feat in poi["features"]:
             props = feat["properties"]
             cls, sub = props.get("class"), props.get("subclass")
+            kind = POI_KINDS.get(sub or "") or POI_KINDS.get(cls or "")
+            if kind and not (cls == "railway" or (cls == "bus" and sub == "bus_station")):
+                p = point(feat["geometry"])
+                if p:
+                    ll = to_ll(poi["extent"], p)
+                    out.append({"type": "node", "id": f"poi-{feat.get('id') or len(out)}", "lat": ll["lat"], "lon": ll["lon"], "tags": {"atlas:poi": kind, "name": props.get("name") or kind.replace("_", " ")}})
+                continue
             if cls == "railway" and sub in ("station", "halt", "subway", "tram_stop") or (cls == "bus" and sub == "bus_station"):
                 p = point(feat["geometry"])
                 if not p:

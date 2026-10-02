@@ -1,0 +1,27 @@
+import { useState } from 'react'
+import type { CityAtlas } from '../../app/CityAtlas'
+import { tierOf, type Feature } from '../../app/tiers'
+import { makeT } from '../i18n'
+
+/** Wraps a Plus or Pro feature: shows it when the tier allows, otherwise the City Atlas Plus card with the password field (Pro: its scope, locked). */
+export function TierGate({ app, feature, children }: { app: CityAtlas; feature: Feature; children: React.ReactNode }) {
+  const T = makeT(app.language)
+  const [pw, setPw] = useState('')
+  const [wrong, setWrong] = useState(false)
+  if (app.can(feature)) return <>{children}</>
+  const need = tierOf(feature)
+  return (
+    <div className={`ca-gate ${need}`}>
+      <div className="ca-gate-head"><span className="ca-gate-badge">{T(`tier.${need}` as 'tier.plus' | 'tier.pro')}</span><span className="ca-gate-tag">{T(need === 'pro' ? 'tier.pro.tag' : 'tier.plus.tag')}</span></div>
+      {need === 'pro' ? <p className="note">{T('tier.pro.locked')}</p> : <>
+        <p className="note">{T('tier.locked')}</p>
+        <p className="note ca-gate-list">{T('tier.plus.list')}</p>
+        <form className="ca-gate-form" onSubmit={(e) => { e.preventDefault(); if (app.unlock(pw)) { setWrong(false); setPw('') } else setWrong(true) }}>
+          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder={T('tier.password')} autoComplete="off" />
+          <button type="submit" className="primary">{T('tier.unlock')}</button>
+        </form>
+        {wrong && <p className="note" style={{ color: 'var(--risk)' }}>{T('tier.wrong')}</p>}
+      </>}
+    </div>
+  )
+}

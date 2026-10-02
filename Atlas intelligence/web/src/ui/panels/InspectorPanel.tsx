@@ -24,7 +24,8 @@ export function InspectorPanel({ app }: { app: CityAtlas }) {
 
   if (sel.kind === 'agent') {
     const a = app.world.agents.get(sel.id)
-    if (!a) return <div className="ca-panel ca-inspector"><h3>{T('insp.title')}</h3><p>{T('insp.gone')}</p><button className="close" onClick={() => app.select(null)}>×</button></div>
+    if (!a) return <div className="ca-panel ca-inspector"><h3>{T('insp.title')}</h3><p>{T('insp.gone')}</p><button className="close" onClick={() => app.select(null)}>×</button>
+      {app.placePoint && <button className="small ca-area-btn" onClick={() => app.select(null)}>{T('place.title')}</button>}</div>
     const edge = app.world.graph.edge(a.edgeId)
     const road = edge && app.world.entities.get(edge.roadId)
     const roadName = (road?.entity.properties as RoadProperties | undefined)?.name
@@ -37,6 +38,7 @@ export function InspectorPanel({ app }: { app: CityAtlas }) {
     return (
       <div className="ca-panel ca-inspector">
         <button className="close" onClick={() => app.select(null)}>×</button>
+        {app.placePoint && <button className="small ca-area-btn" onClick={() => app.select(null)}>{T('place.title')}</button>}
         <h3>{T('insp.title')}</h3>
         <dl>
           <dt>{T('insp.what')}</dt><dd>{kind} #{a.id}</dd>
@@ -71,6 +73,7 @@ export function InspectorPanel({ app }: { app: CityAtlas }) {
   return (
     <div className="ca-panel ca-inspector">
       <button className="close" onClick={() => app.select(null)}>×</button>
+      {app.placePoint && <button className="small ca-area-btn" onClick={() => app.select(null)}>{T('place.title')}</button>}
       <h3>{T('insp.title')}</h3>
       <dl>
         <dt>{T('insp.what')}</dt><dd>{String(e.properties.name ?? e.id)}</dd>

@@ -39,6 +39,7 @@ class Settings:
     ipv4_only: bool = field(default_factory=lambda: os.getenv("ATLAS_IPV4_ONLY", "1") != "0")
     tomtom_base: str = "https://api.tomtom.com"
     open_meteo_base: str = "https://api.open-meteo.com"
+    open_meteo_air_base: str = "https://air-quality-api.open-meteo.com"
 
     @property
     def db_path(self) -> Path:

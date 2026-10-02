@@ -9,8 +9,8 @@ const SUGGESTIONS: Record<'en' | 'hi', string[]> = {
 }
 
 const T = {
-  en: { title: 'Ask the city', placeholder: 'Ask anything about this place…', ask: 'Ask', clear: 'Clear', listen: 'Speak your question', listening: 'Listening…', read: 'Read aloud', stop: 'Stop reading', writer: 'written by', template: 'plain template', evidence: 'facts used', free: 'free question' },
-  hi: { title: 'शहर से पूछिए', placeholder: 'इस जगह के बारे में कुछ भी पूछिए…', ask: 'पूछें', clear: 'हटाएँ', listen: 'बोलकर पूछें', listening: 'सुन रहे हैं…', read: 'पढ़कर सुनाएँ', stop: 'रोकें', writer: 'लेखक', template: 'सादा टेम्पलेट', evidence: 'इस्तेमाल किए गए तथ्य', free: 'खुला सवाल' },
+  en: { title: 'Ask Atlas', placeholder: 'Ask anything about this city…', ask: 'Ask', clear: 'Clear', listen: 'Speak your question', listening: 'Listening…', read: 'Read aloud', stop: 'Stop reading', writer: 'written by', template: 'plain template', evidence: 'facts used', free: 'free question' },
+  hi: { title: 'एटलस से पूछें', placeholder: 'इस शहर के बारे में कुछ भी पूछें…', ask: 'पूछें', clear: 'हटाएँ', listen: 'बोलकर पूछें', listening: 'सुन रहे हैं…', read: 'पढ़कर सुनाएँ', stop: 'रोकें', writer: 'लेखक', template: 'सादा टेम्पलेट', evidence: 'इस्तेमाल किए गए तथ्य', free: 'खुला सवाल' },
 }
 
 /**

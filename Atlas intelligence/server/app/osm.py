@@ -108,6 +108,9 @@ def normalize(elements: list[dict[str, Any]], fetched_at: float) -> list[dict[st
                 mode = "metro" if tags.get("station") == "subway" or tags.get("subway") == "yes" else ("rail" if "railway" in tags else "bus")
                 out.append({"id": f"osm:n{el['id']}", "type": "transit", "geometry": geom, "evidence": ev(),
                             "properties": {"name": tags.get("name", "Station"), "mode": mode, "osm": tags}})
+            elif tags.get("atlas:poi"):
+                out.append({"id": f"osm:n{el['id']}", "type": "poi", "geometry": geom, "evidence": ev(),
+                            "properties": {"kind": tags["atlas:poi"], "name": tags.get("name") or tags["atlas:poi"], "osm": tags}})
             elif tags.get("natural") == "tree":
                 out.append({"id": f"osm:n{el['id']}", "type": "tree", "geometry": geom, "evidence": ev(),
                             "properties": {"name": tags.get("name"), "species": tags.get("species") or tags.get("genus"), "osm": tags}})
@@ -117,7 +120,10 @@ def normalize(elements: list[dict[str, Any]], fetched_at: float) -> list[dict[st
             continue
         if t == "way" and el.get("geometry") and len(el["geometry"]) >= 2:
             coords = [[g["lon"], g["lat"]] for g in el["geometry"]]
-            if "highway" in tags:
+            if tags.get("highway") in ("footway", "path", "pedestrian", "steps", "cycleway", "living_street_path"):
+                out.append({"id": f"osm:w{el['id']}", "type": "path", "geometry": {"type": "LineString", "coordinates": coords}, "evidence": ev(),
+                            "properties": {"kind": tags["highway"], "name": tags.get("name"), "osm": tags}})
+            elif "highway" in tags:
                 cls = HIGHWAY_CLASS.get(tags["highway"], "local")
                 ms = parse_maxspeed(tags.get("maxspeed"))
                 try:

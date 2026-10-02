@@ -91,9 +91,46 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
     from .tomtom import register as register_tomtom
     from .weather import register as register_weather
     from .explain import register as register_explain
+    from .air import register as register_air
+    from .cells import CellModel
+    from .changes import ChangeEngine
+    from .tiles import BBox
     register_tomtom(app, cache, fixtures, history)
+    air = register_air(app, cache, fixtures, history)
     register_memory(app, history)
     register_alerts(app, alerts)
+    cells = CellModel(osm, history, None, air)
+    app.state.cells = cells
+    changes = ChangeEngine(history, air)
+
+    @app.get("/api/place")
+    async def place(lng: float = Query(..., ge=-180, le=180), lat: float = Query(..., ge=-90, le=90), res: int = Query(9, ge=7, le=10), cached: bool = Query(False)):
+        """Place intelligence: one H3 cell's state vector with WHY, confidence and provenance per dimension."""
+        if cells.weather is None:
+            cells.weather = getattr(app.state, "weather", None)
+        return await cells.state(lng, lat, res, cached_only=cached)
+
+    @app.get("/api/cells")
+    async def cells_in(bbox: str = Query(..., pattern=r"^-?[\d.]+,-?[\d.]+,-?[\d.]+,-?[\d.]+$"), res: int = Query(9, ge=7, le=10), limit: int = Query(120, ge=1, le=400)):
+        """Scores for the cells in a bbox, from cached tiles only (no network), for a city-level view."""
+        import h3
+        w, s_, e, n = (float(v) for v in bbox.split(","))
+        poly = h3.LatLngPoly([(s_, w), (s_, e), (n, e), (n, w)])
+        ids = list(h3.polygon_to_cells(poly, res))[:limit]
+        if cells.weather is None:
+            cells.weather = getattr(app.state, "weather", None)
+        out = []
+        for cid in ids:
+            la, ln = h3.cell_to_latlng(cid)
+            st = await cells.state(ln, la, res, cached_only=True)
+            if st["score"] is not None:
+                out.append({"cell": cid, "centre": st["centre"], "boundary": st["boundary"], "score": st["score"], "band": st["band"], "confidence": st["confidence"]})
+        return {"res": res, "cells": out, "considered": len(ids)}
+
+    @app.get("/api/changes")
+    async def what_changed(bbox: str = Query(..., pattern=r"^-?[\d.]+,-?[\d.]+,-?[\d.]+,-?[\d.]+$"), since: float = Query(86400, ge=600, le=30 * 86400), limit: int = Query(17, ge=1, le=50)):
+        w, s_, e, n = (float(v) for v in bbox.split(","))
+        return changes.detect(BBox(w, s_, e, n), since_s=since, limit=limit)
     register_weather(app, cache, fixtures)
     register_explain(app, writer=writer, fake=fixtures is not None and not settings.anthropic_api_key)
 

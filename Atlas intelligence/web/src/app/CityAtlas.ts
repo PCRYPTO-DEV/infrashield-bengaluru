@@ -43,6 +43,8 @@ import type { LngLat } from '../geo/coordinates/lngLat'
 import { localToLngLat } from '../geo/projection/frame'
 import type { AgentView } from '../engine/world/WorldModel'
 import { deriveInsights, type Insight } from '../intelligence/insights/insightEngine'
+import { fetchPlace, fetchChanges, type PlaceState, type ChangeReport } from '../data/adapters/placeAdapter'
+import { loadTier, saveTier, unlockWithPassword, hasFeature, type Tier, type Feature } from './tiers'
 import type { IntelligenceState } from '../intelligence/types'
 
 export type Theme = 'day' | 'night'
@@ -390,7 +392,11 @@ export class CityAtlas {
       if (res) this.finishShape(res)
       return
     }
-    this.select(hitTest(this.world, this.camera, { x: sx, y: sy }, this.lodController.lod(this.camera.zoom)))
+    const hit = hitTest(this.world, this.camera, { x: sx, y: sy }, this.lodController.lod(this.camera.zoom))
+    this.select(hit)
+    // Click anywhere: the place intelligence card for that spot is read for every click (real regions);
+    // when something was hit its details show first, with a button to the area card.
+    if (this.region.source === 'osm') void this.openPlace(p)
   }
   pointerMove(sx: number, sy: number): void {
     const p = this.camera.screenToWorld({ x: sx, y: sy })
@@ -416,6 +422,40 @@ export class CityAtlas {
   /** A route between two chosen places (from the search box), drawn like a picked one. */
   setRouteEndpoints(a: WorldPoint, b: WorldPoint): void { this.routePick = [a, b]; this.computeRoute(a, b) }
   setRouteWeights(w: Partial<RouteWeights>): void { this.routeWeights = { ...this.routeWeights, ...w }; if (this.routePick.length === 2) this.computeRoute(this.routePick[0], this.routePick[1]); else this.notify() }
+
+  // ---------- place intelligence, what changed, tiers ----------
+  place: PlaceState | null = null
+  placePoint: WorldPoint | null = null
+  placeLoading = false
+  placeError: string | null = null
+  async openPlace(p: WorldPoint): Promise<void> {
+    const ll = localToLngLat(this.frame, p)
+    this.placePoint = p; this.placeLoading = true; this.placeError = null; this.highlights = { ...this.highlights, points: [p] }; this.notify()
+    try { this.place = await fetchPlace(SERVER_BASE, ll.lng, ll.lat) }
+    catch (e) { this.place = null; this.placeError = (e as Error).message }
+    finally { this.placeLoading = false; this.notify() }
+  }
+  async openPlaceAt(lng: number, lat: number): Promise<void> { return this.openPlace(lngLatToLocal(this.frame, { lng, lat })) }
+  closePlace(): void { this.place = null; this.placePoint = null; this.placeError = null; this.highlights = { ...this.highlights, points: [] }; this.notify() }
+
+  changes: ChangeReport | null = null
+  changesLoading = false
+  async loadChanges(sinceS = 86400): Promise<ChangeReport | null> {
+    if (this.region.source !== 'osm') return null
+    const b = this.camera.viewBounds()
+    const sw = localToLngLat(this.frame, { x: b.minX, y: b.maxY }), ne = localToLngLat(this.frame, { x: b.maxX, y: b.minY })
+    this.changesLoading = true; this.notify()
+    try { this.changes = await fetchChanges(SERVER_BASE, { west: Math.min(sw.lng, ne.lng), south: Math.min(sw.lat, ne.lat), east: Math.max(sw.lng, ne.lng), north: Math.max(sw.lat, ne.lat) }, sinceS) }
+    catch { this.changes = null }
+    finally { this.changesLoading = false; this.notify() }
+    return this.changes
+  }
+
+  tier: Tier = loadTier()
+  can(f: Feature): boolean { return hasFeature(this.tier, f) }
+  /** Plus is a password for now; a wrong one returns false. */
+  unlock(password: string): boolean { const t = unlockWithPassword(password); if (!t) return false; this.tier = t; saveTier(t); this.notify(); return true }
+  lock(): void { this.tier = 'free'; saveTier('free'); this.notify() }
 
   // ---------- insights for the people who run the city ----------
   insights: Insight[] = []

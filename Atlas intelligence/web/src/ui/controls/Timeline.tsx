@@ -27,7 +27,7 @@ export function Timeline({ app }: { app: CityAtlas }) {
       </div>
       <div className="scrub">
         <input type="range" min={min} max={max} step={30000} value={value} onChange={(e) => app.temporal.seek(Number(e.target.value))} />
-        <div className="ticks"><span>{T('time.left', { n: recordedMin })}</span><span>{T('time.now')}{lag > 5 ? ` · ${T('time.behind', { n: lag })}` : ''}</span><span>{simulate ? T('time.right') : T('time.nofuture')}</span></div>
+        <div className="ticks"><span><b>{T('time.past')}</b> · {T('time.left', { n: recordedMin })}</span><span><b>{T('time.today')}</b>{lag > 5 ? ` · ${T('time.behind', { n: lag })}` : ''}</span><span title={T('time.future.soon')}><b>{T('time.future')}</b> · {simulate ? T('time.right') : T('time.nofuture')}</span></div>
       </div>
       <div className="clock">
         <span className={`ca-badge ${t.mode}`}>{label}</span>

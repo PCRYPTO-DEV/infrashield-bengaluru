@@ -128,3 +128,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+# air quality (synthetic): one reading reused for every spot
+(OUT / "air.json").write_text(json.dumps({"current": {"time": "2026-10-02T06:00", "european_aqi": 58, "us_aqi": 112, "pm2_5": 41.2, "pm10": 88.0, "nitrogen_dioxide": 31.0, "ozone": 60.0}}))
