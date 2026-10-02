@@ -11,9 +11,26 @@ export function CityView({ app }: { app: CityAtlas }) {
     const el = ref.current!
     app.mount(el)
     let down: { x: number; y: number; moved: boolean } | null = null
-    const onDown = (e: PointerEvent) => { if (e.button !== 0) return; down = { x: e.clientX, y: e.clientY, moved: false }; el.setPointerCapture(e.pointerId) }
+    // Touch: track active pointers so two fingers pinch-zoom around their midpoint.
+    const touches = new Map<number, { x: number; y: number }>()
+    let pinchDist = 0
+    const onDown = (e: PointerEvent) => {
+      if (e.button !== 0) return
+      el.setPointerCapture(e.pointerId)
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (touches.size === 2) { const [a, b] = [...touches.values()]; pinchDist = Math.hypot(a.x - b.x, a.y - b.y); down = null; setDragging(false); return }
+      down = { x: e.clientX, y: e.clientY, moved: false }
+    }
     const onMove = (e: PointerEvent) => {
       const r = el.getBoundingClientRect()
+      if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (touches.size === 2) {
+        const [a, b] = [...touches.values()]
+        const d = Math.hypot(a.x - b.x, a.y - b.y)
+        if (pinchDist > 0 && d > 0) app.camera.zoomAt({ x: (a.x + b.x) / 2 - r.left, y: (a.y + b.y) / 2 - r.top }, Math.log2(d / pinchDist))
+        pinchDist = d
+        return
+      }
       if (down) {
         const dx = e.clientX - down.x, dy = e.clientY - down.y
         if (!down.moved && Math.hypot(dx, dy) > 3) { down.moved = true; setDragging(true) }
@@ -24,6 +41,8 @@ export function CityView({ app }: { app: CityAtlas }) {
       setHovering(!!app.hover)
     }
     const onUp = (e: PointerEvent) => {
+      touches.delete(e.pointerId)
+      if (touches.size < 2) pinchDist = 0
       if (!down) return
       const r = el.getBoundingClientRect()
       if (!down.moved) app.pointerClick(e.clientX - r.left, e.clientY - r.top)

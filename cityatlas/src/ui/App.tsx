@@ -26,7 +26,7 @@ export default function App() {
   const [seedInput, setSeedInput] = useState(seed)
   const regenerate = () => {
     const s = parseWorldUri(seedInput)?.seed ?? seed
-    const url = new URL(window.location.href); url.searchParams.set('world', formatWorldUri(s)); window.history.replaceState({}, '', url)
+    try { const url = new URL(window.location.href); url.searchParams.set('world', formatWorldUri(s)); window.history.replaceState({}, '', url) } catch { /* sandboxed host: keep the seed in page state only */ }
     app.dispose(); setSeed(s)
   }
   const district = [...app.world.chunks.values()][0]?.meta.districtName

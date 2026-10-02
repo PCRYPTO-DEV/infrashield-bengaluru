@@ -10,7 +10,7 @@ export function Legend({ app }: { app: CityAtlas }) {
       <div className="row"><span className="sw dashed" style={{ borderColor: 'var(--predicted)' }} />predicted · ghost, dashed</div>
       <div className="row"><span className="sw" style={{ borderColor: 'var(--simulated)' }} />simulated · labelled, violet tint when ahead of now</div>
       <div className="row"><span className="sw" style={{ borderColor: 'var(--risk)', borderTopStyle: 'dotted' }} />incident / risk · contour rings</div>
-      <div className="ca-stats">{s.fps} fps · {s.frameMs} ms · {s.agents} agents · {s.chunks} chunks{s.inFlight ? ` (+${s.inFlight})` : ''} · sim {s.simStepMs} ms · intel {s.intelMs} ms · LOD {app.lodController.lod(app.camera.zoom)}{app.lodController.demotion ? ' (budgeted)' : ''}</div>
+      <div className="ca-stats">{s.fps} fps · {s.frameMs} ms · {s.agents} agents · {s.chunks} chunks{s.inFlight ? ` (+${s.inFlight})` : ''} · sim {s.simStepMs} ms · intel {s.intelMs} ms · LOD {app.lodController.lod(app.camera.zoom)}{app.lodController.demotion ? ' (budgeted)' : ''}{app.sim.mode === 'inline' ? ' · main-thread fallback' : ''}</div>
     </div>
   )
 }

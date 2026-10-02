@@ -116,3 +116,29 @@ button, input, select, textarea { font-family: inherit; color: inherit; }
 
 /* district tier: names only where they fit */
 .ca-static g[data-labels="off"] .ca-d-label { display: none; }
+
+/* phone width: panels stack along the edges and never exceed the screen */
+@media (max-width: 720px) {
+  .ca-top { left: 16px; right: 16px; }
+  .ca-tagline, .ca-seed { display: none; }
+  .ca-wordmark { font-size: 16px; letter-spacing: 0.24em; }
+  .ca-modes { top: auto; bottom: 128px; left: 16px; right: 16px; transform: none; overflow-x: auto; justify-content: space-between; }
+  .ca-modes button { padding: 6px 8px; letter-spacing: 0.1em; flex: 0 0 auto; }
+  .ca-tools { top: 74px; right: 16px; left: 16px; align-items: stretch; }
+  .ca-toolrow { flex-wrap: wrap; }
+  .ca-search input { width: 100%; }
+  .ca-search ul { width: 100%; }
+  .ca-layers { width: 100%; max-height: 50vh; overflow: auto; }
+  .ca-inspector, .ca-side { top: 156px; left: 16px; right: 16px; width: auto; max-height: calc(100% - 340px); }
+  .ca-ask { left: 16px; right: 16px; width: auto; bottom: 176px; }
+  .ca-ask .ca-chips { display: none; }
+  .ca-legend { display: none; }
+  .ca-timeline { left: 16px; right: 16px; height: auto; flex-wrap: wrap; padding-block: 6px; gap: 6px; }
+  .ca-timeline .scrub { flex-basis: 100%; order: 3; }
+  .ca-timeline .ticks { display: none; }
+  .ca-timeline .clock { min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
+}
+button:focus-visible, input:focus-visible { outline: 2px solid var(--selection); outline-offset: 2px; }

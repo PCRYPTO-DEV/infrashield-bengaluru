@@ -1,6 +1,7 @@
 import type { SimChunkPayload } from '../engine/simulation/roadGraph'
 import type { SimSnapshot } from '../engine/simulation/snapshot'
-import type { SimCommand, SimReply } from './simulation.worker'
+import { createSimulationHandler, type SimCommand, type SimReply } from './handlers'
+import { createPort, type Port } from './port'
 
 /**
  * Main-thread handle on the simulation worker. Ticks are request/response
@@ -8,20 +9,21 @@ import type { SimCommand, SimReply } from './simulation.worker'
  * arrived, and at most every `minIntervalMs`.
  */
 export class SimulationClient {
-  private worker: Worker
+  private worker: Port
   private awaiting = false
   private lastSent = 0
   private listeners = new Set<(s: SimSnapshot, stats: SimReply['stats']) => void>()
   stats: SimReply['stats'] = { agents: 0, edges: 0, stepMs: 0, lagS: 0 }
 
   constructor(private minIntervalMs = 80) {
-    this.worker = new Worker(new URL('./simulation.worker.ts', import.meta.url), { type: 'module' })
-    this.worker.onmessage = (e: MessageEvent<SimReply>) => {
-      if (e.data.type !== 'snapshot') return
+    this.worker = createPort(() => new Worker(new URL('./simulation.worker.ts', import.meta.url), { type: 'module' }), createSimulationHandler() as (m: unknown) => unknown)
+    this.worker.onMessage((raw) => {
+      const data = raw as SimReply
+      if (data.type !== 'snapshot') return
       this.awaiting = false
-      this.stats = e.data.stats
-      for (const l of this.listeners) l(e.data.snapshot, e.data.stats)
-    }
+      this.stats = data.stats
+      for (const l of this.listeners) l(data.snapshot, data.stats)
+    })
   }
 
   private send(cmd: SimCommand): void { this.worker.postMessage(cmd) }
@@ -40,6 +42,8 @@ export class SimulationClient {
     this.send({ type: 'tick', time })
     return true
   }
+
+  get mode(): 'worker' | 'inline' { return this.worker.mode }
 
   onSnapshot(fn: (s: SimSnapshot, stats: SimReply['stats']) => void): () => void { this.listeners.add(fn); return () => this.listeners.delete(fn) }
   dispose(): void { this.worker.terminate() }
