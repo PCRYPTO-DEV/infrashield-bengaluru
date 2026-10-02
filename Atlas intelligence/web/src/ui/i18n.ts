@@ -97,7 +97,8 @@ const S = {
   'insp.usual': ['Usual at this hour', 'इस समय आम तौर पर'],
   'insp.usual.val': ['{n}% of free speed ({b}, {s} readings)', 'खुली रफ़्तार का {n}% ({b}, {s} रीडिंग)'],
   'insp.usual.none': ['not enough past readings yet', 'अभी काफ़ी पुरानी रीडिंग नहीं'],
-  'search.placeholder': ['Find any place in India, a road, #car', 'भारत में कोई भी जगह, सड़क, #गाड़ी'],
+  'search.placeholder': ['Search any place or lane in India', 'भारत में कोई भी जगह या गली खोजें'],
+  'search.nomatch': ['Nothing by that name in India. Try another spelling or the area name.', 'इस नाम से भारत में कुछ नहीं मिला। दूसरी वर्तनी या इलाक़े का नाम आज़माएँ।'],
   // layers
   'layers.title': ['What to show', 'क्या दिखाएँ'],
   'layer.roads': ['Roads', 'सड़कें'], 'layer.buildings': ['Buildings', 'इमारतें'], 'layer.labels': ['Street names', 'सड़कों के नाम'],

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CityAtlas } from '../app/CityAtlas'
 import { REGIONS, PLACES, regionFromSearch } from '../app/regions'
 import { useAppVersion } from './useApp'
@@ -61,13 +61,30 @@ export default function App() {
   const [compare, setCompare] = useState<Array<{ name: string; state: PlaceState }>>([])
   useEffect(() => { if (app.toolRequest) { setTool(app.toolRequest); app.toolRequest = null } }, [app.toolRequest]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const u = () => unlockAudio(); window.addEventListener('pointerdown', u, { once: true }); window.addEventListener('keydown', u, { once: true }); return () => { window.removeEventListener('pointerdown', u); window.removeEventListener('keydown', u) } }, [])
+  // A far search result re-anchors the frame at that point (?lng&lat), then opens its card once the new app exists.
+  const pendingRef = useRef<{ lng: number; lat: number; zoom: number; openCard: boolean } | null>(null)
+  const [customCity, setCustomCity] = useState<string | null>(() => new URLSearchParams(window.location.search).get('name'))
+  useEffect(() => {
+    const r = app.relocateRequest; if (!r) return
+    app.relocateRequest = null
+    try { const url = new URL(window.location.href); url.searchParams.set('lng', r.lng.toFixed(5)); url.searchParams.set('lat', r.lat.toFixed(5)); url.searchParams.set('name', r.name); url.searchParams.delete('place'); url.searchParams.delete('world'); window.history.replaceState({}, '', url) } catch { /* sandboxed host */ }
+    pendingRef.current = { lng: r.lng, lat: r.lat, zoom: r.zoom, openCard: r.openCard }
+    setCustomCity(r.name); app.dispose(); setRegionId('india'); setPlaceKey(`ll:${r.lng.toFixed(4)},${r.lat.toFixed(4)}`)
+  }, [app.relocateRequest]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const p = pendingRef.current; if (!p) return
+    pendingRef.current = null
+    app.flyToLngLat(p.lng, p.lat, p.zoom, false)
+    if (p.openCard) void app.openPlaceAt(p.lng, p.lat)
+  }, [app])
   const goPlace = (id: string) => {
+    setCustomCity(null)
     const c = PLACES.find((x) => x.id === id); if (!c) return
-    try { const url = new URL(window.location.href); url.searchParams.set('place', id); url.searchParams.delete('lng'); url.searchParams.delete('lat'); url.searchParams.delete('world'); window.history.replaceState({}, '', url) } catch { /* sandboxed host */ }
+    try { const url = new URL(window.location.href); url.searchParams.set('place', id); url.searchParams.delete('lng'); url.searchParams.delete('lat'); url.searchParams.delete('name'); url.searchParams.delete('world'); window.history.replaceState({}, '', url) } catch { /* sandboxed host */ }
     app.dispose(); setRegionId('india'); setPlaceKey(id)
   }
-  const placeNow = placeKey || 'delhi'
-  const cityName = (PLACES.find((c) => c.id === placeNow) ?? PLACES[0])
+  const placeNow = placeKey.startsWith('ll:') ? '' : placeKey || 'delhi'
+  const cityName = customCity && placeKey.startsWith('ll:') ? { id: '', name: customCity, hi: customCity, lng: 0, lat: 0 } : (PLACES.find((c) => c.id === placeNow) ?? PLACES[0])
   const city = app.language === 'hi' ? cityName.hi.split(' · ').pop()! : cityName.name.split(' · ').pop()!
   const toggle = (t: Tool) => { setTool((cur) => (cur === t ? null : t)); setMore(false) }
   useEffect(() => {
@@ -106,7 +123,7 @@ export default function App() {
       <div className="ca-tools">
         <div className="ca-toolrow ca-primary">
           <SearchBox app={app} />
-          <select className="ca-place-select" title={T('place.goto')} value={placeNow} onChange={(e) => goPlace(e.target.value)}>{PLACES.map((c) => <option key={c.id} value={c.id}>{app.language === 'hi' ? c.hi : c.name}</option>)}</select>
+          <select className="ca-place-select" title={T('place.goto')} value={placeNow} onChange={(e) => goPlace(e.target.value)}>{placeKey.startsWith('ll:') && <option value="">{cityName.name}</option>}{PLACES.map((c) => <option key={c.id} value={c.id}>{app.language === 'hi' ? c.hi : c.name}</option>)}</select>
           <button className={`ca-tool ca-changed-btn ${tool === 'changed' ? 'active' : ''}`} onClick={() => toggle('changed')}>{T('changed.btn')}{app.changes && app.changes.count > 0 && <b>{app.changes.count}</b>}</button>
           <button className={`ca-tool ${more ? 'active' : ''}`} onClick={() => setMore(!more)}>{T('more')} {more ? '▴' : '▾'}</button>
         </div>

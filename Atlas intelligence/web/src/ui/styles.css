@@ -212,7 +212,7 @@ button { cursor: pointer; }
 .ca-search input:focus { border-color: var(--brand-blue); }
 .ca-search ul { position: absolute; right: 0; top: 38px; width: 320px; background: var(--panel-strong); border: 1px solid var(--line); border-radius: var(--radius); margin: 0; padding: 6px 0; list-style: none; z-index: 5; box-shadow: var(--shadow); overflow: hidden; }
 .ca-search li { padding: 6px 14px; cursor: pointer; font-size: 12.5px; }
-.ca-search li:hover { background: rgba(15, 111, 255, 0.18); }
+.ca-search li:hover, .ca-search li.active { background: rgba(15, 111, 255, 0.18); }
 .ca-search li small { color: var(--fg-faint); margin-left: 6px; }
 
 /* ---------- camera (Atlas Vision) ---------- */

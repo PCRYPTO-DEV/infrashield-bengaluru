@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CityAtlas } from '../../app/CityAtlas'
 import type { LayerFlags } from '../../rendering/layers/modes'
 import { search, type SearchResult } from '../../interaction/search/search'
@@ -73,22 +73,40 @@ export function ZonesPanel({ app }: { app: CityAtlas }) {
   )
 }
 
+
+/** Places anywhere in India as you type: 2 letters, 180 ms, the previous answer stays up while the next loads, stale answers are dropped, repeats are instant. */
+const geoCache = new Map<string, GeoResult[]>()
+export function useIndiaSearch(app: CityAtlas, q: string, enabled = true): { far: GeoResult[]; searching: boolean; settled: boolean } {
+  const [far, setFar] = useState<GeoResult[]>([])
+  const [searching, setSearching] = useState(false)
+  const [settledFor, setSettledFor] = useState('')
+  const seq = useRef(0)
+  const key = q.trim().toLowerCase()
+  useEffect(() => {
+    if (!enabled || key.length < 2) { seq.current++; setFar([]); setSearching(false); setSettledFor(key); return }
+    const hit = geoCache.get(key)
+    if (hit) { seq.current++; setFar(hit); setSearching(false); setSettledFor(key); return }
+    const id = ++seq.current
+    setSearching(true)
+    const t = setTimeout(async () => {
+      try {
+        const r = await geocode(SERVER_BASE, key, app.lngLatOf(app.camera.centre))
+        if (id !== seq.current) return
+        geoCache.set(key, r); setFar(r)
+      } catch { if (id === seq.current) setFar([]) }
+      finally { if (id === seq.current) { setSearching(false); setSettledFor(key) } }
+    }, 180)
+    return () => clearTimeout(t)
+  }, [key, enabled]) // eslint-disable-line react-hooks/exhaustive-deps
+  return { far, searching, settled: settledFor === key }
+}
+
 function PlaceInput({ app, value, onPick, placeholder, label }: { app: CityAtlas; value: PlacePick | null; onPick: (p: PlacePick | null) => void; placeholder: string; label: string }) {
   const T = makeT(app.language)
   const [q, setQ] = useState(value?.label ?? '')
   const [open, setOpen] = useState(false)
-  const [far, setFar] = useState<GeoResult[]>([])
-  const [searching, setSearching] = useState(false)
   const local = open && q && q !== value?.label ? search(app.world, q, 5) : []
-  // Anywhere in India: the server's place search, after a short pause in typing.
-  useEffect(() => {
-    if (!open || q.trim().length < 3 || q === value?.label) { setFar([]); return }
-    const id = setTimeout(async () => {
-      setSearching(true)
-      try { const c = app.lngLatOf(app.camera.centre); setFar(await geocode(SERVER_BASE, q, c)) } catch { setFar([]) } finally { setSearching(false) }
-    }, 350)
-    return () => clearTimeout(id)
-  }, [q, open]) // eslint-disable-line react-hooks/exhaustive-deps
+  const { far, searching } = useIndiaSearch(app, q, open && q !== value?.label)
   const pickLocal = (r: SearchResult) => { setQ(r.label); setOpen(false); onPick({ label: r.label, point: r.point, lngLat: app.lngLatOf(r.point) }) }
   const pickFar = (g: GeoResult) => { setQ(g.name); setOpen(false); onPick({ label: g.name, point: lngLatToLocal(app.frame, { lng: g.lng, lat: g.lat }), lngLat: { lng: g.lng, lat: g.lat }, far: true }) }
   return (
@@ -194,28 +212,31 @@ export function UploadPanel({ app }: { app: CityAtlas }) {
 export function SearchBox({ app }: { app: CityAtlas }) {
   const T = makeT(app.language)
   const [q, setQ] = useState('')
-  const [far, setFar] = useState<GeoResult[]>([])
-  const [searching, setSearching] = useState(false)
-  const results = q ? search(app.world, q) : []
-  // Anywhere in India, like a map app: the server's place search, biased to where you are looking (the state you picked).
-  useEffect(() => {
-    if (q.trim().length < 3 || q.startsWith('#')) { setFar([]); return }
-    const id = setTimeout(async () => {
-      setSearching(true)
-      try { setFar(await geocode(SERVER_BASE, q, app.lngLatOf(app.camera.centre))) } catch { setFar([]) } finally { setSearching(false) }
-    }, 350)
-    return () => clearTimeout(id)
-  }, [q]) // eslint-disable-line react-hooks/exhaustive-deps
-  const goFar = (g: GeoResult) => { setQ(''); setFar([]); app.flyToLngLat(g.lng, g.lat, g.kind === 'POI' || g.kind === 'Point Address' || g.kind === 'Street' ? 16.5 : 14.5); void app.openPlaceAt(g.lng, g.lat) }
-  const open = q.length > 0 && (results.length > 0 || far.length > 0 || searching || q.length >= 3)
+  const [open, setOpen] = useState(false)
+  const [cursor, setCursor] = useState(0)
+  const local = useMemo(() => (q.trim() ? search(app.world, q, 6) : []), [app.world, q]) // eslint-disable-line react-hooks/exhaustive-deps
+  const { far, searching, settled } = useIndiaSearch(app, q, open)
+  type Row = { key: string; label: string; sub: string; go: () => void }
+  const rows = useMemo<Row[]>(() => [
+    ...local.map((r, i) => ({ key: `l${i}`, label: r.label, sub: r.sub, go: () => { app.select(r.selection); app.flyTo(r.point) } })),
+    ...far.filter((g) => !local.some((r) => r.label === g.name)).map((g, i) => ({ key: `f${i}`, label: g.name, sub: `${g.address ?? g.town ?? ''} · ${T('route.india')}`, go: () => app.goTo(g.lng, g.lat, g.kind === 'POI' || g.kind === 'Point Address' || g.kind === 'Street' || g.kind === 'Cross Street' ? 16.5 : 14.5, g.town ?? g.name) })),
+  ], [local, far]) // eslint-disable-line react-hooks/exhaustive-deps
+  const pick = (r: Row) => { r.go(); setQ(''); setOpen(false); setCursor(0) }
+  const empty = open && q.trim().length >= 2 && rows.length === 0 && !searching && settled
+  const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') { setOpen(false); (e.target as HTMLInputElement).blur(); return }
+    if (!rows.length) return
+    if (e.key === 'ArrowDown') { e.preventDefault(); setCursor((c) => (c + 1) % rows.length) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => (c - 1 + rows.length) % rows.length) }
+    else if (e.key === 'Enter') { e.preventDefault(); pick(rows[Math.min(cursor, rows.length - 1)]) }
+  }
   return (
-    <div className="ca-search">
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={T('search.placeholder')} />
-      {open && <ul>
-        {results.map((r, i) => <li key={`l${i}`} onClick={() => { app.select(r.selection); app.flyTo(r.point); setQ('') }}>{r.label}<small>{r.sub}</small></li>)}
-        {far.filter((g) => !results.some((r) => r.label === g.name)).map((g, i) => <li key={`f${i}`} onClick={() => goFar(g)}>{g.name}<small>{g.address ?? g.town ?? ''} · {T('route.india')}</small></li>)}
-        {searching && far.length === 0 && <li className="ca-nomatch">{T('route.searching')}</li>}
-        {!searching && results.length === 0 && far.length === 0 && q.length >= 3 && !q.startsWith('#') && <li className="ca-nomatch">{T('route.nomatch')}</li>}
+    <div className="ca-search" role="combobox" aria-expanded={open && (rows.length > 0 || empty)}>
+      <input value={q} onChange={(e) => { setQ(e.target.value); setOpen(true); setCursor(0) }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} onKeyDown={onKey} placeholder={T('search.placeholder')} aria-autocomplete="list" />
+      {open && (rows.length > 0 || empty || (searching && q.trim().length >= 2)) && <ul role="listbox">
+        {rows.map((r, i) => <li key={r.key} role="option" aria-selected={i === cursor} className={i === cursor ? 'active' : ''} onMouseDown={() => pick(r)} onMouseEnter={() => setCursor(i)}>{r.label}<small>{r.sub}</small></li>)}
+        {searching && rows.length === 0 && <li className="ca-nomatch">{T('route.searching')}</li>}
+        {empty && <li className="ca-nomatch">{T('search.nomatch')}</li>}
       </ul>}
     </div>
   )

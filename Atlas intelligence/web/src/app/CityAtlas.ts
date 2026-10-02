@@ -741,6 +741,31 @@ export class CityAtlas {
   removeLayer(id: string): void { this.world.removeLayer(id); this.notify() }
   toggleLayerVisible(id: string): void { const l = this.world.layers.get(id); if (l) { l.visible = !l.visible; this.notify() } }
 
-  flyTo(p: WorldPoint, zoom?: number): void { this.camera.setView(p, zoom) }
-  flyToLngLat(lng: number, lat: number, zoom?: number): void { this.flyTo(lngLatToLocal(this.frame, { lng, lat }), zoom) }
+  /** A smooth flight (about 0.65 s, eased) instead of a jump; `animate: false` jumps at once. */
+  private flight: number | null = null
+  flyTo(p: WorldPoint, zoom?: number, animate = true): void {
+    if (this.flight !== null) { cancelAnimationFrame(this.flight); this.flight = null }
+    const from = { ...this.camera.centre }, z0 = this.camera.zoom, z1 = zoom ?? z0
+    const dist = Math.hypot(p.x - from.x, p.y - from.y) * this.camera.scale
+    if (!animate || typeof requestAnimationFrame === 'undefined' || (dist < 2 && Math.abs(z1 - z0) < 0.01)) { this.camera.setView(p, zoom); return }
+    const ms = Math.min(900, 450 + dist / 8), t0 = performance.now()
+    const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
+    const step = (now: number) => {
+      const k = ease(Math.min(1, (now - t0) / ms))
+      this.camera.setView({ x: from.x + (p.x - from.x) * k, y: from.y + (p.y - from.y) * k }, z0 + (z1 - z0) * k)
+      if (k < 1) this.flight = requestAnimationFrame(step); else this.flight = null
+    }
+    this.flight = requestAnimationFrame(step)
+  }
+  flyToLngLat(lng: number, lat: number, zoom?: number, animate = true): void { this.flyTo(lngLatToLocal(this.frame, { lng, lat }), zoom, animate) }
+  /** Beyond about 40 km from the frame's origin, local coordinates grow past what float32 draws cleanly: the app re-anchors the frame there (a new CityAtlas at that origin). */
+  static readonly FRAME_SAFE_M = 40_000
+  farFromFrame(lng: number, lat: number): boolean { const p = lngLatToLocal(this.frame, { lng, lat }); return Math.hypot(p.x, p.y) / this.world.unitPerMetre > CityAtlas.FRAME_SAFE_M }
+  relocateRequest: { lng: number; lat: number; zoom: number; name: string; openCard: boolean } | null = null
+  /** Go to any place in India: fly when it is inside this frame, re-anchor the frame when it is far. */
+  goTo(lng: number, lat: number, zoom: number, name: string, openCard = true): void {
+    if (this.farFromFrame(lng, lat)) { this.relocateRequest = { lng, lat, zoom, name, openCard }; this.notify(); return }
+    this.flyToLngLat(lng, lat, zoom)
+    if (openCard) void this.openPlaceAt(lng, lat)
+  }
 }
