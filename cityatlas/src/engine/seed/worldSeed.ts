@@ -31,14 +31,14 @@ export function worldPRNG(input: WorldSeedInput): PRNG {
   return new PRNG(worldSeed(input))
 }
 
-/** Parse `cityatlas://world/{seed}` or a bare seed string. */
+/** Parse `atlas://world/{seed}` (or the earlier `cityatlas://world/{seed}`) or a bare seed string. */
 export function parseWorldUri(value: string): { seed: string } | null {
-  const m = /^cityatlas:\/\/world\/([^/?#]+)/.exec(value.trim())
+  const m = /^(?:city)?atlas:\/\/world\/([^/?#]+)/.exec(value.trim())
   if (m) return { seed: decodeURIComponent(m[1]) }
   if (value.trim().length > 0) return { seed: value.trim() }
   return null
 }
 
 export function formatWorldUri(seed: string): string {
-  return `cityatlas://world/${encodeURIComponent(seed)}`
+  return `atlas://world/${encodeURIComponent(seed)}`
 }

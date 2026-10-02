@@ -1,9 +1,9 @@
-# CITYATLAS architecture
+# Atlas Infinity architecture
 
 ## Layers
 
 ```
-                       CITYATLAS UI            src/ui            React: panels, timeline, inspector, ask
+                       Atlas Infinity UI            src/ui            React: panels, timeline, inspector, ask
                             │
                      Interaction Layer         src/interaction   Camera, hit testing, zone drawing, search
                             │

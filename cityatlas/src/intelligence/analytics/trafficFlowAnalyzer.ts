@@ -28,7 +28,7 @@ export const TrafficFlowAnalyzer: IntelligenceModule<SimSnapshot, FlowReport> = 
       meanSpeedRatio: n ? sumRatio / n : 1,
       congestedShare: n ? congested / n : 0,
       vehicleCount: vehicles,
-      evidence: { classification: 'derived', source: snapshot.classification === 'simulated' ? 'cityatlas.simulation' : 'feed', model: 'traffic-flow/1', timestamp: snapshot.time, confidence: 0.8 },
+      evidence: { classification: 'derived', source: snapshot.classification === 'simulated' ? 'atlas.simulation' : 'feed', model: 'traffic-flow/1', timestamp: snapshot.time, confidence: 0.8 },
     }
   },
 }

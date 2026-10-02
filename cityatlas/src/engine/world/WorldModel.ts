@@ -126,7 +126,7 @@ export class WorldModel {
       seen.add(id)
       let a = this.agents.get(id)
       if (!a) {
-        a = { id, kind: s.kinds[i] === 0 ? 'vehicle' : 'pedestrian', x: 0, y: 0, heading: 0, speed: 0, edgeId: '', history: [], lastSeen: s.time, evidence: { classification: s.classification, source: s.classification === 'simulated' ? 'cityatlas.simulation' : 'feed', timestamp: s.time } }
+        a = { id, kind: s.kinds[i] === 0 ? 'vehicle' : 'pedestrian', x: 0, y: 0, heading: 0, speed: 0, edgeId: '', history: [], lastSeen: s.time, evidence: { classification: s.classification, source: s.classification === 'simulated' ? 'atlas.simulation' : 'feed', timestamp: s.time } }
         this.agents.set(id, a)
       }
       a.x = s.xs[i]; a.y = s.ys[i]; a.heading = s.headings[i]; a.speed = s.speeds[i]; a.edgeId = s.edgeIds[i] ?? a.edgeId; a.lastSeen = s.time

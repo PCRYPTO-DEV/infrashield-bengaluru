@@ -1,7 +1,7 @@
 import type { Geometry } from '../geo/geojson'
 
 /**
- * Evidence classification is the backbone of CITYATLAS. Nothing is rendered
+ * Evidence classification is the backbone of Atlas Infinity. Nothing is rendered
  * without one, and renderers style by classification, never by source.
  *
  *  observed  — directly supported by observed data (OSM, sensor, camera, feed)

@@ -1,7 +1,7 @@
-# CITYATLAS — Infinite Living City
+# Atlas Infinity
 
 A procedural, data-driven urban intelligence engine. Where a map answers
-*where is something?*, CITYATLAS is built to answer *what is happening here,
+*where is something?*, Atlas Infinity is built to answer *what is happening here,
 why, what is unusual, what may happen next, and what should I pay attention
 to?* — and to say, for every object on screen, how it knows.
 
@@ -20,7 +20,7 @@ npm test           # vitest
 npm run build      # typecheck + production bundle
 ```
 
-Open `http://localhost:5174/?world=cityatlas://world/bengaluru-2026` — any
+Open `http://localhost:5174/?world=atlas://world/bengaluru-2026` — any
 seed string produces a different, reproducible city anchored on the Bengaluru
 demo region.
 

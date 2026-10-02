@@ -33,6 +33,7 @@ describe('seed determinism', () => {
     expect(worldSeed({ ...base, datasetVersion: 'v2' })).not.toBe(s)
   })
   it('parses world URIs', () => {
+    expect(parseWorldUri('atlas://world/blr-2026')).toEqual({ seed: 'blr-2026' })
     expect(parseWorldUri('cityatlas://world/blr-2026')).toEqual({ seed: 'blr-2026' })
     expect(parseWorldUri(formatWorldUri('a b'))).toEqual({ seed: 'a b' })
     expect(parseWorldUri('')).toBeNull()

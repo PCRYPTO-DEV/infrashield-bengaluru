@@ -3,7 +3,7 @@
  *
  * Shan Shui hashed the seed string with `charCode * 128^i` (overflows to
  * Infinity for long strings) and then relied on a single global PRNG whose
- * output depended on the *order* in which chunks were generated. CITYATLAS
+ * output depended on the *order* in which chunks were generated. Atlas Infinity
  * instead derives an independent 32-bit seed per (globalSeed, tile, time,
  * datasetVersion) tuple so any chunk can be regenerated in isolation.
  */

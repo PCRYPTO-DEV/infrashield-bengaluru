@@ -1,6 +1,6 @@
 # Third-party notices
 
-CITYATLAS is an original code base. It was designed after studying, and
+Atlas Infinity is an original code base. It was designed after studying, and
 preserves the conceptual architecture of, the following MIT-licensed works.
 No landscape code from either is included; the ideas credited in
 `docs/SHAN_SHUI_ARCHITECTURE.md` are.

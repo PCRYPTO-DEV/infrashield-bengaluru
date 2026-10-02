@@ -1,8 +1,8 @@
 {
-  "name": "cityatlas",
+  "name": "atlas-infinity",
   "private": true,
   "version": "0.1.0",
-  "description": "CITYATLAS — Infinite Living City. Procedural, data-driven urban intelligence engine.",
+  "description": "Atlas Infinity: a procedural, data-driven living city and urban intelligence engine.",
   "type": "module",
   "scripts": {
     "dev": "vite",

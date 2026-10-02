@@ -48,7 +48,7 @@ function gather(intent: Intent, ctx: AskContext, ev: EvidenceItem[], hl: Answer[
     case 'whats_happening': {
       let vehicles = 0, peds = 0
       for (const a of world.agents.values()) if (inFocus(a)) { if (a.kind === 'vehicle') vehicles++; else peds++ }
-      push({ id: 'pop', classification: 'simulated', statement: `${vehicles} vehicles and ${peds} pedestrians are in the area right now`, source: 'cityatlas.simulation' })
+      push({ id: 'pop', classification: 'simulated', statement: `${vehicles} vehicles and ${peds} pedestrians are in the area right now`, source: 'atlas.simulation' })
       if (intel.flow) push({ id: 'flow', classification: 'derived', statement: `Mean speed is ${Math.round(intel.flow.meanSpeedRatio * 100)}% of free-flow; ${Math.round(intel.flow.congestedShare * 100)}% of segments are congested`, confidence: 0.8 })
       for (const inc of world.activeIncidents(time).filter((i) => inFocus(i.point)).slice(0, 4)) { push({ id: inc.entity.id, classification: 'simulated', statement: `Active ${inc.props.kind}: ${inc.props.description} (severity ${inc.props.severity})`, location: inc.point, entityIds: [inc.entity.id] }); hl.points.push(inc.point); hl.entityIds.push(inc.entity.id) }
       for (const h of (intel.activity?.hotspots ?? []).filter(inFocus).slice(0, 3)) { push({ id: `hot:${h.x}`, classification: 'derived', statement: `Activity hotspot (index ${h.score.toFixed(2)}): ${h.reason}`, location: h, confidence: 0.7 }); hl.points.push(h) }
@@ -94,7 +94,7 @@ function gather(intent: Intent, ctx: AskContext, ev: EvidenceItem[], hl: Answer[
     case 'history': {
       const from = time - intent.minutes * 60_000
       const events = ctx.memory.near(focusPoint, Math.max(focus.maxX - focus.minX, focus.maxY - focus.minY), from, time)
-      if (!events.length) push({ id: 'none', classification: 'observed', statement: `No events were recorded in the last ${intent.minutes} minutes for this area. CITYATLAS only replays what it recorded; it does not fabricate history.` })
+      if (!events.length) push({ id: 'none', classification: 'observed', statement: `No events were recorded in the last ${intent.minutes} minutes for this area. Atlas Infinity only replays what it recorded; it does not fabricate history.` })
       const byType = new Map<string, number>()
       for (const e of events) byType.set(e.type, (byType.get(e.type) ?? 0) + 1)
       for (const [type, n] of byType) push({ id: `t:${type}`, classification: 'derived', statement: `${n} × ${type.replace('_', ' ')} in the last ${intent.minutes} min` })

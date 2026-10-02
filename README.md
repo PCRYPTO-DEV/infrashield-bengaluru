@@ -170,9 +170,9 @@ Data is clearly marked synthetic. See `backend/data/README_DATA_SOURCES.md`.
 
 ---
 
-## CITYATLAS — Infinite Living City (new)
+## Atlas Infinity (new)
 
-The `cityatlas/` directory contains **CITYATLAS**, a procedural, data-driven
+The `cityatlas/` directory contains **Atlas Infinity**, a procedural, data-driven
 urban intelligence engine built from the concepts of the open-source
 [Shan Shui](https://github.com/LingDong-/shan-shui-inf) landscape generator:
 an infinite, seeded city that is observable, queryable and predictive, with a
@@ -187,7 +187,7 @@ npm test
 - Architecture, dependencies and visual language: [`cityatlas/docs/`](cityatlas/docs/)
 - Overview and interaction guide: [`cityatlas/README.md`](cityatlas/README.md)
 
-CITYATLAS is independent of the InfraShield backend and runs entirely in the
+Atlas Infinity is independent of the InfraShield backend and runs entirely in the
 browser; everything in its demo region is simulated and labelled as such.
 
 ---

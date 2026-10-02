@@ -35,10 +35,10 @@ export default function App() {
     <div className="ca-app">
       <CityView key={seed} app={app} />
       <div className="ca-top">
-        <h1 className="ca-wordmark">CITYATLAS</h1>
+        <h1 className="ca-wordmark">ATLAS INFINITY</h1>
         <p className="ca-tagline">Infinite living city · Bengaluru demo region{district ? ` · ${district}` : ''}</p>
         <div className="ca-seed">
-          <span>cityatlas://world/</span>
+          <span>atlas://world/</span>
           <input value={seedInput} onChange={(e) => setSeedInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && regenerate()} />
           <button onClick={regenerate}>regenerate</button>
         </div>

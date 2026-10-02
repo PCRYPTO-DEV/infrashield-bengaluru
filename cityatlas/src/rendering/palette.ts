@@ -1,5 +1,5 @@
 /**
- * CITYATLAS visual language tokens.
+ * Atlas Infinity visual language tokens.
  *
  * Paper + ink, inherited in spirit from Shan Shui: a warm paper ground,
  * thin ink geometry, no saturated fills. Evidence classification owns the

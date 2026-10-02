@@ -1,4 +1,4 @@
-# CITYATLAS visual language
+# Atlas Infinity visual language
 
 Not a map clone. The city is drawn as ink on paper and certainty is the only
 thing that gets colour.

@@ -1,9 +1,9 @@
-# Shan Shui → CITYATLAS: architecture study
+# Shan Shui → Atlas Infinity: architecture study
 
 This document records the study of the two Shan Shui implementations that
-CITYATLAS was asked to transform, what each contributes conceptually, what
+Atlas Infinity was asked to transform, what each contributes conceptually, what
 code is reusable, what is replaced, and why. It was written *before* the
-CITYATLAS engine code, as the directive requires, and updated once the
+Atlas Infinity engine code, as the directive requires, and updated once the
 replacement was in place.
 
 Sources studied:
@@ -70,7 +70,7 @@ culling of invisible layers, worker-based stringification, dark mode.
 
 | # | Item | Finding |
 |---|---|---|
-| 3 | Reusable algorithms | **Plan → instantiate → cache → cull** pipeline; AABB collision placement (`canFit`); noise-driven density fields for placement; noisy variable-width ink stroke (`stroke()`) and stipple textures as a visual device; ear-clipping triangulation (not needed by CITYATLAS). |
+| 3 | Reusable algorithms | **Plan → instantiate → cache → cull** pipeline; AABB collision placement (`canFit`); noise-driven density fields for placement; noisy variable-width ink stroke (`stroke()`) and stipple textures as a visual device; ear-clipping triangulation (not needed by Atlas Infinity). |
 | 4 | Rendering logic | Everything is an SVG *string*. Geometry is stringified once per chunk and never re-projected; panning rewrites only the root `viewBox`. The refactor adds per-layer `<g>` grouping and visibility culling. |
 | 5 | Procedural generation | Two-level grammar: *planner* decides what goes where (tags, x, y, h) from noise; *generators* (`Mount.mountain`, `Tree.tree0x`, `Arch.*`) turn a plan item into geometry using fractal/noise recursion. |
 | 6 | Seed handling | A single global PRNG seeded from `?seed=` (or `Date.now()`); `Math.random` is overridden. Deterministic **only** if every call happens in the same order: generating chunk B before chunk A changes both. The refactor inherits this (static `PRNG.seed`). |
@@ -81,11 +81,11 @@ culling of invisible layers, worker-based stringification, dark mode.
 | 11 | Geometry primitives | `[x, y]` arrays; `PolyTools` (midpoint, triangulate, intersect, point-in-polygon); `bezmh` (Bézier through midpoints); `div()` subdivision. |
 | 12 | Performance bottlenecks | (a) whole-document `innerHTML` rewrite per scroll; (b) no unloading → unbounded DOM/memory; (c) `mountplanner` re-scans with `xstep = 5`; (d) `Math.random` override makes every call a closure invocation; (e) refactor spawns and terminates one Worker **per layer per render** (worker start-up dominates); (f) `feTurbulence` paper filter over the full viewport is expensive on large screens. |
 | 13 | Must not be reused | Global PRNG / `Math.random` override (order-dependent determinism); 1-D chunk model; whole-DOM rewrite; p5-derived noise verbatim (LGPL-2.1 lineage, see §4); all landscape-specific generators (mountains, trees, boats, pagodas, water); the per-layer worker spawn pattern; the `Date.now()` default seed. |
-| 14 | Licences | Both projects: MIT. Attribution preserved in `cityatlas/THIRD_PARTY_NOTICES.md`. The noise code inside Shan Shui is a port of p5.js (LGPL-2.1); CITYATLAS does not reuse it (§4). |
+| 14 | Licences | Both projects: MIT. Attribution preserved in `cityatlas/THIRD_PARTY_NOTICES.md`. The noise code inside Shan Shui is a port of p5.js (LGPL-2.1); Atlas Infinity does not reuse it (§4). |
 
-## 3. What CITYATLAS keeps (conceptually) and how
+## 3. What Atlas Infinity keeps (conceptually) and how
 
-| Shan Shui concept | CITYATLAS equivalent |
+| Shan Shui concept | Atlas Infinity equivalent |
 |---|---|
 | `mountplanner` plan → instantiate | `engine/procedural/grammar/*` (roads → blocks → buildings/parks/transit → signals → incidents) inside `generateChunk()` |
 | `MEM.chunks` + `chunkloader` + `chunkrender` | `engine/chunks/CityChunkManager` (2-D tiles, priority, cancellation, LRU unload) |
@@ -93,7 +93,7 @@ culling of invisible layers, worker-based stringification, dark mode.
 | `viewBox` panning | `rendering/svg/StaticSvgRenderer` sets only the root `viewBox` per frame |
 | noise-driven placement fields | `engine/procedural/grammar/blocks.ts` `createCityFields` (density, commercial, green) |
 | noisy ink stroke / stipple | park stipple and building hatch in `rendering/svg/chunkSvg.ts` |
-| `?seed=` URL | `cityatlas://world/{seed}` via `?world=` |
+| `?seed=` URL | `atlas://world/{seed}` via `?world=` |
 | Worker stringification | Generation **and** stringification happen in a persistent worker pool (`workers/worldGeneration.worker.ts`) |
 | `Designer.canFit` collisions | not needed: the street grid is a partition, so blocks never overlap by construction |
 
@@ -120,7 +120,7 @@ culling of invisible layers, worker-based stringification, dark mode.
 5. **Rendering.** Static geometry stays SVG (one `<g>` per chunk, swapped on
    LOD change only). Moving objects go to Canvas 2D with a single transform.
    React renders UI only.
-6. **Time and simulation.** Shan Shui is timeless. CITYATLAS adds a
+6. **Time and simulation.** Shan Shui is timeless. Atlas Infinity adds a
    `TemporalEngine`, a deterministic `MovementEngine` in a worker, a replay
    recorder, and incident grammar keyed by (tile, hour bucket).
 7. **Evidence.** Every entity carries `EvidenceMetadata`; renderers style by

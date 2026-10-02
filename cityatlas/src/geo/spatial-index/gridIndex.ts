@@ -2,7 +2,7 @@ import type { WorldBounds, WorldPoint } from '../projection/mercator'
 
 /**
  * Uniform grid spatial hash. Simple, predictable, and fast for the
- * viewport-sized working sets CITYATLAS deals with. Items are stored by
+ * viewport-sized working sets Atlas Infinity deals with. Items are stored by
  * bounding box; callers refine with exact geometry tests.
  */
 export class GridIndex<T> {

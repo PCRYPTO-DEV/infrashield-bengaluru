@@ -21,7 +21,7 @@ function fieldsNoise(globalSeed: string): Noise {
 }
 
 function simulatedEvidence(datasetVersion: string, model: string): EvidenceMetadata {
-  return { classification: 'simulated', source: 'cityatlas.procedural', model, datasetVersion, confidence: 1 }
+  return { classification: 'simulated', source: 'atlas.procedural', model, datasetVersion, confidence: 1 }
 }
 
 /**
