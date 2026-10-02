@@ -652,7 +652,10 @@ export class CityAtlas {
   readonly writer = new ClaudeExplainer(SERVER_BASE, () => this.language)
   /** Whether the server has an AI writer configured (null until checked). */
   writerConfigured: boolean | null = null
+  private writerCheckedAt = 0
+  /** Ask the server whether the AI writer has a key. A "no" is re-checked every 20 s, so a cold start or a key added later is picked up without a reload. */
   private async checkWriter(): Promise<void> {
+    this.writerCheckedAt = Date.now()
     try { const r = await fetch(`${SERVER_BASE}/api/writer/status`); const j = r.ok ? await r.json() as { configured: boolean } : { configured: false }; this.writerConfigured = !!j.configured } catch { this.writerConfigured = false }
     this.notify()
   }
@@ -779,7 +782,7 @@ export class CityAtlas {
 
   async ask(question: string): Promise<Answer> {
     const focus = this.camera.viewBounds()
-    if (this.writerConfigured === null) await this.checkWriter()
+    if (this.writerConfigured !== true && Date.now() - this.writerCheckedAt > 20_000) await this.checkWriter()
     // 1. The deterministic tools: facts and highlights for whatever the question is about.
     let answer = (await this.askPlaceOrChange(question)) ?? (await this.askSites(question))
     if (!answer) {
@@ -798,6 +801,9 @@ export class CityAtlas {
         if (answer.intent === 'help') { answer.intent = 'chat'; answer.evidence = facts; answer.classification = weakest(facts) }
         answer.caveats = answer.caveats.filter((c) => !/built only from|सिर्फ़ उन बातों/.test(c))
         for (const a of reply.actions) this.actOn(a)
+      } else {
+        const why = this.writer.lastError ?? 'no reply'
+        answer.caveats = [...answer.caveats, this.language === 'hi' ? `AI लेखक ने अभी जवाब नहीं दिया (${why}); यह तय जवाब है।` : `The AI writer did not answer this time (${why}); this is the fixed answer.`]
       }
     } else if (answer.intent === 'help') {
       answer.caveats = [...answer.caveats, this.language === 'hi' ? 'खुली बातचीत के लिए सर्वर पर ANTHROPIC_API_KEY सेट करें; अभी सिर्फ़ तय सवालों के जवाब हैं।' : 'For free conversation the server needs ANTHROPIC_API_KEY; until then Atlas answers the fixed questions only.']

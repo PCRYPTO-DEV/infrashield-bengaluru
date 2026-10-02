@@ -16,7 +16,7 @@ WEB_DIST = SERVER_DIR.parent / "web" / "dist"
 @dataclass
 class Settings:
     tomtom_api_key: str = field(default_factory=lambda: os.getenv("TOMTOM_API_KEY", ""))
-    anthropic_api_key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
+    anthropic_api_key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", "").strip())
     region: str = field(default_factory=lambda: os.getenv("ATLAS_REGION", "india"))
     data_dir: Path = field(default_factory=lambda: Path(os.getenv("ATLAS_DATA_DIR") or (SERVER_DIR / "data")))
     fixtures: Path | None = field(default_factory=lambda: Path(os.environ["ATLAS_FIXTURES"]) if os.getenv("ATLAS_FIXTURES") else None)
