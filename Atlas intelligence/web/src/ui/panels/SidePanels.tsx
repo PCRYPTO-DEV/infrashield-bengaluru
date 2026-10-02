@@ -194,11 +194,29 @@ export function UploadPanel({ app }: { app: CityAtlas }) {
 export function SearchBox({ app }: { app: CityAtlas }) {
   const T = makeT(app.language)
   const [q, setQ] = useState('')
+  const [far, setFar] = useState<GeoResult[]>([])
+  const [searching, setSearching] = useState(false)
   const results = q ? search(app.world, q) : []
+  // Anywhere in India, like a map app: the server's place search, biased to where you are looking (the state you picked).
+  useEffect(() => {
+    if (q.trim().length < 3 || q.startsWith('#')) { setFar([]); return }
+    const id = setTimeout(async () => {
+      setSearching(true)
+      try { setFar(await geocode(SERVER_BASE, q, app.lngLatOf(app.camera.centre))) } catch { setFar([]) } finally { setSearching(false) }
+    }, 350)
+    return () => clearTimeout(id)
+  }, [q]) // eslint-disable-line react-hooks/exhaustive-deps
+  const goFar = (g: GeoResult) => { setQ(''); setFar([]); app.flyToLngLat(g.lng, g.lat, g.kind === 'POI' || g.kind === 'Point Address' || g.kind === 'Street' ? 16.5 : 14.5); void app.openPlaceAt(g.lng, g.lat) }
+  const open = q.length > 0 && (results.length > 0 || far.length > 0 || searching || q.length >= 3)
   return (
     <div className="ca-search">
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={T('search.placeholder')} />
-      {results.length > 0 && <ul>{results.map((r, i) => <li key={i} onClick={() => { app.select(r.selection); app.flyTo(r.point); setQ('') }}>{r.label}<small>{r.sub}</small></li>)}</ul>}
+      {open && <ul>
+        {results.map((r, i) => <li key={`l${i}`} onClick={() => { app.select(r.selection); app.flyTo(r.point); setQ('') }}>{r.label}<small>{r.sub}</small></li>)}
+        {far.filter((g) => !results.some((r) => r.label === g.name)).map((g, i) => <li key={`f${i}`} onClick={() => goFar(g)}>{g.name}<small>{g.address ?? g.town ?? ''} · {T('route.india')}</small></li>)}
+        {searching && far.length === 0 && <li className="ca-nomatch">{T('route.searching')}</li>}
+        {!searching && results.length === 0 && far.length === 0 && q.length >= 3 && !q.startsWith('#') && <li className="ca-nomatch">{T('route.nomatch')}</li>}
+      </ul>}
     </div>
   )
 }
