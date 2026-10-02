@@ -164,14 +164,25 @@ button { cursor: pointer; }
 
 /* ---------- timeline ---------- */
 .ca-timeline { position: absolute; left: 16px; right: 16px; bottom: 16px; height: 62px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: var(--shadow); display: flex; align-items: center; gap: 14px; padding: 0 14px; }
-.ca-timeline .ctl { display: flex; gap: 4px; align-items: center; }
+.ca-timeline .ctl, .ca-timeline .ca-when { display: flex; gap: 4px; align-items: center; }
+.ca-timeline .ca-when button { font-weight: 600; letter-spacing: 0.1em; }
+.ca-timeline .ca-when button.now { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.ca-timeline .ca-when button.now.active { background: var(--brand-teal); border-color: var(--brand-teal); color: #fff; }
+.ca-timeline.when-past .ca-when button.active { background: var(--panel-raised); border-color: var(--fg); color: var(--fg); }
+.ca-timeline.when-future .ca-when button.active { background: var(--predicted); border-color: var(--predicted); color: #fff; }
+.ca-timeline .ticks button { background: none; border: none; padding: 0; font: inherit; color: var(--fg-faint); cursor: pointer; letter-spacing: 0.04em; }
+.ca-timeline .ticks button:hover { color: var(--fg); }
+.ca-timeline .ticks button.now { color: var(--brand-teal); font-weight: 600; }
+.ca-timeline .clock .ca-badge.live { color: var(--brand-teal); }
+.ca-timeline .clock .ca-badge.observed { color: var(--fg); }
+.ca-timeline.when-future { border-color: var(--predicted); }
 .ca-timeline button { background: var(--panel-raised); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; cursor: pointer; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--fg-soft); }
 .ca-timeline button.active { border-color: var(--brand-teal); color: var(--brand-teal); }
 .ca-timeline .scrub { flex: 1; position: relative; height: 28px; }
 .ca-timeline input[type=range] { width: 100%; accent-color: var(--brand-teal); background: transparent; }
 .ca-timeline .ticks { position: absolute; left: 0; right: 0; top: 20px; display: flex; justify-content: space-between; font-family: var(--mono); font-size: 9px; color: var(--fg-faint); }
-.ca-timeline .clock { font-family: var(--mono); font-size: 12px; min-width: 150px; text-align: right; }
-.ca-timeline .clock small { display: block; font-size: 9px; letter-spacing: 0.1em; color: var(--fg-faint); margin-top: 2px; }
+.ca-timeline .clock { font-family: var(--mono); font-size: 11px; min-width: 150px; max-width: 34%; text-align: right; }
+.ca-timeline .clock small { display: block; font-size: 9px; letter-spacing: 0.06em; color: var(--fg-faint); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- legend ---------- */
 .ca-legend-pill { position: absolute; bottom: 92px; right: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; color: var(--fg-soft); backdrop-filter: blur(14px); box-shadow: var(--shadow); display: flex; gap: 8px; align-items: center; }
@@ -374,6 +385,31 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .ca-questions { margin: 4px 0; padding-left: 18px; font-size: 12.5px; line-height: 1.45; }
 
 /* ---------- tier gate ---------- */
+/* scenario lab, saved & projects */
+.ca-keep[hidden] { display: none; }
+.ca-side h4 { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg-faint); margin: 12px 0 4px; }
+.ca-steps-list { margin: 4px 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; display: flex; flex-direction: column; gap: 6px; }
+.ca-steps-list select { font: inherit; background: var(--panel-raised); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+.ca-scn-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 6px 0; }
+.ca-scn-table td { padding: 3px 6px; border-top: 1px solid var(--line); }
+.ca-scn-table td:first-child { color: var(--fg-faint); }
+.ca-scn-delta { font-weight: 600; margin: 6px 0; color: var(--predicted); }
+.ca-notyet { margin: 4px 0; padding-left: 16px; font-size: 12px; line-height: 1.45; color: var(--fg-soft); }
+.ca-saved-list { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.ca-saved-list li { display: flex; gap: 6px; align-items: center; }
+.ca-saved-item { flex: 1; display: flex; gap: 10px; align-items: center; text-align: left; background: var(--panel-raised); border: 1px solid var(--line); border-radius: var(--radius-s); padding: 6px 10px; cursor: pointer; color: var(--fg); font-size: 12.5px; }
+.ca-saved-item > b { min-width: 28px; font-family: var(--mono); color: var(--brand-blue); }
+.ca-saved-item > span { display: flex; flex-direction: column; }
+.ca-saved-item small { color: var(--fg-faint); }
+/* site finder (Pro) */
+.ca-sites-list { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ca-site { display: flex; gap: 10px; width: 100%; text-align: left; background: var(--panel-raised); border: 1px solid var(--line); border-radius: var(--radius-s); padding: 8px 10px; cursor: pointer; color: var(--fg); }
+.ca-site > b { font-size: 22px; line-height: 1; min-width: 34px; color: var(--brand-blue); font-family: var(--mono); }
+.ca-site > span { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.ca-site small { color: var(--fg-faint); line-height: 1.35; }
+.ca-site small.ca-site-gaps { color: var(--risk); }
+.ca-sites-list li.active .ca-site { border-color: var(--brand-blue); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-blue) 25%, transparent); }
+.ca-chips button.active, .ca-chip.active { border-color: var(--brand-blue); color: var(--brand-blue); font-weight: 600; }
 .ca-gate { border: 1px solid var(--brand-teal); border-radius: var(--radius-s); padding: 10px 12px; margin: 8px 0; background: color-mix(in srgb, var(--brand-teal) 8%, transparent); }
 .ca-gate.pro { border-color: var(--brand-blue); background: color-mix(in srgb, var(--brand-blue) 8%, transparent); }
 .ca-gate-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }

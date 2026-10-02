@@ -15,6 +15,9 @@ import { InsightBubbles } from './overlays/InsightBubbles'
 import { PlaceCard } from './panels/PlaceCard'
 import { WhatChanged } from './panels/WhatChanged'
 import { ComparePanel } from './panels/ComparePanel'
+import { SiteFinderPanel } from './panels/SiteFinderPanel'
+import { ScenarioPanel } from './panels/ScenarioPanel'
+import { SavedPanel } from './panels/SavedPanel'
 import { Home } from './overlays/Home'
 import { AroundYou } from './overlays/AroundYou'
 import { unlockAudio } from './bleep'
@@ -25,8 +28,8 @@ import { installEmbed, readEmbedParams } from '../app/embed'
 import { lngLatToLocal } from '../geo/projection/frame'
 import type { PlaceState } from '../data/adapters/placeAdapter'
 
-type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'changed' | 'compare' | null
-const TOOLS = ['insights', 'layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'compare'] as const
+type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'changed' | 'compare' | 'sites' | 'scenario' | 'saved' | null
+const TOOLS = ['insights', 'layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'compare', 'sites', 'scenario', 'saved'] as const
 
 function seedFromUrl(): string {
   const p = new URLSearchParams(window.location.search)
@@ -83,14 +86,15 @@ export default function App() {
     return installEmbed(app)
   }, [app, embed])
   const addCompare = (name: string, st: PlaceState) => { setCompare((c) => (c.some((x) => x.state.cell === st.cell) || c.length >= 3 ? c : [...c, { name, state: st }])); setTool('compare') }
-  const sidePanel = tool === 'zones' || tool === 'route' || tool === 'upload' || tool === 'pulse'
+  const sidePanel = tool === 'zones' || tool === 'route' || tool === 'upload' || tool === 'pulse' || tool === 'sites' || tool === 'scenario' || tool === 'saved'
+  const cardOverList = (tool === 'sites' || tool === 'saved') && !!app.placePoint
   return (
     <div className={`ca-app ${app.theme}${embed.embed ? ' ca-embed' : ''}`}>
       <CityView key={`${regionId}:${seed}:${placeKey}`} app={app} />
 
       {/* 1. the mark, with language and theme */}
       <div className="ca-top">
-        <div className="ca-brand"><img src="./brand/symbol-64.png" alt="City Atlas" width={34} height={34} /><div><h1 className="ca-wordmark">CITY ATLAS</h1><span className="ca-by">{app.tier === 'plus' ? 'PLUS · ' : ''}{T('top.tagline')} · {city}</span></div>
+        <div className="ca-brand"><img src="./brand/symbol-64.png" alt="City Atlas" width={34} height={34} /><div><h1 className="ca-wordmark">CITY ATLAS</h1><span className="ca-by">{app.tier === 'pro' ? 'PRO · ' : app.tier === 'plus' ? 'PLUS · ' : ''}{T('top.tagline')} · {city}</span></div>
           <span className="ca-lang" title="Language · भाषा"><button className={app.language === 'en' ? 'active' : ''} onClick={() => app.setLanguage('en')}>EN</button><button className={app.language === 'hi' ? 'active' : ''} onClick={() => app.setLanguage('hi')}>हि</button></span>
           <span className="ca-lang ca-theme" title={T('theme.title')}><button className={app.theme === 'night' ? 'active' : ''} onClick={() => app.setTheme('night')} aria-label={T('theme.night')}>☾</button><button className={app.theme === 'day' ? 'active' : ''} onClick={() => app.setTheme('day')} aria-label={T('theme.day')}>☀</button></span>
         </div>
@@ -112,7 +116,7 @@ export default function App() {
           <div className="ca-more-group"><span>{T('more.tools')}</span><div className="ca-toolrow">{TOOLS.map((t) => <button key={t} className={`ca-tool ${tool === t ? 'active' : ''}`} onClick={() => { toggle(t); app.select(null) }}>{T(`tool.${t}` as StringKey)}</button>)}</div></div>
           {app.mode === 'ink3d' && <div className="ca-more-group"><span>{T('mode.ink3d')}</span><div className="ca-toolrow"><span className="note">{app.camera.zoom < 16 ? T('ink.zoom') : app.inkPending > 0 ? T('ink.drawing', { n: app.inkPending }) : T('ink.ready')}</span><button className="ca-tool" onClick={() => saveDrawing(app)}>{T('ink.save')}</button></div></div>}
           <div className="ca-more-group"><span>{T('more.about')}</span><div className="ca-badges">{app.region.source === 'osm' ? <span className="ca-badge observed">{T('badge.osm')}</span> : <span className="ca-badge simulated">{T('badge.demo')}</span>} {app.liveStatus.live ? <span className="ca-badge observed">{T('badge.livetraffic')}</span> : <span className="ca-badge derived">{T('badge.notraffic')}</span>} <span className="ca-badge observed">{T('badge.realonly')}</span>{app.realDataFallbacks > 0 && <span className="ca-badge derived">{T('badge.fallback', { n: app.realDataFallbacks })}</span>}</div></div>
-          <div className="ca-more-group"><span>{T('tier.plus')}</span><div className="ca-toolrow">{app.tier === 'free' ? <span className="note">{T('tier.locked')}</span> : <><span className="note">{T('tier.open')}</span><button className="ca-tool" onClick={() => app.lock()}>{T('tier.leave')}</button></>}</div></div>
+          <div className="ca-more-group"><span>{app.tier === 'pro' ? T('tier.pro') : T('tier.plus')}</span><div className="ca-toolrow">{app.tier === 'free' ? <><span className="note">{T('tier.locked')}</span><button className="ca-tool" onClick={() => { toggle('sites') }}>{T('tier.pro.try')}</button></> : <><span className="note">{T(app.tier === 'pro' ? 'tier.open.pro' : 'tier.open')}</span>{app.tier === 'plus' && <button className="ca-tool" onClick={() => { toggle('sites') }}>{T('tier.pro.try')}</button>}<button className="ca-tool" onClick={() => app.lock()}>{T('tier.leave')}</button></>}</div></div>
         </div>}
         {tool === 'layers' && <LayersPanel app={app} />}
       </div>
@@ -122,12 +126,16 @@ export default function App() {
       {tool === 'route' && !app.selection && <RoutePanel app={app} />}
       {tool === 'upload' && !app.selection && <UploadPanel app={app} />}
       {tool === 'pulse' && !app.selection && <PulsePanel app={app} />}
+      {/* list panels stay mounted (their results survive) while a place card opened from them is on top */}
+      {tool === 'sites' && !app.selection && <div className="ca-keep" hidden={cardOverList}><SiteFinderPanel app={app} /></div>}
+      {tool === 'scenario' && !app.selection && <ScenarioPanel app={app} />}
+      {tool === 'saved' && !app.selection && <div className="ca-keep" hidden={cardOverList}><SavedPanel app={app} /></div>}
       {tool === 'camera' && <VisionPanel app={app} />}
       {tool === 'alerts' && <AlertsPanel app={app} />}
       {tool === 'insights' && <InsightsPanel app={app} />}
       {tool === 'changed' && <WhatChanged app={app} />}
       {tool === 'compare' && <ComparePanel app={app} places={compare} onRemove={(i) => setCompare((c) => c.filter((_, j) => j !== i))} />}
-      {!sidePanel && tool !== 'changed' && tool !== 'compare' && !app.selection && <PlaceCard app={app} onCompare={addCompare} />}
+      {(!sidePanel || cardOverList) && tool !== 'changed' && tool !== 'compare' && !app.selection && <PlaceCard app={app} onCompare={addCompare} />}
       <InspectorPanel app={app} />
       <InsightBubbles app={app} onOpen={() => setTool('insights')} />
 

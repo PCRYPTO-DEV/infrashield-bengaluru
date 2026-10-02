@@ -101,14 +101,19 @@ class TomTomClient:
         self.cache.set(key, out, 86400, time.time())
         return out
 
-    async def route(self, a: tuple[float, float], b: tuple[float, float], alternatives: int = 2) -> dict[str, Any]:
-        """Routes with live traffic between two points anywhere: TomTom Routing. The fastest and its alternatives, cached 60 s."""
-        key = f"tomtom:route:{a[0]:.4f},{a[1]:.4f}:{b[0]:.4f},{b[1]:.4f}:{alternatives}"
+    async def route(self, a: tuple[float, float], b: tuple[float, float], alternatives: int = 2, avoid: list[tuple[float, float, float, float]] | None = None) -> dict[str, Any]:
+        """Routes with live traffic between two points anywhere: TomTom Routing. The fastest and its alternatives, cached 60 s.
+        `avoid` closes rectangles (west, south, east, north) to the router: the Scenario Lab's "road closes"."""
+        avoid = avoid or []
+        akey = "|".join(f"{w:.4f},{s:.4f},{e:.4f},{n:.4f}" for w, s, e, n in avoid)
+        key = f"tomtom:route:{a[0]:.4f},{a[1]:.4f}:{b[0]:.4f},{b[1]:.4f}:{alternatives}:{akey}"
         cached = self.cache.get(key)
         if cached is not None:
             return cached
-        data = await self._get(f"/routing/1/calculateRoute/{a[0]},{a[1]}:{b[0]},{b[1]}/json",
-                               {"traffic": "true", "routeType": "fastest", "maxAlternatives": alternatives, "travelMode": "car", "computeTravelTimeFor": "all"}, "tomtom_route.json")
+        params: dict[str, Any] = {"traffic": "true", "routeType": "fastest", "maxAlternatives": alternatives, "travelMode": "car", "computeTravelTimeFor": "all"}
+        if avoid:
+            params["avoidAreas"] = "|".join(f"{s},{w}:{n},{e}" for w, s, e, n in avoid)  # southWest:northEast, lat,lng
+        data = await self._get(f"/routing/1/calculateRoute/{a[0]},{a[1]}:{b[0]},{b[1]}/json", params, "tomtom_route_avoid.json" if avoid else "tomtom_route.json")
         now = time.time()
         routes = []
         for i, r in enumerate(data.get("routes", [])):
@@ -116,8 +121,9 @@ class TomTomClient:
             pts = [[p["longitude"], p["latitude"]] for leg in r.get("legs", []) for p in leg.get("points", [])]
             routes.append({"index": i, "lengthM": sm.get("lengthInMeters"), "travelTimeS": sm.get("travelTimeInSeconds"), "trafficDelayS": sm.get("trafficDelayInSeconds", 0),
                            "noTrafficTravelTimeS": sm.get("noTrafficTravelTimeInSeconds"), "arrival": sm.get("arrivalTime"), "points": pts})
-        result = {"from": {"lat": a[0], "lng": a[1]}, "to": {"lat": b[0], "lng": b[1]}, "routes": routes, "fetchedAt": int(now * 1000), "source": "tomtom-routing",
-                  "evidence": {"classification": "derived", "source": "tomtom-routing", "timestamp": int(now * 1000), "confidence": 0.8, "model": "tomtom routing with live traffic"}}
+        result = {"from": {"lat": a[0], "lng": a[1]}, "to": {"lat": b[0], "lng": b[1]}, "routes": routes, "fetchedAt": int(now * 1000), "source": "tomtom-routing", "avoided": [list(r) for r in avoid],
+                  "evidence": {"classification": "predicted" if avoid else "derived", "source": "tomtom-routing", "timestamp": int(now * 1000), "confidence": 0.7 if avoid else 0.8,
+                               "model": "tomtom routing with live traffic" + (", with the closed areas removed from the network (a what-if, not an observation)" if avoid else "")}}
         self.cache.set(key, result, 60, now)
         return result
 
@@ -193,9 +199,21 @@ def decode_flow_tile(pbf: bytes, z: int, x: int, y: int) -> list[dict[str, Any]]
                 level = None
             for j, line in enumerate(lines):
                 coords = [tile_px_to_lnglat(px, py, z, x, y, extent) for px, py in line]
-                out.append({"id": f"tt:{z}/{x}/{y}:{layer_name}:{i}:{j}", "coordinates": coords, "trafficLevel": level,
+                # A stable id from where the piece of road is, not from its position in the tile: TomTom
+                # rebuilds the tile every minute and the feature order moves, while the memory and the
+                # time machine need the same road to keep the same name from one reading to the next.
+                sid = segment_id(z, x, y, line)
+                out.append({"id": sid, "coordinates": coords, "trafficLevel": level,
                             "roadCoverage": props.get("traffic_road_coverage"), "roadType": props.get("road_type"), "layer": layer_name})
     return out
+
+
+def segment_id(z: int, x: int, y: int, line: list) -> str:
+    """`tt:z/x/y:<digest>` of the line's tile-pixel start, end, midpoint and length: the same road reads the same id every fetch."""
+    import hashlib
+    a, b, m = line[0], line[-1], line[len(line) // 2]
+    key = f"{int(a[0])},{int(a[1])}|{int(m[0])},{int(m[1])}|{int(b[0])},{int(b[1])}|{len(line)}"
+    return f"tt:{z}/{x}/{y}:{hashlib.blake2b(key.encode(), digest_size=6).hexdigest()}"
 
 
 def tile_px_to_lnglat(px: float, py: float, z: int, x: int, y: int, extent: int) -> list[float]:
@@ -312,10 +330,24 @@ def register(app: FastAPI, cache: Cache, fixtures: Path | None, history=None) ->
 
     @app.get("/api/route")
     @guard
-    async def route(frm: str = Query(..., alias="from", pattern=r"^-?[\d.]+,-?[\d.]+$"), to: str = Query(..., pattern=r"^-?[\d.]+,-?[\d.]+$"), alternatives: int = Query(2, ge=0, le=3)):
+    async def route(frm: str = Query(..., alias="from", pattern=r"^-?[\d.]+,-?[\d.]+$"), to: str = Query(..., pattern=r"^-?[\d.]+,-?[\d.]+$"), alternatives: int = Query(2, ge=0, le=3),
+                    avoid: str | None = Query(None, max_length=400, description="closed rectangles west,south,east,north separated by ';' (Scenario Lab)")):
         """Routes with live traffic anywhere in India, plus the incidents the city has seen near each one, so a safer choice can be made."""
         a = tuple(float(v) for v in frm.split(",")); b = tuple(float(v) for v in to.split(","))
-        r = await client.route((a[0], a[1]), (b[0], b[1]), alternatives)
+        boxes: list[tuple[float, float, float, float]] = []
+        for part in (avoid or "").split(";"):
+            if not part.strip():
+                continue
+            try:
+                w, s_, e, n = (float(v) for v in part.split(","))
+            except ValueError:
+                raise HTTPException(400, "avoid must be west,south,east,north rectangles separated by ';'")
+            if not (w < e and s_ < n) or (e - w) * (n - s_) > 0.01:
+                raise HTTPException(400, "each closed area must be a small rectangle (under about 10 km x 10 km)")
+            boxes.append((w, s_, e, n))
+        if len(boxes) > 5:
+            raise HTTPException(400, "at most 5 closed areas")
+        r = await client.route((a[0], a[1]), (b[0], b[1]), alternatives, boxes)
         for rt in r["routes"]:
             near = _incidents_near_route(history, rt["points"])
             rt["incidentsNear"] = len(near)

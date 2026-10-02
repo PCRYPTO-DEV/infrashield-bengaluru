@@ -24,7 +24,7 @@ export interface WorldState {
   intel: IntelligenceState
   zones: MonitoringZone[]
   selection: Selection | null
-  highlights: { points: WorldPoint[]; entityIds: string[]; agentIds: number[] }
+  highlights: { points: WorldPoint[]; entityIds: string[]; agentIds: number[]; rings?: WorldPoint[][] }
   route: RouteResult | null
   routePick: WorldPoint[]
   drawing: DrawState | null

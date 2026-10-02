@@ -107,9 +107,13 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
     broadcast, hot = register_live(app, history, app.state.tomtom, osm, fixtures is not None)
     app.state.tomtom.hot = hot
     register_memory(app, history)
+    from .timemachine import register as register_timemachine
+    register_timemachine(app, history)
     register_alerts(app, alerts)
     cells = CellModel(osm, history, None, air)
     app.state.cells = cells
+    from .sites import register as register_sites
+    register_sites(app, cells)
     changes = ChangeEngine(history, air)
 
     @app.get("/api/place")

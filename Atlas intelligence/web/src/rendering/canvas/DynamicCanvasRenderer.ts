@@ -156,6 +156,12 @@ export class DynamicCanvasRenderer {
       ctx.beginPath(); ctx.arc(p.x, p.y, (8 + pulse * 4) * px, 0, Math.PI * 2); ctx.strokeStyle = this.c.selection; ctx.lineWidth = 1.5 * px; ctx.stroke()
     }
     for (const id of s.highlights.entityIds) this.outlineEntity(ctx, s, id, this.c.selection, px)
+    for (const ring of s.highlights.rings ?? []) {
+      if (ring.length < 3) continue
+      ctx.beginPath(); ring.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath()
+      ctx.fillStyle = this.c.selection; ctx.globalAlpha = 0.08; ctx.fill(); ctx.globalAlpha = 1
+      ctx.strokeStyle = this.c.selection; ctx.lineWidth = 2 * px; ctx.setLineDash([6 * px, 4 * px]); ctx.stroke(); ctx.setLineDash([])
+    }
 
     // ---- hover / selection ----
     if (s.hover && !(s.selection && sameSel(s.hover, s.selection))) this.drawSelection(ctx, s, s.hover, this.c.inkSoft, px, extrapolate)
@@ -232,7 +238,9 @@ export class DynamicCanvasRenderer {
 
   private drawFlow(ctx: CanvasRenderingContext2D, s: WorldState, px: number, inView: (p: WorldPoint, pad?: number) => boolean): void {
     const g = s.world.graph
+    const predicted = s.world.observedFlowMeta?.source === 'forecast'
     for (const f of s.intel.flow!.edges.values()) {
+      if (!f.observed && s.mode === 'reality') continue
       const e = g.edge(f.edgeId); const ep = e && g.endpoints(e); if (!e || !ep || !inView(ep.a, 50)) continue
       const c = f.congestion
       ctx.beginPath(); ctx.moveTo(ep.a.x, ep.a.y); ctx.lineTo(ep.b.x, ep.b.y)
@@ -241,7 +249,7 @@ export class DynamicCanvasRenderer {
       ctx.strokeStyle = trafficColour(c)
       ctx.globalAlpha = alpha
       ctx.lineWidth = (f.observed ? 3.5 + c * 3 : 2 + f.count * 0.6) * px
-      if (!f.observed) ctx.setLineDash([5 * px, 4 * px])
+      if (!f.observed || predicted) ctx.setLineDash([5 * px, 4 * px])
       ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1
     }
   }

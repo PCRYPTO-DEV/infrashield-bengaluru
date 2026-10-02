@@ -50,7 +50,7 @@ The deployed Atlas serves a drop-in script. No build step, no framework:
     mode: 'mobility',                          // reality | mobility | activity | risk | forecast | ink3d
     lang: 'hi',                                // en | hi
     theme: 'day',                              // day (white paper, default) | night (City Atlas deep night)
-    tool: 'insights',                          // a panel to open at once: insights | camera | alerts | …
+    tool: 'insights',                          // a panel to open at once: insights | camera | alerts | sites | scenario | saved | …
     place: 'maharashtra',                      // start in a state (ids in web/src/app/regions.ts), or lng/lat anywhere in India
     radius: '16px',
   })
@@ -108,7 +108,7 @@ atlas.postMessage({ type: 'atlas:setView', lng: 77.2295, lat: 28.6129, zoom: 17 
 atlas.postMessage({ type: 'atlas:setMode', mode: 'ink3d' }, '*')          // reality | mobility | activity | risk | forecast | ink3d
 atlas.postMessage({ type: 'atlas:setLanguage', lang: 'hi' }, '*')         // en | hi
 atlas.postMessage({ type: 'atlas:setTheme', theme: 'night' }, '*')        // day | night
-atlas.postMessage({ type: 'atlas:openTool', tool: 'camera' }, '*')         // insights | camera | alerts | zones | route | pulse | layers | upload | null
+atlas.postMessage({ type: 'atlas:openTool', tool: 'camera' }, '*')         // insights | camera | alerts | zones | route | pulse | layers | upload | sites | scenario | saved | null
 atlas.postMessage({ type: 'atlas:ask', question: 'Why is traffic slow?' }, '*')
 atlas.postMessage({ type: 'atlas:zone', name: 'Gate 2', ring: [{ lng, lat }, { lng, lat }, { lng, lat }] }, '*')
 atlas.postMessage({ type: 'atlas:snapshot' }, '*')

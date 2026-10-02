@@ -32,7 +32,7 @@ const BASE: LayerFlags = { roads: true, buildings: true, vehicles: true, pedestr
 
 export function modeDefaults(mode: ViewMode): LayerFlags {
   switch (mode) {
-    case 'reality': return { ...BASE }
+    case 'reality': return { ...BASE, flow: true }  // measured traffic colours are real data: on by default
     case 'mobility': return { ...BASE, flow: true, pedestrians: false, predictions: true }
     case 'activity': return { ...BASE, density: true, activity: true, vehicles: false }
     case 'risk': return { ...BASE, anomalies: true, risk: true, pedestrians: false }

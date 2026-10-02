@@ -1,7 +1,7 @@
 /**
  * Free tells you what is here. Plus tells you what it means for you. Pro tells you
  * what it means for a decision. One city model; the question changes.
- * The Plus gate is a password for now (no accounts yet); Pro is shown locked with its scope.
+ * The gates are passwords for now (no accounts yet): one opens Plus, the Pro one opens the workstation.
  */
 export type Tier = 'free' | 'plus' | 'pro'
 export type Feature =
@@ -15,8 +15,9 @@ export const FEATURES: Record<Feature, Tier> = {
   'pro.market': 'pro', 'pro.site': 'pro', 'pro.scenario': 'pro', 'pro.report': 'pro', 'pro.projects': 'pro',
 }
 const RANK: Record<Tier, number> = { free: 0, plus: 1, pro: 2 }
-/** The Plus password agreed for this stage; replaced by accounts and billing later. */
+/** The passwords agreed for this stage; replaced by accounts and billing later. */
 const PLUS_PASSWORD = 'atbose'
+const PRO_PASSWORD = 'atbose-pro'
 /** Free: how many What changed? items are shown. */
 export const FREE_CHANGES = 3
 
@@ -24,5 +25,5 @@ export function hasFeature(tier: Tier, f: Feature): boolean { return RANK[tier] 
 export function tierOf(f: Feature): Tier { return FEATURES[f] }
 export function loadTier(): Tier { try { const t = localStorage.getItem('atlas.tier'); return t === 'plus' || t === 'pro' ? t : 'free' } catch { return 'free' } }
 export function saveTier(t: Tier): void { try { localStorage.setItem('atlas.tier', t) } catch { /* private mode */ } }
-/** Returns the tier unlocked by the password, or null when it is wrong. */
-export function unlockWithPassword(password: string): Tier | null { return password.trim() === PLUS_PASSWORD ? 'plus' : null }
+/** Returns the tier unlocked by the password, or null when it is wrong. The Pro password opens Pro (and so Plus); the Plus password opens Plus. */
+export function unlockWithPassword(password: string): Tier | null { const p = password.trim(); return p === PRO_PASSWORD ? 'pro' : p === PLUS_PASSWORD ? 'plus' : null }

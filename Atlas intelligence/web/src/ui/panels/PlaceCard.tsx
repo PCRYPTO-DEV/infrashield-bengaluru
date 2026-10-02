@@ -4,6 +4,7 @@ import type { Dimension, PlaceState } from '../../data/adapters/placeAdapter'
 import { orderDimensions, viewScore, strengthsAndWeaknesses, questionsWorthAsking, type LifeView } from '../../intelligence/place/relevance'
 import { makeT, type StringKey } from '../i18n'
 import { TierGate } from './TierGate'
+import { clientReportHtml, openClientReport } from '../report/clientReport'
 
 const VIEWS: LifeView[] = ['everyone', 'family', 'student', 'professional', 'retired']
 
@@ -64,6 +65,9 @@ export function PlaceCard({ app, onCompare }: { app: CityAtlas; onCompare: (name
   const T = makeT(app.language)
   const [view, setView] = useState<LifeView>('everyone')
   const [property, setProperty] = useState(false)
+  const [report, setReport] = useState(false)
+  const [watch, setWatch] = useState(false)
+  const [watched, setWatched] = useState(false)
   if (!app.placePoint) return null
   const st = app.place
   const name = st ? `${st.centre.lat.toFixed(4)}, ${st.centre.lng.toFixed(4)}` : ''
@@ -91,7 +95,14 @@ export function PlaceCard({ app, onCompare }: { app: CityAtlas; onCompare: (name
         <div className="ca-row">
           <button className="small" onClick={() => setProperty(!property)}>{T('place.property')}</button>
           <button className="small" onClick={() => onCompare(name, st)}>{T('place.compare.add')}</button>
+          <button className="small" onClick={() => setReport(!report)}>{T('report.btn')}</button>
+          <button className="small" disabled={watched} onClick={() => { if (!app.can('watchlist')) { setReport(false); setWatch(true); return } app.save({ kind: 'place', name: T('saved.place.name', { n: name }), lng: st.centre.lng, lat: st.centre.lat, score: st.score, data: { band: st.band, dimensions: st.dimensions.map((d) => ({ key: d.key, score: d.score })) } }); setWatched(true) }}>{watched ? T('saved.done') : T('saved.watch')}</button>
         </div>
+        {watch && !app.can('watchlist') && <TierGate app={app} feature="watchlist"><span /></TierGate>}
+        {report && <TierGate app={app} feature="pro.report">
+          <p className="note">{T('report.help')}</p>
+          <button className="primary small" onClick={() => { if (!openClientReport(clientReportHtml(st, name, app.changes, app.language, app.region.name))) alert(T('report.popup')) }}>{T('report.open')}</button>
+        </TierGate>}
         {property && <TierGate app={app} feature="place.property">
           <h3>{T('place.questions')}</h3>
           <ul className="ca-questions">{questionsWorthAsking(st.dimensions).map((k) => <li key={k}>{T(k as StringKey)}</li>)}</ul>

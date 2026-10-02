@@ -108,7 +108,7 @@ App
 ├─ Home (first open: greeting, "N meaningful changes since yesterday", three prompts)
 ├─ AskAtlas (persistent; typed or spoken; answer card with facts + writer label)
 ├─ WhatChanged (control + ranked list with show-me and evidence)
-├─ TimeBar (PAST ← TODAY → FUTURE; future = MODELLED, disabled until Phase 3)
+├─ TimeBar (PAST · NOW · FUTURE: past = the memory's readings, future = PREDICTED from the usual hour with a confidence)
 ├─ PlaceCard (click anywhere: ATLAS SCORE, trend, dimensions, WHY, evidence, confidence; Live-here view; Plus: before you rent or buy)
 ├─ AroundYou (strip: traffic, air, rain, safety, unusual)
 ├─ More (contextual: layers, zones, route, upload, pulse, camera, alerts, insights, compare)
@@ -131,4 +131,4 @@ Gate today: a password (`atbose`) unlocks Plus on this browser; Pro is shown loc
 
 ## 9. Phases
 
-Phase 1 (this sprint): H3 state + place card + WHY + provenance + What changed + Ask Atlas chrome + tiers. Phase 2: timeline over cell history, anomaly engine per cell, OSM change detection from snapshots. Phase 3: forecasting ensemble, flood/heat (needs elevation + rainfall history adapters), MODELLED future. Phase 4: What If?, site finder, routing modes, Pro workstation, traffic policy engine (§30), opportunity engine (§31.14). Phase 5: live camera behaviour, IoT, streaming.
+Phase 1 (done): H3 state + place card + WHY + provenance + What changed + Ask Atlas chrome + tiers. Phase 2 (done in part): the time machine over the memory (`/api/history/at`), stable road ids so readings line up across days, anomaly per road vs the usual; OSM change detection waits for a second snapshot. Phase 3 (done in part): `/api/forecast/at` predicts each road from its usual hour with today's anomaly fading, labelled with a confidence; flood/heat still need elevation and rainfall adapters. Phase 4 (done in part): site finder (`/api/sites`), Scenario Lab "road closes" (`/api/route?avoid=`), Pro workspace (saved shortlists, scenarios, GeoJSON/CSV export), client report; routing modes, a calibrated traffic twin (§30) and the opportunity engine (§31.14) wait for demand and population data. Phase 5: live camera behaviour, IoT, streaming. See `docs/DECK_COVERAGE.md` for the claim-by-claim map.

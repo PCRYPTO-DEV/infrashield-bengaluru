@@ -69,17 +69,21 @@ server.
 | **Click anywhere** | the Atlas place intelligence card: score, trend, every dimension with WHY, evidence class, confidence and provenance; Live-here views; Before you rent or buy; Compare areas |
 | **What changed?** | ranked, evidenced changes since yesterday for the view on screen |
 | **Around you** | traffic, air, rain, safety and unusual activity in five words |
-| **Free · Plus · Pro** | Free: what is here. Plus (password gate for now): what it means for you. Pro: what it means for a decision (coming) |
+| **Free · Plus · Pro** | Free: what is here. Plus (password gate for now): what it means for you, with areas you watch. Pro (its own password): the site finder, the Scenario Lab, a project workspace with GeoJSON/CSV export and client reports |
+| **Site finder** (Pro) | pick café, pharmacy, clinic, school, shop, office, warehouse or home; the hexagons on screen are ranked from the same real place scores, gaps in supply count, every candidate says why and what has no data |
+| **Scenario Lab** (Pro) | "Road closes": the closed area is removed from the network and the live router re-plans the trip; metro, new development and signal changes are listed as not modelled, with the reason |
+| **Saved & projects** | Plus: watch an area and see how its score moved since you saved it. Pro: shortlists and scenarios, exported as GeoJSON or CSV |
+| **Client report** (Pro) | a printable report of a place card: every score with its class, confidence, why and source, plus what changed nearby |
 | **Map · Traffic · Busy · Risk · Ahead · Ink 3D** | the six modes (under More) |
 | **Ask the city** | type or press the mic; answers list the facts they came from |
 | **English / हिंदी** | every label, answer and voice follows the toggle |
 | **Day / Night** | white paper and ink by default; the City Atlas deep-night look one click away (also `?theme=night` and the embed option) |
 | **Embed** | `embed.js` drops the whole map into the City Atlas app on Emergent, or any page, in two minutes ([docs](docs/INTEGRATION.md)) |
 | **Zones** | draw a shape; it counts who goes in and out, including camera dots |
-| **Route** | a route with less risk, with the factors shown |
+| **Route** | From → To anywhere in India with live traffic; options with time, delay and the incidents seen near each; the one with strictly fewer incidents is marked |
 | **Camera** | count people and vehicles as moving dots from a phone or laptop camera; Atlas Vision shows the street from the camera's eye as ink lines |
 | **Upload** | GeoJSON / JSON / CSV up to 10 MB become a "seen" layer |
-| **Timeline** | live, recorded replay, or what may come next |
+| **PAST · NOW · FUTURE** | the time machine: PAST shows the readings the city kept (nothing interpolated), NOW is live, FUTURE is predicted from what each road usually reads at that hour, labelled with a confidence; a day back, six hours ahead |
 | **Save line drawing** | in Ink 3D, export the view as a plotter-ready SVG |
 | **Alerts** | "tell me when a road gets very slow / a camera counts too many / something happens in a zone", by WhatsApp or SMS in English or Hindi |
 | **Memory** | every live reading is kept; roads show "usual at this hour" and you can ask "is it worse than usual?" |
@@ -99,6 +103,8 @@ writer never adds a fact. Camera frames never leave the device and no face
 model is ever loaded.
 
 ## Docs
+
+- [What the decks promise and where the product stands](docs/DECK_COVERAGE.md)
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): the whole system, the ln merge, the data flow
 - [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md): OpenStreetMap, TomTom, Open-Meteo, cameras, the AI writer; quotas and caching

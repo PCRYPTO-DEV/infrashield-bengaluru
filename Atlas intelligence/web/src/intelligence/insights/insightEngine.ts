@@ -29,6 +29,9 @@ export interface InsightInput {
   time: number
   /** TomTom level (0..1 of free-flow) per edge, with the road's name and a point on it */
   flow: Array<{ edgeId: string; level: number; name: string; point: WorldPoint }>
+  /** where the flow came from: live TomTom, the memory (past) or a prediction (future) */
+  flowSource?: string
+  flowClass?: EvidenceClassification
   /** now vs the usual level at this weekday and hour (from the city's memory) */
   usual: Array<{ edgeId: string; now: number; usual: number | null; delta: number | null; samples: number; name: string; point: WorldPoint }>
   incidents: Array<{ id: string; kind: string; severity: number; description: string; startTime: number; point: WorldPoint; classification: EvidenceClassification; source: string }>
@@ -70,7 +73,7 @@ export function deriveInsights(input: InsightInput, max = 8): Insight[] {
   // 2. Slowest corridors right now (live TomTom).
   for (const f of worstByRoad(input.flow.filter((f) => f.level < 0.35)).sort((a, b) => a.level - b.level).slice(0, 3)) {
     if (worse.has(f.name)) continue
-    out.push({ id: `slow:${f.name}`, kind: 'slow', severity: Math.min(1, 0.35 + (0.35 - f.level) * 1.6), key: 'ins.slow', vars: { road: f.name, pct: pct(f.level) }, point: f.point, classification: 'observed', source: 'tomtom', time: t })
+    out.push({ id: `slow:${f.name}`, kind: 'slow', severity: Math.min(1, 0.35 + (0.35 - f.level) * 1.6), key: 'ins.slow', vars: { road: f.name, pct: pct(f.level) }, point: f.point, classification: input.flowClass ?? 'observed', source: input.flowSource ?? 'tomtom', time: t })
   }
 
   // 3. Incidents: clusters first, then the severe ones.

@@ -99,6 +99,9 @@ export class LiveFeeds {
   private lastSegmentsAt = 0
   /** edge id → TomTom segment id from the last match (for history and alerts) */
   edgeSegment = new Map<string, string>()
+  /** While the time machine shows another instant, polls keep fetching but do not touch the world. */
+  frozen = false
+  private lastIncidents: UrbanEntity[] = []
   private lastUsualAt = 0
   private lastFlowAt = 0
   private lastIncidentAt = 0
@@ -169,7 +172,7 @@ export class LiveFeeds {
       const segmentOf = new Map<string, string>()
       const levels = matchFlowToEdges(this.world, segments, 14, segmentOf)
       this.edgeSegment = segmentOf
-      this.world.setObservedFlow(levels, now, 'tomtom', segments.length)
+      if (!this.frozen) this.world.setObservedFlow(levels, now, 'tomtom', segments.length)
       this.status.flow = 'open'; this.lastError = null
       void this.pollUsual(tiles.map((t) => t.key))
     } catch (e) { this.status.flow = 'error'; this.lastError = (e as Error).message }
@@ -181,7 +184,20 @@ export class LiveFeeds {
     if (!this.lastSegments.length) return
     const segmentOf = new Map<string, string>()
     const levels = matchFlowToEdges(this.world, this.lastSegments, 14, segmentOf)
+    if (this.frozen) { this.edgeSegment = segmentOf; return }
     if (levels.size !== this.world.observedFlow.size) { this.edgeSegment = segmentOf; this.world.setObservedFlow(levels, this.lastSegmentsAt, 'tomtom', this.lastSegments.length); this.applyUsual(); this.changed() }
+  }
+
+  /** Back to now: put the last live readings and incidents back on the map. */
+  restore(): void {
+    this.frozen = false
+    const segmentOf = new Map<string, string>()
+    const levels = matchFlowToEdges(this.world, this.lastSegments, 14, segmentOf)
+    this.edgeSegment = segmentOf
+    this.world.setObservedFlow(levels, this.lastSegmentsAt, 'tomtom', this.lastSegments.length)
+    this.world.setLiveIncidents(this.lastIncidents)
+    this.applyUsual(); this.changed()
+    void this.pollFlow(true); void this.pollIncidents(true)
   }
 
   /** The city's memory: what each matched segment usually reads at this weekday and hour. */
@@ -241,7 +257,8 @@ export class LiveFeeds {
       if (!r.ok) throw new Error(`incidents: HTTP ${r.status}`)
       const data = (await r.json()) as { entities: UrbanEntity[] }
       const entities = data.entities.map((e) => ({ ...e, properties: { ...(e.properties as IncidentProperties), edgeId: attachIncidentToEdge(this.world, e) } }))
-      this.world.setLiveIncidents(entities)
+      this.lastIncidents = entities
+      if (!this.frozen) this.world.setLiveIncidents(entities)
       this.status.incidents = 'open'
     } catch (e) { this.status.incidents = 'error'; this.lastError = (e as Error).message }
     this.changed()

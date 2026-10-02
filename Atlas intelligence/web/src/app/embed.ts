@@ -35,7 +35,7 @@ import { tr, type StringKey } from '../ui/i18n'
  */
 export interface EmbedOptions { allowedOrigins?: string[] }
 
-const TOOLS: ToolName[] = ['layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'insights']
+const TOOLS: ToolName[] = ['layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'insights', 'sites', 'scenario', 'saved']
 export function readEmbedParams(search: string): { lng?: number; lat?: number; zoom?: number; mode?: ViewMode; lang?: Language; theme?: Theme; tool?: ToolName; embed: boolean } {
   const q = new URLSearchParams(search)
   const num = (k: string) => (q.has(k) && Number.isFinite(Number(q.get(k))) ? Number(q.get(k)) : undefined)

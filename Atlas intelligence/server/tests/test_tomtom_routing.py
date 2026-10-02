@@ -28,3 +28,22 @@ def test_geocode_and_route_with_safer_choice(tmp_path):
         r = c.get("/api/route", params={"from": "28.6315,77.2167", "to": "28.4595,77.0266"}).json()
         assert r["routes"][0]["incidentsNear"] == 1 and r["routes"][1]["incidentsNear"] == 0
         assert r["recommended"]["safer"] == 1 and "fewer reported incidents" in r["explanation"][0]
+
+
+def test_segment_ids_follow_the_road_not_the_tile_order():
+    from app.tomtom import segment_id
+    line = [[10, 20], [30, 40], [50, 60]]
+    assert segment_id(12, 1, 2, line) == segment_id(12, 1, 2, [list(p) for p in line])
+    assert segment_id(12, 1, 2, line) != segment_id(12, 1, 2, [[10, 20], [30, 40], [50, 61]])
+    assert segment_id(12, 1, 2, line).startswith("tt:12/1/2:")
+
+
+def test_route_with_a_closed_area_is_a_labelled_what_if(tmp_path):
+    cache = Cache(tmp_path / "c.db"); history = History(tmp_path / "c.db")
+    app = create_app(cache=cache, fixtures=FIXTURES, history=history)
+    with TestClient(app) as c:
+        base = c.get("/api/route", params={"from": "28.6315,77.2167", "to": "28.4595,77.0266"}).json()
+        closed = c.get("/api/route", params={"from": "28.6315,77.2167", "to": "28.4595,77.0266", "avoid": "77.10,28.55,77.13,28.58"}).json()
+        assert closed["evidence"]["classification"] == "predicted" and closed["avoided"] == [[77.10, 28.55, 77.13, 28.58]]
+        assert closed["routes"][0]["travelTimeS"] > base["routes"][0]["travelTimeS"]
+        assert c.get("/api/route", params={"from": "28.6315,77.2167", "to": "28.4595,77.0266", "avoid": "70,20,80,30"}).status_code == 400

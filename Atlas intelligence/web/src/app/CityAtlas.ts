@@ -31,6 +31,9 @@ import type { SimSnapshot } from '../engine/simulation/snapshot'
 import { REGIONS, DEFAULT_REGION, type Region } from './regions'
 import { LiveFeeds } from '../data/realtime/liveFeeds'
 import { SnapshotRecorder } from '../engine/simulation/snapshotRecorder'
+import { TimeMachine, type TimeKind } from '../data/realtime/timeMachine'
+import { parseIntent } from '../intelligence/reasoning/intentParser'
+import { saveItem } from './saved'
 import { inkDocument } from '../rendering/svg/inkSvg'
 import { ClaudeExplainer, type Language } from '../intelligence/reasoning/claudeExplainer'
 import type { EvidenceItem } from '../intelligence/reasoning/evidence'
@@ -50,7 +53,7 @@ import { tr, type StringKey } from '../ui/i18n'
 import type { IntelligenceState } from '../intelligence/types'
 
 export type Theme = 'day' | 'night'
-export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights'
+export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'sites' | 'scenario' | 'saved'
 
 export const DEFAULT_SEED = REGIONS[DEFAULT_REGION].seed
 /** Base URL of the Atlas server; empty means same origin (Vite proxies /api in dev). */
@@ -80,6 +83,8 @@ export class CityAtlas {
   readonly recorder = new SnapshotRecorder(2000, 300)
   /** Live feeds (TomTom flow + incidents, Open-Meteo weather); null for procedural regions. */
   readonly feeds: LiveFeeds | null
+  /** PAST and FUTURE for real regions: the memory and a labelled prediction. */
+  readonly timeMachine: TimeMachine | null
   readonly lodController = new LodController(20)
   renderer: CompositeRenderer | null = null
   private gen: WorldGenerationClient
@@ -88,7 +93,7 @@ export class CityAtlas {
   layers: LayerFlags = modeDefaults('reality')
   selection: Selection | null = null
   hover: Selection | null = null
-  highlights: WorldState['highlights'] = { points: [], entityIds: [], agentIds: [] }
+  highlights: WorldState['highlights'] = { points: [], entityIds: [], agentIds: [], rings: [] }
   route: RouteResult | null = null
   routePick: WorldPoint[] = []
   routeWeights: RouteWeights = { ...DEFAULT_WEIGHTS }
@@ -129,6 +134,9 @@ export class CityAtlas {
     this.districts = new CityChunkManager(districtSource, { frame: this.frame, globalSeed: this.seed, datasetVersion: DATASET_VERSION, prefetchPad: 1, unloadPad: 2, maxChunks: 160, concurrency: real ? 1 : 2, chunkZoom: DISTRICT_ZOOM, budget: 120 })
     this.realSources = { street: real ? streetSource : null, district: real ? districtSource : null }
     this.feeds = real && typeof window !== 'undefined' ? new LiveFeeds(this.world, { baseUrl: SERVER_BASE }) : null
+    this.timeMachine = this.feeds ? new TimeMachine(this.world, () => this.feeds!.edgeSegment, SERVER_BASE) : null
+    // Real regions: the past is the server's memory (28 days), not this browser's recording.
+    if (this.feeds) this.temporal.setRecordedFrom(startTime - 28 * 86400_000)
     // Warm the streets around this origin on the server right away (a state just chosen): by the time the reader pans, tiles are there.
     if (real && typeof window !== 'undefined') { const o = region.origin; void fetch(`${SERVER_BASE}/api/warm?lng=${o.lng}&lat=${o.lat}`).catch(() => {}) }
     this.feeds?.subscribe(() => this.onFeeds())
@@ -200,8 +208,9 @@ export class CityAtlas {
       this.chunks.update(view, this.camera.centre)
       if (this.camera.zoom < 15.4) this.districts.update(view, this.camera.centre)
       this.feeds?.setView(view)
+      if (ts.mode !== 'live') this.syncTimeMachine()
     }
-    if (ts.mode === 'historical') {
+    if (ts.mode === 'historical' && this.region.simulation) {
       // Replay: show the recorded frame for this instant; the simulation is not consulted.
       const f = this.recorder.at(ts.timestamp)
       if (f && f.time !== this.world.snapshotTime) this.world.ingest(f)
@@ -283,14 +292,28 @@ export class CityAtlas {
   }
 
   private onSnapshot(s: SimSnapshot): void {
-    if (this.temporal.current.mode === 'historical') return
+    const sim = this.region.simulation
+    if (this.temporal.current.mode === 'historical' && sim) return
     this.lastSnapshot = s
     this.world.ingest(s)
-    if (this.temporal.current.mode === 'live') { this.recorder.record(s); this.temporal.setRecordedFrom(this.recorder.from) }
+    if (sim && this.temporal.current.mode === 'live') { this.recorder.record(s); this.temporal.setRecordedFrom(this.recorder.from) }
+  }
+  /** Ask the memory (past) or the prediction (future) for the instant on the clock and the streets on screen. */
+  private syncTimeMachine(): void {
+    const tm = this.timeMachine; if (!tm || !this.feeds) return
+    const st = this.temporal.current
+    if (st.mode === 'live') return
+    this.feeds.frozen = true
+    const kind: TimeKind = st.timestamp < this.temporal.liveTimestamp() ? 'past' : 'future'
+    void tm.show(kind, st.timestamp, this.camera.viewBounds()).then((fetched) => { if (fetched) { this.onFeeds(); this.notify() } })
   }
   private onTemporal(st: TemporalState, prev: TemporalState): void {
     const bucket = Math.floor(st.timestamp / 3600_000)
     this.chunks.setHourBucket(bucket)
+    if (this.feeds && this.timeMachine) {
+      if (st.mode === 'live' && prev.mode !== 'live') { this.timeMachine.reset(); this.feeds.restore(); this.onFeeds() }
+      else if (st.mode !== 'live') this.syncTimeMachine()
+    }
     // Leaving a replay, or jumping back beyond the recording, re-simulates deterministically from that instant.
     const leftReplay = prev.mode === 'historical' && st.mode !== 'historical'
     if (st.mode !== 'historical' && (st.timestamp < prev.timestamp - 1000 || leftReplay)) { this.sim.reset(st.timestamp); this.world.clearAgents(); this.intel.reset() }
@@ -386,7 +409,9 @@ export class CityAtlas {
   toggleLayer(key: keyof LayerFlags): void { this.layers = { ...this.layers, [key]: !this.layers[key] }; this.notify() }
   select(sel: Selection | null): void { this.selection = sel; this.notify() }
   setHover(sel: Selection | null): void { if (JSON.stringify(sel) !== JSON.stringify(this.hover)) { this.hover = sel; this.notify() } }
-  clearHighlights(): void { this.highlights = { points: [], entityIds: [], agentIds: [] }; this.route = null; this.routePick = []; this.notify() }
+  clearHighlights(): void { this.highlights = { points: [], entityIds: [], agentIds: [], rings: [] }; this.route = null; this.routePick = []; this.notify() }
+  /** Outline cells (lng/lat rings) on the map, e.g. the site finder's candidates. */
+  setRings(rings: number[][][]): void { this.highlights = { ...this.highlights, rings: rings.map((r) => r.map((p) => lngLatToLocal(this.frame, { lng: p[0], lat: p[1] }))) }; this.notify() }
 
   pointerClick(sx: number, sy: number): void {
     const p = this.camera.screenToWorld({ x: sx, y: sy })
@@ -454,6 +479,16 @@ export class CityAtlas {
     finally { this.routeBusy = false; this.notify() }
   }
   chooseRoute(i: number): void { this.routeChoice = i; this.applyRouteChoice(); this.notify() }
+  /** Scenario Lab: draw the re-routed trip (a what-if from the live router) in place of the chosen route. */
+  showScenarioRoute(points: number[][]): void {
+    const path = points.map((p) => lngLatToLocal(this.frame, { lng: p[0], lat: p[1] }))
+    if (this.route) this.route = { ...this.route, path, explanation: [...this.route.explanation], evidence: { classification: 'predicted', source: 'tomtom-routing', timestamp: Date.now(), confidence: 0.7, model: 'closed area removed from the network' } }
+    this.notify()
+  }
+  clearScenarioRoute(): void { this.applyRouteChoice(); this.notify() }
+  /** Saved areas and projects live in this browser; the version lets panels refresh. */
+  savedVersion = 0
+  save(item: Parameters<typeof saveItem>[0]): void { saveItem(item); this.savedVersion++; this.notify() }
   private applyRouteChoice(): void {
     const r = this.routeAnswer; const o: RouteOption | undefined = r?.routes[this.routeChoice]
     if (!r || !o) return
@@ -509,7 +544,7 @@ export class CityAtlas {
   tier: Tier = loadTier()
   can(f: Feature): boolean { return hasFeature(this.tier, f) }
   /** Plus is a password for now; a wrong one returns false. */
-  unlock(password: string): boolean { const t = unlockWithPassword(password); if (!t) return false; this.tier = t; saveTier(t); this.notify(); return true }
+  unlock(password: string, want: Tier = 'plus'): boolean { const t = unlockWithPassword(password); if (!t || (want === 'pro' && t !== 'pro')) return false; this.tier = t; saveTier(t); this.notify(); return true }
   lock(): void { this.tier = 'free'; saveTier('free'); this.notify() }
 
   // ---------- insights for the people who run the city ----------
@@ -536,7 +571,10 @@ export class CityAtlas {
     const camPoint = this.vision.position ? lngLatToLocal(this.frame, this.vision.position) : null
     const camera = this.vision.status === 'running' ? { people: this.vision.stats.people, vehicles: this.vision.stats.vehicles, point: camPoint } : null
     const zoneEvents = this.zoneEvents.slice(-6).map((e) => { const z = this.zones.zones.get(e.zoneId); return { id: e.id, zone: z?.name ?? '', type: e.type as string, description: e.description, point: z?.ring[0] ?? null, timestamp: e.timestamp } })
-    return deriveInsights({ time, flow, usual, incidents, hotspots: state.risk?.hotspots ?? [], anomalies: state.anomalies, weather: w.weather, camera, zoneEvents, unitPerMetre: w.unitPerMetre, congestion: state.flow && state.flow.observedEdges > 0 ? state.flow.congestedShare : null })
+    // In the time machine the "usual" comparison is about now, so it is left out; the flow names its source.
+    const src = w.observedFlowMeta?.source ?? 'tomtom'
+    const timeShift = this.temporal.current.mode !== 'live' && !!this.timeMachine
+    return deriveInsights({ time, flow, flowSource: src === 'memory' ? 'atlas memory' : src === 'forecast' ? 'prediction from the memory' : src, flowClass: src === 'forecast' ? 'predicted' : 'observed', usual: timeShift ? [] : usual, incidents, hotspots: state.risk?.hotspots ?? [], anomalies: state.anomalies, weather: w.weather, camera, zoneEvents, unitPerMetre: w.unitPerMetre, congestion: state.flow && state.flow.observedEdges > 0 ? state.flow.congestedShare : null })
   }
   private inViewPoint(p: WorldPoint): boolean { const b = this.camera.viewBounds(); const pad = (b.maxX - b.minX) * 0.5; return p.x >= b.minX - pad && p.x <= b.maxX + pad && p.y >= b.minY - pad && p.y <= b.maxY + pad }
 
@@ -641,11 +679,41 @@ export class CityAtlas {
     return { question, intent: isPlace ? 'place' : 'changed', summary: text, classification: weakest(facts.length ? facts : [{ id: 'none', classification: 'observed', statement: '' }]), evidence: facts, highlights: { points: this.placePoint ? [this.placePoint] : [], entityIds: [], agentIds: [] }, caveats: [], writer: this.writer.lastWriter } as Answer
   }
 
+  /** "Where should I open a café?" in a real region: the site finder ranks the cells on screen; the top three are the answer, the panel has the rest. */
+  private async askSites(question: string): Promise<Answer | null> {
+    if (this.region.source !== 'osm') return null
+    const intent = parseIntent(question)
+    if (intent.kind !== 'site_selection') return null
+    const b = intent.business.toLowerCase()
+    const purpose = /caf|coffee|chai|restaurant|कैफ़े|चाय/.test(b) || /caf|coffee|chai|restaurant|कैफ़े|चाय/.test(question.toLowerCase()) ? 'cafe' : /pharm|दवा/.test(b) ? 'pharmacy' : /clinic|hospital/.test(b) ? 'clinic' : /school|tuition/.test(b) ? 'school' : /office|gym/.test(b) ? 'office' : /warehouse|godown|logistic/.test(b) ? 'logistics' : /home|flat|house|live/.test(b) ? 'housing' : 'shop'
+    const v = this.camera.viewBounds()
+    const sw = this.lngLatOf({ x: v.minX, y: v.maxY }), ne = this.lngLatOf({ x: v.maxX, y: v.minY })
+    const bbox = [Math.min(sw.lng, ne.lng), Math.min(sw.lat, ne.lat), Math.max(sw.lng, ne.lng), Math.max(sw.lat, ne.lat)].map((x) => x.toFixed(4)).join(',')
+    const hi = this.language === 'hi'
+    let facts: Answer['evidence'] = []
+    let summary: string
+    let rings: number[][][] = []
+    try {
+      const r = await fetch(`${SERVER_BASE}/api/sites?bbox=${bbox}&purpose=${purpose}&limit=3`)
+      if (!r.ok) { let d = `HTTP ${r.status}`; try { d = String((await r.json()).detail ?? d) } catch { /* not json */ } throw new Error(d) }
+      const a = (await r.json()) as { candidates: Array<{ cell: string; centre: { lng: number; lat: number }; boundary: number[][]; score: number | null; coverage: number; why: Array<{ key: string; score: number; inverted: boolean }>; gaps: string[] }>; cellsChecked: number }
+      const dn = (k: string) => tr(this.language, `dim.${k}` as StringKey)
+      facts = a.candidates.map((c, i) => ({ id: `site:${c.cell}`, classification: 'derived' as const, statement: `#${i + 1} (${c.centre.lat.toFixed(4)}, ${c.centre.lng.toFixed(4)}): ${Math.round(c.score ?? 0)}/100 · ${c.why.slice(0, 3).map((w) => `${dn(w.key)} ${Math.round(w.score)}${w.inverted ? (hi ? ' (कमी)' : ' (gap)') : ''}`).join(', ')}${c.gaps.length ? (hi ? ` · डेटा नहीं: ${c.gaps.map(dn).join(', ')}` : ` · no data: ${c.gaps.map(dn).join(', ')}`) : ''}`, location: lngLatToLocal(this.frame, c.centre), source: 'atlas-cells', confidence: c.coverage }))
+      rings = a.candidates.map((c) => c.boundary)
+      summary = a.candidates.length
+        ? (hi ? `स्क्रीन पर ${a.cellsChecked} सेल जाँचे; ${tr('hi', `sites.p.${purpose}` as StringKey)} के लिए शीर्ष ${a.candidates.length} नीचे हैं, हर एक अपने कारणों के साथ। पूरी सूची और नक्शे पर रूपरेखा Pro के साइट फ़ाइंडर में है।` : `Checked ${a.cellsChecked} cells on screen; the top ${a.candidates.length} for a ${tr('en', `sites.p.${purpose}` as StringKey).toLowerCase()} are below, each with its reasons. The full ranked list with outlines on the map is in the Pro site finder.`)
+        : (hi ? 'स्क्रीन पर किसी सेल में अभी काफ़ी डेटा नहीं है। जहाँ सड़कें लोड हैं वहाँ ज़ूम करें।' : 'No cell on screen has enough data yet. Zoom to streets the map has loaded and ask again.')
+    } catch (e) { summary = (hi ? 'साइट फ़ाइंडर अभी जवाब नहीं दे सका: ' : 'The site finder could not answer right now: ') + (e as Error).message }
+    this.setRings(rings)
+    this.requestTool('sites')
+    return { question, intent: 'site_selection', summary, classification: 'derived', evidence: facts, highlights: { points: facts.map((f) => f.location!).filter(Boolean), entityIds: [], agentIds: [] }, caveats: [hi ? 'स्कोर उन्हीं असली जगह-आयामों से बने हैं; "डेटा नहीं" की जगह अनुमान नहीं रखा जाता।' : 'Scores come from the same real place dimensions as the place card; "no data" is never replaced by a guess.'], writer: 'template' } as Answer
+  }
+
   async ask(question: string): Promise<Answer> {
     const focus = this.camera.viewBounds()
     if (this.writerConfigured === null) await this.checkWriter()
-    const special = await this.askPlaceOrChange(question)
-    if (special) { this.lastAnswer = special; this.highlights = special.highlights; this.notify(); return special }
+    const special = (await this.askPlaceOrChange(question)) ?? (await this.askSites(question))
+    if (special) { this.lastAnswer = special; this.highlights = { ...this.highlights, ...special.highlights }; this.notify(); return special }
     const answer = await askTheCity(question, { world: this.world, intel: this.intel.state, memory: this.memory, time: this.temporal.current.timestamp, focus, focusPoint: this.camera.centre, unitPerMetre: this.world.unitPerMetre, explainer: this.writer, language: this.language })
     answer.writer = this.writer.lastWriter
     // A question the fixed intents do not cover goes to the writer as a free question, answered only from the snapshot.

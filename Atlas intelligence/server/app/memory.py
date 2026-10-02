@@ -30,6 +30,7 @@ class History:
         c.execute("CREATE TABLE IF NOT EXISTS flow_readings (ts REAL NOT NULL, tile TEXT NOT NULL, segment TEXT NOT NULL, level REAL NOT NULL, road_type TEXT, lng REAL, lat REAL)")
         c.execute("CREATE INDEX IF NOT EXISTS flow_seg_ts ON flow_readings (segment, ts)")
         c.execute("CREATE INDEX IF NOT EXISTS flow_tile_ts ON flow_readings (tile, ts)")
+        c.execute("CREATE INDEX IF NOT EXISTS flow_pos_ts ON flow_readings (lng, lat, ts)")
         c.execute("CREATE TABLE IF NOT EXISTS incident_readings (ts REAL NOT NULL, id TEXT NOT NULL, kind TEXT, severity REAL, lng REAL, lat REAL, description TEXT)")
         c.execute("CREATE INDEX IF NOT EXISTS inc_ts ON incident_readings (ts)")
         c.execute("CREATE TABLE IF NOT EXISTS camera_counts (ts REAL NOT NULL, camera TEXT NOT NULL, people INTEGER NOT NULL, vehicles INTEGER NOT NULL, lng REAL, lat REAL)")
@@ -124,6 +125,49 @@ class History:
         with self._lock:
             rows = self._conn.execute("SELECT id, MAX(ts), kind, severity, lng, lat, description, MIN(ts) FROM incident_readings WHERE ts >= ? AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? GROUP BY id", (now - since_s, west, east, south, north)).fetchall()
         return [{"id": r[0], "ts": r[1], "kind": r[2], "severity": r[3], "lng": r[4], "lat": r[5], "description": r[6], "firstSeen": r[7]} for r in rows]
+
+    # ---- the time machine: what the city read at a past instant, and what it usually reads at an hour ----
+    def flow_at_bbox(self, west: float, south: float, east: float, north: float, at: float, window_s: float = 900) -> list[dict[str, Any]]:
+        """The last level each segment in the bbox read at or before `at`, if read within `window_s` of it. Nothing is interpolated."""
+        with self._lock:
+            rows = self._conn.execute("SELECT segment, level, ts, road_type, lng, lat FROM flow_readings WHERE ts BETWEEN ? AND ? AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? ORDER BY ts ASC", (at - window_s, at, west, east, south, north)).fetchall()
+        latest: dict[str, dict[str, Any]] = {}
+        for seg, lvl, ts, rt, lng, lat in rows:
+            latest[seg] = {"segment": seg, "level": lvl, "ts": ts, "roadType": rt, "lng": lng, "lat": lat}
+        return list(latest.values())
+
+    def incidents_at_bbox(self, west: float, south: float, east: float, north: float, at: float, window_s: float = 900) -> list[dict[str, Any]]:
+        """Incidents the city saw within `window_s` of `at` (they are re-read every poll while they last)."""
+        with self._lock:
+            rows = self._conn.execute("SELECT id, MAX(ts), kind, severity, lng, lat, description, MIN(ts) FROM incident_readings WHERE ts BETWEEN ? AND ? AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? GROUP BY id", (at - window_s, at + window_s, west, east, south, north)).fetchall()
+        return [{"id": r[0], "ts": r[1], "kind": r[2], "severity": r[3], "lng": r[4], "lat": r[5], "description": r[6], "firstSeen": r[7]} for r in rows]
+
+    def coverage_bbox(self, west: float, south: float, east: float, north: float) -> dict[str, Any]:
+        """How far back the memory reaches for this area, and how many roads it knows."""
+        with self._lock:
+            row = self._conn.execute("SELECT MIN(ts), MAX(ts), COUNT(DISTINCT segment), COUNT(*) FROM flow_readings WHERE lng BETWEEN ? AND ? AND lat BETWEEN ? AND ?", (west, east, south, north)).fetchone()
+        return {"from": row[0], "to": row[1], "segments": row[2] or 0, "readings": row[3] or 0}
+
+    def usual_in_bbox(self, west: float, south: float, east: float, north: float, at: float) -> dict[str, dict[str, Any]]:
+        """`usual()` for every segment in the bbox in one pass: median at the same weekday and hour over 28 days, else the same hour on any day."""
+        d = datetime.fromtimestamp(at, timezone.utc)
+        since = at - BASELINE_DAYS * 86400
+        with self._lock:
+            rows = self._conn.execute("SELECT segment, ts, level FROM flow_readings WHERE ts >= ? AND ts < ? AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? AND CAST(strftime('%H', ts, 'unixepoch') AS INTEGER) = ?", (since, at - 1800, west, east, south, north, d.hour)).fetchall()
+        same_dow: dict[str, list[float]] = {}
+        same_hour: dict[str, list[float]] = {}
+        for seg, ts, lvl in rows:
+            same_hour.setdefault(seg, []).append(lvl)
+            if datetime.fromtimestamp(ts, timezone.utc).weekday() == d.weekday():
+                same_dow.setdefault(seg, []).append(lvl)
+        out: dict[str, dict[str, Any]] = {}
+        for seg, levels in same_hour.items():
+            dow = same_dow.get(seg, [])
+            if len(dow) >= MIN_SAMPLES:
+                out[seg] = {"usual": statistics.median(dow), "samples": len(dow), "basis": "same weekday and hour"}
+            elif len(levels) >= MIN_SAMPLES:
+                out[seg] = {"usual": statistics.median(levels), "samples": len(levels), "basis": "same hour, any day"}
+        return out
 
     def camera_in_bbox(self, west: float, south: float, east: float, north: float, within_s: float = 900, now: float | None = None) -> list[dict[str, Any]]:
         now = time.time() if now is None else now
