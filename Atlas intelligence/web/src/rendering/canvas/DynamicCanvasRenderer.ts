@@ -18,6 +18,13 @@ export function trafficColour(congestion: number): string {
  */
 export class DynamicCanvasRenderer {
   readonly canvas: HTMLCanvasElement
+  /** Colours for the moving layer; swapped by theme. Traffic colours (trafficColour) never change. */
+  private c: Record<keyof typeof PALETTE, string> = { ...PALETTE }
+  setTheme(theme: 'day' | 'night'): void {
+    this.c = theme === 'night'
+      ? { ...PALETTE, paper: '#071924', ink: '#eef5f8', inkSoft: 'rgba(238,245,248,0.7)', inkFaint: 'rgba(238,245,248,0.35)', inkHair: 'rgba(238,245,248,0.14)', observed: '#7ed957', derived: '#00c2a8', derivedSoft: 'rgba(0,194,168,0.22)', predicted: '#b7a6ff', predictedSoft: 'rgba(183,166,255,0.25)', simulated: '#ff9f43', simulatedSoft: 'rgba(255,159,67,0.18)', risk: '#ff5a5f', riskSoft: 'rgba(255,90,95,0.2)', activity: '#ff9f43', activitySoft: 'rgba(255,159,67,0.25)', vehicle: '#eef5f8', pedestrian: '#7ed957', transit: '#3d8bff' }
+      : { ...PALETTE }
+  }
   private ctx: CanvasRenderingContext2D
   private dpr = 1
 
@@ -58,10 +65,10 @@ export class DynamicCanvasRenderer {
     if (s.layers.zones) for (const z of s.zones) {
       if (z.ring.length < 3) continue
       ctx.beginPath(); z.ring.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath()
-      ctx.fillStyle = z.restricted ? PALETTE.riskSoft : PALETTE.derivedSoft
+      ctx.fillStyle = z.restricted ? this.c.riskSoft : this.c.derivedSoft
       ctx.fill()
-      ctx.lineWidth = 1.2 * px; ctx.setLineDash([6 * px, 4 * px]); ctx.strokeStyle = z.restricted ? PALETTE.risk : PALETTE.derived; ctx.stroke(); ctx.setLineDash([])
-      this.label(ctx, z.name, z.ring[0], px, z.restricted ? PALETTE.risk : PALETTE.derived)
+      ctx.lineWidth = 1.2 * px; ctx.setLineDash([6 * px, 4 * px]); ctx.strokeStyle = z.restricted ? this.c.risk : this.c.derived; ctx.stroke(); ctx.setLineDash([])
+      this.label(ctx, z.name, z.ring[0], px, z.restricted ? this.c.risk : this.c.derived)
     }
 
     // ---- uploaded layers (observed) ----
@@ -83,8 +90,8 @@ export class DynamicCanvasRenderer {
         const n = s.world.graph.node(nodeId); if (!n || !inView(n)) continue
         const phase = signalPhase(props, t)
         const r = 1.6 * upm
-        ctx.beginPath(); ctx.arc(n.x + 4 * upm, n.y - 4 * upm, r, 0, Math.PI * 2); ctx.fillStyle = phase === 'ns' ? PALETTE.signalGreen : phase === 'ew' ? PALETTE.signalRed : PALETTE.activity; ctx.fill()
-        ctx.beginPath(); ctx.arc(n.x - 4 * upm, n.y + 4 * upm, r, 0, Math.PI * 2); ctx.fillStyle = phase === 'ew' ? PALETTE.signalGreen : phase === 'ns' ? PALETTE.signalRed : PALETTE.activity; ctx.fill()
+        ctx.beginPath(); ctx.arc(n.x + 4 * upm, n.y - 4 * upm, r, 0, Math.PI * 2); ctx.fillStyle = phase === 'ns' ? this.c.signalGreen : phase === 'ew' ? this.c.signalRed : this.c.activity; ctx.fill()
+        ctx.beginPath(); ctx.arc(n.x - 4 * upm, n.y + 4 * upm, r, 0, Math.PI * 2); ctx.fillStyle = phase === 'ew' ? this.c.signalGreen : phase === 'ns' ? this.c.signalRed : this.c.activity; ctx.fill()
       }
     }
 
@@ -97,7 +104,7 @@ export class DynamicCanvasRenderer {
         this.drawAgent(ctx, a, extrapolate, upm, px, s)
       }
     } else {
-      ctx.fillStyle = s.lod === 'city' ? PALETTE.inkFaint : PALETTE.inkSoft
+      ctx.fillStyle = s.lod === 'city' ? this.c.inkFaint : this.c.inkSoft
       const r = s.lod === 'city' ? 0.8 * px : 1.2 * px
       for (const a of agents.values()) {
         if (a.kind !== 'vehicle' || !s.layers.vehicles || !inView(a)) continue
@@ -109,8 +116,8 @@ export class DynamicCanvasRenderer {
     // ---- camera-observed agents: solid ink dots with a halo, at every LOD ----
     for (const a of s.world.observedAgents.values()) {
       if (!inView(a, 20)) continue
-      ctx.beginPath(); ctx.arc(a.x, a.y, 5 * px, 0, Math.PI * 2); ctx.strokeStyle = PALETTE.observed; ctx.lineWidth = 1 * px; ctx.stroke()
-      ctx.beginPath(); ctx.arc(a.x, a.y, Math.max(0.9 * upm, 2.4 * px), 0, Math.PI * 2); ctx.fillStyle = PALETTE.observed; ctx.fill()
+      ctx.beginPath(); ctx.arc(a.x, a.y, 5 * px, 0, Math.PI * 2); ctx.strokeStyle = this.c.observed; ctx.lineWidth = 1 * px; ctx.stroke()
+      ctx.beginPath(); ctx.arc(a.x, a.y, Math.max(0.9 * upm, 2.4 * px), 0, Math.PI * 2); ctx.fillStyle = this.c.observed; ctx.fill()
     }
 
     // ---- incidents: contour rings, not alarming markers ----
@@ -124,8 +131,8 @@ export class DynamicCanvasRenderer {
       if (!inView(a.location, 40)) continue
       const r = (6 + a.severity * 10) * upm
       ctx.beginPath(); ctx.arc(a.location.x, a.location.y, r, 0, Math.PI * 2)
-      ctx.strokeStyle = PALETTE.derived; ctx.lineWidth = 1 * px; ctx.setLineDash([3 * px, 3 * px]); ctx.stroke(); ctx.setLineDash([])
-      if (s.lod === 'street') this.label(ctx, a.type.replace('_', ' '), { x: a.location.x + r, y: a.location.y - r }, px, PALETTE.derived)
+      ctx.strokeStyle = this.c.derived; ctx.lineWidth = 1 * px; ctx.setLineDash([3 * px, 3 * px]); ctx.stroke(); ctx.setLineDash([])
+      if (s.lod === 'street') this.label(ctx, a.type.replace('_', ' '), { x: a.location.x + r, y: a.location.y - r }, px, this.c.derived)
     }
 
     // ---- predictions ----
@@ -134,10 +141,10 @@ export class DynamicCanvasRenderer {
     // ---- route ----
     if (s.route) {
       ctx.beginPath(); s.route.path.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
-      ctx.strokeStyle = PALETTE.paper; ctx.lineWidth = 6 * px; ctx.stroke()
-      ctx.strokeStyle = PALETTE.derived; ctx.lineWidth = 3 * px; ctx.setLineDash([10 * px, 6 * px]); ctx.lineDashOffset = -(s.wallClock / 40) * px; ctx.stroke(); ctx.setLineDash([])
+      ctx.strokeStyle = this.c.paper; ctx.lineWidth = 6 * px; ctx.stroke()
+      ctx.strokeStyle = this.c.derived; ctx.lineWidth = 3 * px; ctx.setLineDash([10 * px, 6 * px]); ctx.lineDashOffset = -(s.wallClock / 40) * px; ctx.stroke(); ctx.setLineDash([])
     }
-    for (const p of s.routePick) { ctx.beginPath(); ctx.arc(p.x, p.y, 5 * px, 0, Math.PI * 2); ctx.fillStyle = PALETTE.derived; ctx.fill() }
+    for (const p of s.routePick) { ctx.beginPath(); ctx.arc(p.x, p.y, 5 * px, 0, Math.PI * 2); ctx.fillStyle = this.c.derived; ctx.fill() }
 
     // ---- drawing in progress ----
     if (s.drawing) this.drawDrawing(ctx, s, px)
@@ -145,13 +152,13 @@ export class DynamicCanvasRenderer {
     // ---- highlights from Ask ----
     for (const p of s.highlights.points) {
       const pulse = 0.5 + 0.5 * Math.sin(s.wallClock / 500)
-      ctx.beginPath(); ctx.arc(p.x, p.y, (8 + pulse * 4) * px, 0, Math.PI * 2); ctx.strokeStyle = PALETTE.selection; ctx.lineWidth = 1.5 * px; ctx.stroke()
+      ctx.beginPath(); ctx.arc(p.x, p.y, (8 + pulse * 4) * px, 0, Math.PI * 2); ctx.strokeStyle = this.c.selection; ctx.lineWidth = 1.5 * px; ctx.stroke()
     }
-    for (const id of s.highlights.entityIds) this.outlineEntity(ctx, s, id, PALETTE.selection, px)
+    for (const id of s.highlights.entityIds) this.outlineEntity(ctx, s, id, this.c.selection, px)
 
     // ---- hover / selection ----
-    if (s.hover && !(s.selection && sameSel(s.hover, s.selection))) this.drawSelection(ctx, s, s.hover, PALETTE.inkSoft, px, extrapolate)
-    if (s.selection) this.drawSelection(ctx, s, s.selection, PALETTE.selection, px, extrapolate)
+    if (s.hover && !(s.selection && sameSel(s.hover, s.selection))) this.drawSelection(ctx, s, s.hover, this.c.inkSoft, px, extrapolate)
+    if (s.selection) this.drawSelection(ctx, s, s.selection, this.c.selection, px, extrapolate)
 
     // ---- simulation-mode treatment: distinct, calm vignette ----
     if (s.temporal.mode === 'simulation') {
@@ -179,12 +186,12 @@ export class DynamicCanvasRenderer {
       ctx.save(); ctx.translate(x, y); ctx.rotate(a.heading)
       // true size is 4.4 × 2 m; never smaller than 7 × 3 screen pixels so motion stays legible
       const L = Math.max(4.4 * upm, 7 * px), W = Math.max(2 * upm, 3 * px)
-      ctx.fillStyle = observed ? PALETTE.observed : PALETTE.vehicle
+      ctx.fillStyle = observed ? this.c.observed : this.c.vehicle
       ctx.beginPath(); ctx.roundRect(-L / 2, -W / 2, L, W, W * 0.25); ctx.fill()
-      ctx.fillStyle = PALETTE.paper; ctx.fillRect(L * 0.1, -W / 2 + W * 0.15, L * 0.2, W * 0.7)
+      ctx.fillStyle = this.c.paper; ctx.fillRect(L * 0.1, -W / 2 + W * 0.15, L * 0.2, W * 0.7)
       ctx.restore()
     } else {
-      ctx.beginPath(); ctx.arc(x, y, Math.max(0.55 * upm, 1.6 * px), 0, Math.PI * 2); ctx.fillStyle = PALETTE.pedestrian; ctx.fill()
+      ctx.beginPath(); ctx.arc(x, y, Math.max(0.55 * upm, 1.6 * px), 0, Math.PI * 2); ctx.fillStyle = this.c.pedestrian; ctx.fill()
     }
   }
 
@@ -196,8 +203,8 @@ export class DynamicCanvasRenderer {
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
       ctx.strokeStyle = `rgba(181,73,58,${(0.45 * (1 - f)).toFixed(3)})`; ctx.lineWidth = 1 * px; ctx.stroke()
     }
-    ctx.beginPath(); ctx.arc(p.x, p.y, 3 * upm, 0, Math.PI * 2); ctx.fillStyle = PALETTE.paper; ctx.fill(); ctx.strokeStyle = PALETTE.risk; ctx.lineWidth = 1.2 * px; ctx.stroke()
-    if (s.lod !== 'city') this.label(ctx, props.kind, { x: p.x + 5 * upm, y: p.y - 4 * upm }, px, PALETTE.risk)
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3 * upm, 0, Math.PI * 2); ctx.fillStyle = this.c.paper; ctx.fill(); ctx.strokeStyle = this.c.risk; ctx.lineWidth = 1.2 * px; ctx.stroke()
+    if (s.lod !== 'city') this.label(ctx, props.kind, { x: p.x + 5 * upm, y: p.y - 4 * upm }, px, this.c.risk)
   }
 
   private drawPrediction(ctx: CanvasRenderingContext2D, path: WorldPoint[], envelope: number[], confidence: number, s: WorldState, px: number, alternatives: Array<{ path: WorldPoint[]; probability: number }>): void {
@@ -213,9 +220,9 @@ export class DynamicCanvasRenderer {
       ctx.strokeStyle = `rgba(111,102,163,${(0.35 * alt.probability).toFixed(3)})`; ctx.lineWidth = 1 * px; ctx.setLineDash([2 * px, 4 * px]); ctx.stroke(); ctx.setLineDash([])
     }
     ctx.beginPath(); path.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
-    ctx.strokeStyle = PALETTE.predicted; ctx.lineWidth = 1.4 * px; ctx.setLineDash([5 * px, 5 * px]); ctx.lineDashOffset = -(s.wallClock / 60) * px; ctx.stroke(); ctx.setLineDash([])
+    ctx.strokeStyle = this.c.predicted; ctx.lineWidth = 1.4 * px; ctx.setLineDash([5 * px, 5 * px]); ctx.lineDashOffset = -(s.wallClock / 60) * px; ctx.stroke(); ctx.setLineDash([])
     const end = path[path.length - 1]
-    this.label(ctx, `+${path.length - 1}s · ${Math.round(confidence * 100)}%`, { x: end.x + 3 * px, y: end.y }, px, PALETTE.predicted)
+    this.label(ctx, `+${path.length - 1}s · ${Math.round(confidence * 100)}%`, { x: end.x + 3 * px, y: end.y }, px, this.c.predicted)
   }
 
   private drawFlow(ctx: CanvasRenderingContext2D, s: WorldState, px: number, inView: (p: WorldPoint, pad?: number) => boolean): void {
@@ -244,7 +251,7 @@ export class DynamicCanvasRenderer {
       ctx.strokeStyle = trafficColour(v); ctx.globalAlpha = 0.45 + v * 0.3; ctx.lineWidth = (3 + v * 6) * px; ctx.setLineDash([6 * px, 4 * px]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0)
-    ctx.font = `${12 * this.dpr}px Georgia, serif`; ctx.fillStyle = PALETTE.predicted
+    ctx.font = `${12 * this.dpr}px Georgia, serif`; ctx.fillStyle = this.c.predicted
     ctx.fillText(`FORECAST +${f.horizonsMin[idx]} min · confidence ${Math.round(f.confidence[idx] * 100)}%`, 16 * this.dpr, this.canvas.height - 56 * this.dpr)
     const cam = s.camera, k = cam.scale
     ctx.setTransform(this.dpr * k, 0, 0, this.dpr * k, this.dpr * (cam.width / 2 - cam.centre.x * k), this.dpr * (cam.height / 2 - cam.centre.y * k))
@@ -286,7 +293,7 @@ export class DynamicCanvasRenderer {
     const d = s.drawing!
     const pts = d.cursor ? [...d.points, d.cursor] : d.points
     if (!pts.length) return
-    ctx.strokeStyle = PALETTE.selection; ctx.fillStyle = PALETTE.selection; ctx.lineWidth = 1.5 * px; ctx.setLineDash([4 * px, 4 * px])
+    ctx.strokeStyle = this.c.selection; ctx.fillStyle = this.c.selection; ctx.lineWidth = 1.5 * px; ctx.setLineDash([4 * px, 4 * px])
     if (d.kind === 'radius' && pts.length >= 2) { const r = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y); ctx.beginPath(); ctx.arc(pts[0].x, pts[0].y, r, 0, Math.PI * 2); ctx.stroke() }
     else { ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); if (d.kind === 'polygon' && pts.length > 2) ctx.closePath(); ctx.stroke() }
     if (d.kind === 'corridor') { ctx.lineWidth = d.width; ctx.strokeStyle = 'rgba(29,111,165,0.15)'; ctx.setLineDash([]); ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.stroke() }
