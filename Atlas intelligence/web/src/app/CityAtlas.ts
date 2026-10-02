@@ -414,6 +414,17 @@ export class CityAtlas {
   select(sel: Selection | null): void { this.selection = sel; this.notify() }
   setHover(sel: Selection | null): void { if (JSON.stringify(sel) !== JSON.stringify(this.hover)) { this.hover = sel; this.notify() } }
   clearHighlights(): void { this.highlights = { points: [], entityIds: [], agentIds: [], rings: [], pins: [] }; this.route = null; this.routePick = []; this.notify() }
+  /** The named area (sector, colony, neighbourhood) nearest a point, within about 1.5 km, from the loaded map. */
+  nearestAreaName(p: WorldPoint, maxM = 1500): string | null {
+    let best: string | null = null, bd = maxM * this.world.unitPerMetre
+    for (const rec of this.world.entities.values()) {
+      const e = rec.entity
+      if (e.type !== 'zone' || !e.properties.name || !rec.local?.[0]) continue
+      const d = Math.hypot(rec.local[0].x - p.x, rec.local[0].y - p.y)
+      if (d < bd) { bd = d; best = String(e.properties.name) }
+    }
+    return best
+  }
   /** Numbered pins (lng/lat) on the map, e.g. the site finder's best spots. */
   setPins(pins: Array<{ lng: number; lat: number; label: string }>): void { this.highlights = { ...this.highlights, pins: pins.map((p) => ({ point: lngLatToLocal(this.frame, { lng: p.lng, lat: p.lat }), label: p.label })) }; this.notify() }
   /** What Ask Atlas understood the person wants to open; the site finder starts from it. */

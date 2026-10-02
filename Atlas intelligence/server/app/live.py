@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 from typing import Any
 
@@ -64,10 +65,13 @@ def sse(msg: dict[str, Any]) -> str:
 class HotTiles:
     """Flow tiles with a recent viewer, re-read by the server on a budget-aware interval."""
 
-    def __init__(self) -> None:
+    def __init__(self, always: list[str] | None = None) -> None:
         self.seen: dict[str, float] = {}
         self.bboxes: dict[str, float] = {}
         self.last_cycle: dict[str, Any] = {}
+        # The home cities stay warm so the memory grows even when nobody is watching, and PAST and FUTURE
+        # have something to show. Override with ATLAS_WARM_FLOW_TILES="12/x/y,12/x/y" (empty = none).
+        self.ALWAYS: list[str] = always if always is not None else [t.strip() for t in os.getenv("ATLAS_WARM_FLOW_TILES", "12/2926/1707,12/2924/1709,12/2925/1708,12/2928/1709").split(",") if t.strip()]
 
     def touch(self, key: str, now: float | None = None) -> None:
         self.seen[key] = time.time() if now is None else now
@@ -78,7 +82,7 @@ class HotTiles:
     def hot(self, now: float | None = None) -> list[str]:
         now = time.time() if now is None else now
         self.seen = {k: t for k, t in self.seen.items() if now - t <= HOT_WINDOW_S}
-        return sorted(self.seen)
+        return sorted(set(self.seen) | set(self.ALWAYS))
 
     def hot_bboxes(self, now: float | None = None) -> list[str]:
         now = time.time() if now is None else now
@@ -97,7 +101,7 @@ class HotTiles:
 def register(app: FastAPI, history: Any, tomtom: Any, osm: Any, fixtures_mode: bool) -> tuple[Broadcaster, HotTiles]:
     bc = Broadcaster()
     bc.attach(history)
-    hot = HotTiles()
+    hot = HotTiles(always=[] if fixtures_mode else None)
     app.state.broadcast = bc
     app.state.hot = hot
     warming: set[str] = set()

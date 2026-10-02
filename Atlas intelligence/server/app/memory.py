@@ -164,13 +164,15 @@ class History:
 
     # ---- the time machine: what the city read at a past instant, and what it usually reads at an hour ----
     def flow_at_bbox(self, west: float, south: float, east: float, north: float, at: float, window_s: float = 900) -> list[dict[str, Any]]:
-        """The last level each segment in the bbox read at or before `at`, if read within `window_s` of it. Nothing is interpolated."""
+        """The reading of each segment in the bbox nearest to `at`, within `window_s` either side. Nothing is interpolated; each row says how far its reading is from `at`."""
         with self._lock:
-            rows = self._conn.execute("SELECT segment, level, ts, road_type, lng, lat FROM flow_readings WHERE ts BETWEEN ? AND ? AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? ORDER BY ts ASC", (at - window_s, at, west, east, south, north)).fetchall()
-        latest: dict[str, dict[str, Any]] = {}
+            rows = self._conn.execute("SELECT segment, level, ts, road_type, lng, lat FROM flow_readings WHERE ts BETWEEN ? AND ? AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ?", (at - window_s, at + window_s, west, east, south, north)).fetchall()
+        best: dict[str, dict[str, Any]] = {}
         for seg, lvl, ts, rt, lng, lat in rows:
-            latest[seg] = {"segment": seg, "level": lvl, "ts": ts, "roadType": rt, "lng": lng, "lat": lat}
-        return list(latest.values())
+            cur = best.get(seg)
+            if cur is None or abs(ts - at) < abs(cur["ts"] - at):
+                best[seg] = {"segment": seg, "level": lvl, "ts": ts, "roadType": rt, "lng": lng, "lat": lat, "offsetS": round(ts - at)}
+        return list(best.values())
 
     def incidents_at_bbox(self, west: float, south: float, east: float, north: float, at: float, window_s: float = 900) -> list[dict[str, Any]]:
         """Incidents the city saw within `window_s` of `at` (they are re-read every poll while they last)."""
@@ -184,7 +186,7 @@ class History:
             row = self._conn.execute("SELECT MIN(ts), MAX(ts), COUNT(DISTINCT segment), COUNT(*) FROM flow_readings WHERE lng BETWEEN ? AND ? AND lat BETWEEN ? AND ?", (west, east, south, north)).fetchone()
         return {"from": row[0], "to": row[1], "segments": row[2] or 0, "readings": row[3] or 0}
 
-    def usual_in_bbox(self, west: float, south: float, east: float, north: float, at: float) -> dict[str, dict[str, Any]]:
+    def usual_in_bbox(self, west: float, south: float, east: float, north: float, at: float, min_samples: int = MIN_SAMPLES) -> dict[str, dict[str, Any]]:
         """`usual()` for every segment in the bbox in one pass: median at the same weekday and hour over 28 days, else the same hour on any day."""
         d = datetime.fromtimestamp(at, timezone.utc)
         since = at - BASELINE_DAYS * 86400
@@ -203,6 +205,8 @@ class History:
                 out[seg] = {"usual": statistics.median(dow), "samples": len(dow), "basis": "same weekday and hour"}
             elif len(levels) >= MIN_SAMPLES:
                 out[seg] = {"usual": statistics.median(levels), "samples": len(levels), "basis": "same hour, any day"}
+            elif min_samples <= len(levels):
+                out[seg] = {"usual": statistics.median(levels), "samples": len(levels), "basis": "same hour, few readings"}
         return out
 
     def camera_in_bbox(self, west: float, south: float, east: float, north: float, within_s: float = 900, now: float | None = None) -> list[dict[str, Any]]:

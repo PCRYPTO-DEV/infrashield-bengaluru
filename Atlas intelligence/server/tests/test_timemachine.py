@@ -21,8 +21,10 @@ def test_history_at_returns_only_what_was_read():
     r = history_at(h, BBOX, now - 3300)
     assert r["kind"] == "recorded" and r["flow"]["segments"][0]["level"] == 0.4 and len(r["incidents"]) == 1
     assert r["evidence"]["classification"] == "observed" and r["coverage"]["segments"] == 1
-    # an instant with no reading within 15 minutes shows nothing, rather than a guess
+    # an instant between readings shows the nearest one and says how far off it is; beyond 3 hours, nothing
     r = history_at(h, BBOX, now - 2000)
+    assert r["flow"]["count"] == 1 and r["flow"]["segments"][0]["level"] == 0.9 and r["flow"]["segments"][0]["offsetS"] == 1400 and r["flow"]["typicalOffsetS"] == 1400
+    r = history_at(h, BBOX, now - 6 * 3600)
     assert r["flow"]["count"] == 0 and r["incidents"] == [] and r["evidence"]["confidence"] == 0.0
 
 
@@ -43,8 +45,13 @@ def test_forecast_is_the_usual_plus_a_fading_anomaly_with_confidence():
     r = forecast_at(h, BBOX, target, now=now)
     s = r["flow"]["segments"][0]
     assert s["anomalyNow"] < 0 and 0.6 < s["level"] < 0.8 and r["incidents"] == []
-    # nothing remembered → nothing predicted
+    # nothing remembered anywhere → nothing predicted
     assert forecast_at(h, (78.0, 29.0, 78.1, 29.1), target, now=now)["flow"]["count"] == 0
+    # a road with a live reading but no history carries it forward, at low confidence, and says so
+    h2 = History(":memory:")
+    h2.record_flow("12/1/1", SEG(0.55), now - 60)
+    s2 = forecast_at(h2, BBOX, target, now=now)["flow"]["segments"][0]
+    assert s2["level"] == 0.55 and s2["samples"] == 0 and s2["confidence"] == 0.2 and "carried forward" in s2["basis"]
 
 
 def test_time_machine_routes(tmp_path):

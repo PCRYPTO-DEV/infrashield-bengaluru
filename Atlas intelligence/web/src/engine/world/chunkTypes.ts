@@ -34,6 +34,8 @@ export interface RenderChunk {
   parks: RenderPark[]
   signals: RenderSignal[]
   transit: RenderPoint[]
+  /** named areas inside the chunk (sectors, colonies, neighbourhoods) for quiet labels */
+  areas?: Array<{ id: string; x: number; y: number; label: string }>
   construction: RenderPark[]
   blocks: RenderBlock[]
   /** Mapped trees (OSM natural=tree); absent for procedural chunks. */

@@ -64,6 +64,15 @@ const CLASS_NAMES = new Set(['residential', 'service', 'unclassified', 'tertiary
  * longest segment, rotated along it and kept upright, with a paper halo so
  * it reads over buildings. Sizes are world units; the map scales them.
  */
+/** Sector, colony and neighbourhood names: quiet capitals, haloed, so people know where they are. */
+export function areaLabels(chunk: RenderChunk, opts: { halo?: string; fill?: string } = {}): string {
+  const out: string[] = []
+  for (const a of chunk.areas ?? []) {
+    out.push(`<text class="ca-area-label" x="${f(a.x)}" y="${f(a.y)}" font-size="15" text-anchor="middle" fill="${opts.fill ?? 'rgba(43,42,38,0.62)'}" stroke="${opts.halo ?? PALETTE.paper}" stroke-width="4" paint-order="stroke" stroke-linejoin="round" font-family="'DM Sans', 'Helvetica Neue', Arial, sans-serif" font-weight="700" letter-spacing="2.2">${escapeXml(a.label.toUpperCase())}</text>`)
+  }
+  return out.join('')
+}
+
 export function roadLabels(chunk: RenderChunk, opts: { halo?: string; fill?: string } = {}): string {
   const best = new Map<string, { len: number; mx: number; my: number; angle: number; roadClass: RoadClass }>()
   for (const r of chunk.roads) {
@@ -156,6 +165,7 @@ export function buildChunkSvg(key: string, chunk: RenderChunk, lod: Lod): string
       parts.push(`<path d="${polyline(r.pts)}" stroke="${PALETTE.roadFill}" stroke-width="${f(w - 2.2)}" fill="none" stroke-linecap="round"/>`)
     }
     for (const t of chunk.transit) parts.push(`<rect x="${f(t.x - 7)}" y="${f(t.y - 7)}" width="14" height="14" fill="${PALETTE.transit}" opacity="0.8"/>`)
+  parts.push(areaLabels(chunk))
     return `<g data-chunk="${key}" data-lod="neighbourhood">${parts.join('')}</g>`
   }
 
@@ -193,5 +203,6 @@ export function buildChunkSvg(key: string, chunk: RenderChunk, lod: Lod): string
   }
   parts.push(roadLabels(chunk))
   parts.push(parkLabels(chunk))
+  parts.push(areaLabels(chunk))
   return `<g data-chunk="${key}" data-lod="street">${parts.join('')}</g>`
 }

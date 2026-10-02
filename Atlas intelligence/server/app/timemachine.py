@@ -35,16 +35,22 @@ def _padded(bbox: tuple[float, float, float, float]) -> tuple[float, float, floa
     return (w - FLOW_PAD_DEG, s - FLOW_PAD_DEG, e + FLOW_PAD_DEG, n + FLOW_PAD_DEG)
 
 
+PAST_WINDOW_S = 3 * 3600
+
+
 def history_at(history: History, bbox: tuple[float, float, float, float], at: float) -> dict[str, Any]:
-    flow = history.flow_at_bbox(*_padded(bbox), at=at)
+    flow = history.flow_at_bbox(*_padded(bbox), at=at, window_s=PAST_WINDOW_S)
+    offsets = [abs(r["offsetS"]) for r in flow]
+    typical_offset = int(sorted(offsets)[len(offsets) // 2]) if offsets else None
     incidents = history.incidents_at_bbox(*bbox, at=at)
     cov = history.coverage_bbox(*bbox)
     return {
         "at": at, "kind": "recorded",
-        "flow": {"segments": flow, "count": len(flow)},
+        "flow": {"segments": flow, "count": len(flow), "typicalOffsetS": typical_offset},
         "incidents": incidents,
         "coverage": cov,
-        "evidence": {"classification": "observed", "source": "atlas-memory", "timestamp": at, "confidence": 1.0 if flow else 0.0, "model": "the readings the city kept at that time; nothing interpolated"},
+        "evidence": {"classification": "observed", "source": "atlas-memory", "timestamp": at, "confidence": (1.0 if (typical_offset or 0) <= 900 else 0.7) if flow else 0.0,
+                     "model": "the readings the city kept nearest that time (within 3 hours); nothing interpolated"},
     }
 
 
@@ -52,11 +58,15 @@ def forecast_at(history: History, bbox: tuple[float, float, float, float], at: f
     now = time.time() if now is None else now
     ahead = max(0.0, at - now)
     pb = _padded(bbox)
-    usual_then = history.usual_in_bbox(*pb, at=at)
-    usual_now = history.usual_in_bbox(*pb, at=now) if usual_then else {}
+    usual_then = history.usual_in_bbox(*pb, at=at, min_samples=1)
+    usual_now = history.usual_in_bbox(*pb, at=now, min_samples=1) if usual_then else {}
     now_levels = {r["segment"]: r for r in history.flow_in_bbox(*pb, within_s=900, now=now)}
     decay = math.exp(-ahead / 2700.0)  # what is unusual right now fades over about 45 minutes
     segments = []
+    # no history for a road yet: the latest reading carried forward is the only honest guess, and it says so
+    for seg, nl in now_levels.items():
+        if seg not in usual_then:
+            usual_then[seg] = {"usual": nl["level"], "samples": 0, "basis": "latest reading carried forward; no history for this hour yet"}
     for seg, u in usual_then.items():
         pred = u["usual"]
         anomaly = 0.0
@@ -64,7 +74,7 @@ def forecast_at(history: History, bbox: tuple[float, float, float, float], at: f
         if nl and un and un["usual"] is not None:
             anomaly = (nl["level"] - un["usual"]) * decay
             pred = max(0.0, min(1.0, pred + anomaly))
-        conf = min(0.8, 0.35 + 0.04 * u["samples"]) * (1.0 if u["basis"].startswith("same weekday") else 0.85)
+        conf = 0.2 if u["samples"] == 0 else min(0.8, 0.3 + 0.05 * u["samples"]) * (1.0 if u["basis"].startswith("same weekday") else 0.8 if u["basis"].startswith("same hour, any") else 0.6)
         segments.append({"segment": seg, "level": round(pred, 3), "usual": round(u["usual"], 3), "anomalyNow": round(anomaly, 3), "samples": u["samples"], "basis": u["basis"], "confidence": round(conf, 2),
                          "lng": nl["lng"] if nl else None, "lat": nl["lat"] if nl else None})
     cov = history.coverage_bbox(*bbox)
@@ -75,7 +85,7 @@ def forecast_at(history: History, bbox: tuple[float, float, float, float], at: f
         "incidents": [],
         "coverage": cov,
         "evidence": {"classification": "predicted", "source": "atlas-memory", "timestamp": now, "confidence": mean_conf,
-                     "model": "median of what each road read at this weekday and hour over 28 days, plus what is unusual right now fading over 45 min; no incidents are predicted"},
+                     "model": "median of what each road read at this weekday and hour over 28 days, plus what is unusual right now fading over 45 min; roads without history carry their latest reading forward at low confidence; no incidents are predicted"},
     }
 
 

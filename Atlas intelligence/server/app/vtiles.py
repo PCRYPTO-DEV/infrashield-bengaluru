@@ -166,6 +166,16 @@ def decode_tile(pbf: bytes, b: BBox, tier: str) -> list[dict[str, Any]]:
                     ll = to_ll(pl["extent"], p)
                     out.append({"type": "node", "id": f"place-{feat.get('id') or name}", "lat": ll["lat"], "lon": ll["lon"], "tags": {"place": "neighbourhood" if cls == "quarter" else cls, "name": name}})
         return out
+    # --- neighbourhood names at street zoom: OpenMapTiles only shows them from z14, so the district tile misses sectors and colonies
+    pl = layers.get("place")
+    if pl:
+        for feat in pl["features"]:
+            p = point(feat["geometry"])
+            cls = feat["properties"].get("class")
+            name = feat["properties"].get("name") or feat["properties"].get("name:latin")
+            if p and name and cls in ("suburb", "neighbourhood", "quarter", "village", "hamlet", "isolated_dwelling"):
+                ll = to_ll(pl["extent"], p)
+                out.append({"type": "node", "id": f"place-{feat.get('id') or name}", "lat": ll["lat"], "lon": ll["lon"], "tags": {"place": "neighbourhood" if cls in ("quarter", "hamlet", "isolated_dwelling") else cls, "name": name}})
     # --- buildings
     bl = layers.get("building")
     if bl:

@@ -128,6 +128,7 @@ export function buildOsmChunk(req: ChunkRequest, tile: OsmTile): ChunkData {
       render.transit.push({ id: e.id, x: p.x, y: p.y, label: String(e.properties.name ?? 'Station') })
       entities.push(e)
     } else if (e.type === 'zone') {
+      if (e.properties.name) (render.areas ??= []).push({ id: e.id, x: p.x, y: p.y, label: String(e.properties.name) })
       entities.push(e)
     } else if (e.type === 'tree') {
       ;(render.trees ??= []).push({ id: e.id, x: p.x, y: p.y, label: String(e.properties.species ?? e.properties.name ?? '') })

@@ -17,6 +17,8 @@ export interface TimeMachineState {
   memorySince: number | null
   confidence: number
   model: string
+  /** past: how far (s) the shown readings typically are from the chosen minute */
+  offsetS: number | null
   busy: boolean
   error: string | null
 }
@@ -24,7 +26,7 @@ export interface TimeMachineState {
 interface Reading { segment: string; level: number; lng: number | null; lat: number | null; confidence?: number }
 interface AtResponse {
   at: number; kind: 'recorded' | 'predicted'
-  flow: { segments: Reading[]; count: number; roadsRemembered?: number }
+  flow: { segments: Reading[]; count: number; roadsRemembered?: number; typicalOffsetS?: number | null }
   incidents: Array<{ id: string; ts: number; kind: string; severity: number | null; lng: number; lat: number; description: string | null; firstSeen: number }>
   coverage: { from: number | null; to: number | null; segments: number; readings: number }
   evidence: { classification: string; source: string; timestamp: number; confidence: number; model: string }
@@ -38,7 +40,7 @@ interface AtResponse {
  * the inspector and Ask the City all see the chosen time.
  */
 export class TimeMachine {
-  state: TimeMachineState = { kind: null, at: 0, count: 0, roadsRemembered: 0, memorySince: null, confidence: 0, model: '', busy: false, error: null }
+  state: TimeMachineState = { kind: null, at: 0, count: 0, roadsRemembered: 0, memorySince: null, confidence: 0, model: '', offsetS: null, busy: false, error: null }
   private fetchImpl: typeof fetch
   private seq = 0
   private lastKey = ''
@@ -93,7 +95,7 @@ export class TimeMachine {
       return e
     })
     this.world.setLiveIncidents(incidents)
-    this.state = { kind, at, count: levels.size, roadsRemembered: data.coverage.segments, memorySince: data.coverage.from ? data.coverage.from * 1000 : null, confidence: data.evidence.confidence, model: data.evidence.model, busy: false, error: null }
+    this.state = { kind, at, count: levels.size, roadsRemembered: data.coverage.segments, memorySince: data.coverage.from ? data.coverage.from * 1000 : null, confidence: data.evidence.confidence, model: data.evidence.model, offsetS: data.flow.typicalOffsetS ?? null, busy: false, error: null }
   }
 
   /** Back to live: forget the shown instant so the next visit asks again. */

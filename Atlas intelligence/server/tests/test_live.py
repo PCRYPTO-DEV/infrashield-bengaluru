@@ -14,7 +14,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def test_hot_tiles_expire_and_interval_respects_the_budget():
-    h = HotTiles()
+    h = HotTiles(always=[])
     now = time.time()
     h.touch("12/1/1", now - 700); h.touch("12/1/2", now - 10)
     assert h.hot(now) == ["12/1/2"]

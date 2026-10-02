@@ -38,7 +38,7 @@ export function Timeline({ app }: { app: CityAtlas }) {
   else if (real) {
     const sure = tm && tm.count > 0 ? ` · ${T('time.sure', { n: Math.round((tm.confidence || 0) * 100) })}` : ''
     label = past ? `${T('time.remembered')} · ${hoursAbs(t.timestamp - live)} ${T('time.ago')}` : `${T('time.predicted')} · +${hoursAbs(t.timestamp - live)}${sure}`
-    detail = tm?.busy ? T('time.asking') : tm?.error ? tm.error : tm && tm.count > 0 ? (past ? T('time.roads.read', { n: tm.count }) : T('time.roads.pred', { n: tm.count, m: tm.roadsRemembered })) : past ? T('time.nothing.past', { d: tm?.memorySince ? fmtDay(tm.memorySince, app.language) : '—' }) : T('time.nothing.future')
+    detail = tm?.busy ? T('time.asking') : tm?.error ? tm.error : tm && tm.count > 0 ? (past ? (tm.offsetS !== null && Math.abs(tm.offsetS) > 900 ? T('time.roads.read.off', { n: tm.count, m: Math.round(Math.abs(tm.offsetS) / 60) }) : T('time.roads.read', { n: tm.count })) : T('time.roads.pred', { n: tm.count, m: tm.roadsRemembered })) : past ? T('time.nothing.past', { d: tm?.memorySince ? fmtDay(tm.memorySince, app.language) : '—' }) : T('time.nothing.future')
   } else {
     label = t.mode === 'historical' ? T('time.replay', { n: offsetMin }) : t.resimulated ? T('time.resim', { n: offsetMin }) : T('time.sim', { n: offsetMin })
     detail = lag > 5 ? T('time.behind', { n: lag }) : simulate ? T('time.demo.detail') : T('time.nofuture')

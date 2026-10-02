@@ -70,7 +70,8 @@ export function PlaceCard({ app, onCompare }: { app: CityAtlas; onCompare: (name
   const [watched, setWatched] = useState(false)
   if (!app.placePoint) return null
   const st = app.place
-  const name = st ? `${st.centre.lat.toFixed(4)}, ${st.centre.lng.toFixed(4)}` : ''
+  const area = app.placePoint ? app.nearestAreaName(app.placePoint) : null
+  const name = st ? (area ? `${area} · ${st.centre.lat.toFixed(3)}, ${st.centre.lng.toFixed(3)}` : `${st.centre.lat.toFixed(4)}, ${st.centre.lng.toFixed(4)}`) : ''
   return (
     <div className="ca-panel ca-side ca-placecard">
       <button className="close" onClick={() => app.closePlace()}>×</button>

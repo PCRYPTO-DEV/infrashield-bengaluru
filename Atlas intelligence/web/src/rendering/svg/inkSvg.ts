@@ -3,7 +3,7 @@ import { Scene, Prism, Vector, Matrix, Paths, type Path } from '../ln'
 import { inkPaths, type Pt } from './ink'
 import { PRNG } from '../../engine/seed/prng'
 import { PALETTE } from '../palette'
-import { roadLabels, parkLabels, greenFill } from './chunkSvg'
+import { roadLabels, areaLabels, parkLabels, greenFill } from './chunkSvg'
 
 /**
  * The Ink 3D tier: fogleman/ln's hidden-line renderer drawing the chunk as
@@ -118,6 +118,7 @@ export function buildInkSvg(key: string, chunk: RenderChunk, upm: number, opts: 
   // Street names on the ground plane, the same labels as the 2D map, so they line up across modes.
   parts.push(roadLabels(chunk))
   parts.push(parkLabels(chunk))
+  parts.push(areaLabels(chunk))
   for (const t of chunk.trees ?? []) parts.push(tree3d(t.x, t.y, upm))
   // Transit marks stay flat on the ground so they match the 2D map.
   for (const t of chunk.transit) parts.push(`<rect x="${(t.x - 7).toFixed(1)}" y="${(t.y - 7).toFixed(1)}" width="14" height="14" fill="none" stroke="${PALETTE.transit}" stroke-width="1.2"/>`)
