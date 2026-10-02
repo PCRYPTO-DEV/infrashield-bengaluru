@@ -75,7 +75,7 @@ server.
 | **Saved & projects** | Plus: watch an area and see how its score moved since you saved it. Pro: shortlists and scenarios, exported as GeoJSON or CSV |
 | **Client report** (Pro) | a printable report of a place card: every score with its class, confidence, why and source, plus what changed nearby |
 | **Map · Traffic · Busy · Risk · Ahead · Ink 3D** | the six modes (under More) |
-| **Ask the city** | type or press the mic; answers list the facts they came from |
+| **Ask Atlas** | a real conversation, typed or spoken, in English or Hindi: the thread stays on screen, follow-ups work, and every reply is phrased by the AI writer from the facts the map knows right now (`ANTHROPIC_API_KEY` on the server); each turn can show the facts it used |
 | **English / हिंदी** | every label, answer and voice follows the toggle |
 | **Day / Night** | white paper and ink by default; the City Atlas deep-night look one click away (also `?theme=night` and the embed option) |
 | **Embed** | `embed.js` drops the whole map into the City Atlas app on Emergent, or any page, in two minutes ([docs](docs/INTEGRATION.md)) |

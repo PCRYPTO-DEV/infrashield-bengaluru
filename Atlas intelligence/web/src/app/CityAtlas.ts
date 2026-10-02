@@ -54,7 +54,7 @@ import { tr, type StringKey } from '../ui/i18n'
 import type { IntelligenceState } from '../intelligence/types'
 
 export type Theme = 'day' | 'night'
-export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'sites' | 'scenario' | 'saved' | 'report'
+export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'sites' | 'scenario' | 'saved' | 'report' | 'changed'
 
 export const DEFAULT_SEED = REGIONS[DEFAULT_REGION].seed
 /** Base URL of the Atlas server; empty means same origin (Vite proxies /api in dev). */
@@ -742,23 +742,57 @@ export class CityAtlas {
     return { question, intent: 'site_selection', summary, classification: 'derived', evidence: facts, highlights: { points: facts.map((f) => f.location!).filter(Boolean), entityIds: [], agentIds: [] }, caveats: [hi ? 'स्कोर उन्हीं असली जगह-आयामों से बने हैं; "डेटा नहीं" की जगह अनुमान नहीं रखा जाता।' : 'Scores come from the same real place dimensions as the place card; "no data" is never replaced by a guess.'], writer: 'template' } as Answer
   }
 
+  /** The conversation with Atlas: what was said, in order. The writer sees the last turns so follow-ups make sense. */
+  chat: Array<{ role: 'user' | 'assistant'; content: string; answer?: Answer }> = []
+  clearChat(): void { this.chat = []; this.lastAnswer = null; this.clearHighlights() }
+
   async ask(question: string): Promise<Answer> {
     const focus = this.camera.viewBounds()
     if (this.writerConfigured === null) await this.checkWriter()
-    const special = (await this.askPlaceOrChange(question)) ?? (await this.askSites(question))
-    if (special) { this.lastAnswer = special; this.highlights = { ...this.highlights, ...special.highlights }; this.notify(); return special }
-    const answer = await askTheCity(question, { world: this.world, intel: this.intel.state, memory: this.memory, time: this.temporal.current.timestamp, focus, focusPoint: this.camera.centre, unitPerMetre: this.world.unitPerMetre, explainer: this.writer, language: this.language })
-    answer.writer = this.writer.lastWriter
-    // A question the fixed intents do not cover goes to the writer as a free question, answered only from the snapshot.
-    if (answer.intent === 'help' && this.writerConfigured) {
-      const snapshot = this.worldSnapshot()
-      const text = await this.writer.askFree(question, snapshot)
-      if (text) { answer.summary = text; answer.intent = 'free'; answer.evidence = snapshot; answer.classification = weakest(snapshot); answer.writer = this.writer.lastWriter; answer.caveats = [this.language === 'hi' ? 'यह जवाब सिर्फ़ उन बातों से बना है जो नक्शा अभी जानता है।' : 'This answer is built only from what the map knows right now; the facts are listed below it.'] }
+    // 1. The deterministic tools: facts and highlights for whatever the question is about.
+    let answer = (await this.askPlaceOrChange(question)) ?? (await this.askSites(question))
+    if (!answer) {
+      answer = await askTheCity(question, { world: this.world, intel: this.intel.state, memory: this.memory, time: this.temporal.current.timestamp, focus, focusPoint: this.camera.centre, unitPerMetre: this.world.unitPerMetre, explainer: this.writer, language: this.language })
+      answer.writer = this.writer.lastWriter
     }
+    // 2. The conversation: Atlas phrases the reply naturally from those facts plus what the map knows, remembering the thread.
+    if (this.writerConfigured) {
+      const facts = answer.intent === 'help' || answer.evidence.length < 3 ? [...answer.evidence, ...this.worldSnapshot(), ...this.contextFacts()] : [...answer.evidence, ...this.contextFacts()]
+      const t = this.temporal.current
+      const reply = await this.writer.chat([...this.chat.map((c) => ({ role: c.role, content: c.content })), { role: 'user', content: question }], facts, {
+        city: this.region.name, localTime: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }), timeView: t.mode === 'live' ? 'now' : t.timestamp < this.temporal.liveTimestamp() ? 'past (remembered readings)' : 'future (predicted)', tier: this.tier, reportsOnScreen: this.reports.length,
+      })
+      if (reply) {
+        answer.summary = reply.text; answer.writer = this.writer.lastWriter
+        if (answer.intent === 'help') { answer.intent = 'chat'; answer.evidence = facts; answer.classification = weakest(facts) }
+        answer.caveats = answer.caveats.filter((c) => !/built only from|सिर्फ़ उन बातों/.test(c))
+        for (const a of reply.actions) this.actOn(a)
+      }
+    } else if (answer.intent === 'help') {
+      answer.caveats = [...answer.caveats, this.language === 'hi' ? 'खुली बातचीत के लिए सर्वर पर ANTHROPIC_API_KEY सेट करें; अभी सिर्फ़ तय सवालों के जवाब हैं।' : 'For free conversation the server needs ANTHROPIC_API_KEY; until then Atlas answers the fixed questions only.']
+    }
+    this.chat = [...this.chat, { role: 'user' as const, content: question }, { role: 'assistant' as const, content: answer.summary, answer }].slice(-24)
     this.lastAnswer = answer
-    this.highlights = answer.highlights
+    this.highlights = { ...this.highlights, ...answer.highlights }
     this.notify()
     return answer
+  }
+  /** Small facts about the moment that make the conversation feel present: time view, reports, place card, tier. */
+  private contextFacts(): EvidenceItem[] {
+    const f: EvidenceItem[] = []
+    const t = this.temporal.current
+    if (t.mode !== 'live' && this.timeMachine?.state.kind) { const st = this.timeMachine.state; f.push({ id: 'timemachine', classification: st.kind === 'future' ? 'predicted' : 'observed', statement: st.kind === 'past' ? `The map is showing the past: ${new Date(t.timestamp).toUTCString()}, ${st.count} roads had a reading then.` : `The map is showing a prediction for ${new Date(t.timestamp).toUTCString()}: ${st.count} roads predicted from what is usual, about ${Math.round(st.confidence * 100)}% sure.`, source: 'atlas-memory' }) }
+    if (this.reports.length) f.push({ id: 'reports', classification: 'observed', statement: `People reported ${this.reports.length} thing(s) on this screen in the last day: ${this.reports.slice(0, 5).map((r) => `${r.kind} ${r.ageMin} min ago${r.description ? ` (${r.description})` : ''}`).join('; ')}. Reports are not verified.`, source: 'people · not verified', confidence: 0.5 })
+    if (this.place && this.placePoint) f.push({ id: 'placecard', classification: 'derived', statement: `A place card is open at ${this.place.centre.lat.toFixed(4)}, ${this.place.centre.lng.toFixed(4)}: Atlas score ${this.place.score ?? 'no data'}/100, ${this.place.dimensions.filter((d) => d.score !== null).map((d) => `${d.key} ${Math.round(d.score!)}`).join(', ')}.`, source: 'atlas-cells' })
+    if (this.routeAnswer) { const b = this.routeAnswer.routes[this.routeChoice]; if (b) f.push({ id: 'route', classification: 'derived', statement: `A route is on the map: ${Math.round(b.travelTimeS / 60)} min, ${(b.lengthM / 1000).toFixed(1)} km, ${b.incidentsNear} incident(s) within 300 m, with live traffic.`, source: 'tomtom-routing' }) }
+    f.push({ id: 'tier', classification: 'observed', statement: `The person is on the ${this.tier} tier.`, source: 'atlas' })
+    return f
+  }
+  /** An action tag from the writer: open a panel or move the clock. */
+  private actOn(tag: string): void {
+    const [kind, v] = tag.split(':')
+    if (kind === 'open' && ['changed', 'route', 'sites', 'report', 'scenario', 'saved', 'camera', 'alerts', 'zones', 'insights'].includes(v)) this.requestTool(v as ToolName)
+    if (kind === 'time') { const live = this.temporal.liveTimestamp(); if (v === 'past') this.temporal.seek(live - 3600_000); else if (v === 'future') this.temporal.seek(live + 3600_000); else this.temporal.goLive() }
   }
 
   /** Upload a GeoJSON / JSON / CSV text as a new observed layer. */

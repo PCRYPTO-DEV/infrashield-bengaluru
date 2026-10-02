@@ -36,3 +36,20 @@ def test_echo_writer_rewrites_facts_and_refuses_empty_evidence():
     assert c.post("/api/explain", json={"question": "q", "evidence": []}).status_code == 400
     free = c.post("/api/ask", json={"question": "Is it raining?", "language": "hi", "snapshot": [{"classification": "observed", "statement": "Weather: clear sky, 31 °C"}]})
     assert free.status_code == 200 and free.json()["language"] == "hi" and "clear sky" in free.json()["text"]
+
+
+def test_chat_keeps_the_thread_and_returns_actions():
+    c = client(EchoWriter())
+    body = {"language": "en", "context": {"city": "Delhi"}, "facts": [{"classification": "observed", "statement": "Janpath is at 30% of free speed"}],
+            "messages": [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "Hello!"}, {"role": "user", "content": "why is Janpath slow?"}]}
+    r = c.post("/api/chat", json=body)
+    assert r.status_code == 200
+    j = r.json()
+    assert j["text"].startswith("(turn 2) You asked: why is Janpath slow?") and "Janpath is at 30%" in j["text"] and j["actions"] == []
+    assert c.post("/api/chat", json={**body, "messages": [{"role": "assistant", "content": "x"}]}).status_code == 400
+
+    class Tagger(EchoWriter):
+        def chat(self, system, messages, max_tokens=900):  # noqa: ARG002
+            return "Yesterday was slower here. [[time:past]]"
+    r = client(Tagger()).post("/api/chat", json=body).json()
+    assert r["text"] == "Yesterday was slower here." and r["actions"] == ["time:past"]

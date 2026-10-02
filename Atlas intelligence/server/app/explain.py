@@ -59,6 +59,23 @@ class WriterReply(BaseModel):
     language: Language
 
 
+class ChatTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(..., max_length=2000)
+
+
+class ChatRequest(BaseModel):
+    """A conversation: the recent turns, the facts the app knows right now, and a little context."""
+    messages: list[ChatTurn] = Field(..., min_length=1, max_length=24)
+    facts: list[Fact] = Field(default_factory=list, max_length=80)
+    language: Language = "en"
+    context: dict[str, Any] = Field(default_factory=dict)
+
+
+class ChatReply(WriterReply):
+    actions: list[str] = Field(default_factory=list)
+
+
 LABELS = {
     "en": {"observed": "we saw", "derived": "we worked out", "predicted": "our model guesses", "simulated": "in the simulation"},
     "hi": {"observed": "हमने देखा", "derived": "हमने निकाला", "predicted": "मॉडल का अनुमान", "simulated": "सिमुलेशन में"},
@@ -77,6 +94,29 @@ You receive a question and a numbered list of FACTS the app measured. Rules:
 SYSTEM_ASK = SYSTEM + """
 This is a free question. The facts are a snapshot of what the app knows right now. If the question is about something the snapshot does not cover (for example a place, a time or a topic not listed), say plainly that the map does not know that right now, and mention one related fact if there is one.
 """
+
+
+SYSTEM_CHAT = """You are Atlas, the voice of City Atlas: a living map of Indian cities that shows what is happening on the streets right now and how sure it is.
+
+How you talk:
+- Like a sharp, warm local friend. Natural, conversational, short. Two to five sentences unless the person asks for detail. Answer follow-ups in the flow of the conversation; remember what was said earlier in this chat.
+- Greetings, thanks and small talk get a human reply. Jokes are fine, gently.
+- Match the person's language: English, or simple everyday Hindi in Devanagari when they write Hindi (Hinglish in Latin script gets Hinglish back). Keep road and place names as they are.
+- Plain words a 12-year-old understands. No jargon, no markdown, no bullet lists, no headings.
+
+What you may say about the city:
+- Every claim about traffic, places, incidents, air, rain, reports, routes or scores must come from the FACTS block in the latest message (what the app measured or worked out right now). Never invent a number, place, cause, time or event. If the facts do not cover the question, say so in one short sentence and say what would help ("tap the place on the map", "open What changed?", "search the area first").
+- Say lightly how you know when it matters: "the map saw", "worked out from the readings", "a guess from what is usual", "someone reported this, not verified". Never call anything safe; say "fewer problems reported".
+- For danger to life, say to call 112 first.
+
+Actions: when a panel or time view would help, add at most one tag at the very end of your reply, on its own: [[open:changed]] [[open:route]] [[open:sites]] [[open:report]] [[open:scenario]] [[open:saved]] [[open:camera]] [[open:alerts]] [[time:past]] [[time:future]] [[time:now]]. Only when it truly helps the person.
+"""
+
+
+def build_chat_prompt(question: str, facts: list[Fact], language: Language, context: dict[str, Any]) -> str:
+    lang = "English" if language == "en" else "Hindi (Devanagari)"
+    ctx = "; ".join(f"{k}: {v}" for k, v in context.items() if v not in (None, ""))
+    return f"Preferred language: {lang}\nContext: {ctx or '(none)'}\n\nFACTS the app knows right now:\n" + _facts_block(facts, language) + f"\n\nThe person says: {question.strip()}"
 
 
 def _facts_block(facts: list[Fact], language: Language) -> str:
@@ -102,6 +142,8 @@ class Writer(Protocol):
 
     def write(self, system: str, prompt: str) -> str: ...
 
+    def chat(self, system: str, messages: list[dict[str, str]]) -> str: ...
+
 
 class ClaudeWriter:
     """The Anthropic Messages API behind one short, cached system prompt."""
@@ -115,16 +157,19 @@ class ClaudeWriter:
         self.client = anthropic.Anthropic(api_key=api_key, max_retries=2, timeout=40.0)
 
     def write(self, system: str, prompt: str) -> str:
+        return self.chat(system, [{"role": "user", "content": prompt}], max_tokens=600)
+
+    def chat(self, system: str, messages: list[dict[str, str]], max_tokens: int = 900) -> str:
         a = self._anthropic
         try:
             response = self.client.beta.messages.create(
                 model=MODEL,
-                max_tokens=600,
+                max_tokens=max_tokens,
                 output_config={"effort": "low"},
                 betas=["server-side-fallback-2026-07-01"],
                 fallbacks="default",
                 system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
             )
         except a.RateLimitError as e:
             raise HTTPException(429, "the writer is busy; try again in a minute") from e
@@ -152,6 +197,13 @@ class EchoWriter:
         if not facts:
             return "The map has no facts for this question right now."
         return " ".join(f.rstrip(".") + "." for f in facts[:4])
+
+    def chat(self, system: str, messages: list[dict[str, str]], max_tokens: int = 900) -> str:  # noqa: ARG002
+        last = messages[-1]["content"]
+        q = last.rsplit("The person says: ", 1)[-1].strip()
+        turns = sum(1 for m in messages if m["role"] == "user")
+        facts = self.write(system, last)
+        return f"(turn {turns}) You asked: {q}. {facts}"
 
 
 def make_writer(fake: bool = False) -> Writer | None:
@@ -182,6 +234,28 @@ def register(app: FastAPI, writer: Writer | None = None, fake: bool = False) -> 
     def ask(req: AskRequest) -> WriterReply:
         text = need().write(SYSTEM_ASK, build_prompt(req.question, req.snapshot, req.language))
         return WriterReply(text=text, writer=need().name, language=req.language)
+
+    @app.post("/api/chat", response_model=ChatReply)
+    def chat(req: ChatRequest) -> ChatReply:
+        """A natural conversation with Atlas: history + the facts the app knows now; actions come back as tags."""
+        import re
+        if req.messages[-1].role != "user":
+            raise HTTPException(400, "the last message must be the person's")
+        history = [{"role": m.role, "content": m.content} for m in req.messages[:-1] if m.content.strip()]
+        # the API wants alternating roles starting with the person
+        clean: list[dict[str, str]] = []
+        for m in history:
+            if clean and clean[-1]["role"] == m["role"]:
+                clean[-1]["content"] += "\n" + m["content"]
+            else:
+                clean.append(m)
+        while clean and clean[0]["role"] != "user":
+            clean.pop(0)
+        clean.append({"role": "user", "content": build_chat_prompt(req.messages[-1].content, req.facts, req.language, req.context)})
+        text = need().chat(SYSTEM_CHAT, clean)
+        actions = re.findall(r"\[\[(open:[a-z]+|time:(?:past|future|now))\]\]", text)
+        text = re.sub(r"\s*\[\[(?:open:[a-z]+|time:(?:past|future|now))\]\]", "", text).strip()
+        return ChatReply(text=text, writer=need().name, language=req.language, actions=actions)
 
     @app.get("/api/writer/status")
     def status() -> dict[str, Any]:

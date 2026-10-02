@@ -9,15 +9,13 @@ const SUGGESTIONS: Record<'en' | 'hi', string[]> = {
 }
 
 const T = {
-  en: { title: 'Ask Atlas', placeholder: 'Ask anything about this city…', ask: 'Ask', clear: 'Clear', listen: 'Speak your question', listening: 'Listening…', read: 'Read aloud', stop: 'Stop reading', writer: 'written by', template: 'plain template', evidence: 'facts used', free: 'free question' },
-  hi: { title: 'एटलस से पूछें', placeholder: 'इस शहर के बारे में कुछ भी पूछें…', ask: 'पूछें', clear: 'हटाएँ', listen: 'बोलकर पूछें', listening: 'सुन रहे हैं…', read: 'पढ़कर सुनाएँ', stop: 'रोकें', writer: 'लेखक', template: 'सादा टेम्पलेट', evidence: 'इस्तेमाल किए गए तथ्य', free: 'खुला सवाल' },
+  en: { title: 'Ask Atlas', placeholder: 'Ask anything about this city…', follow: 'Ask a follow-up…', ask: 'Ask', clear: 'New chat', listen: 'Speak your question', listening: 'Listening…', read: 'Read aloud', stop: 'Stop reading', writer: 'written by', template: 'plain template', evidence: 'facts used', thinking: 'Atlas is looking at the map…' },
+  hi: { title: 'एटलस से पूछें', placeholder: 'इस शहर के बारे में कुछ भी पूछें…', follow: 'आगे पूछें…', ask: 'पूछें', clear: 'नई बातचीत', listen: 'बोलकर पूछें', listening: 'सुन रहे हैं…', read: 'पढ़कर सुनाएँ', stop: 'रोकें', writer: 'लेखक', template: 'सादा टेम्पलेट', evidence: 'इस्तेमाल किए गए तथ्य', thinking: 'एटलस नक्शा देख रहा है…' },
 }
 
 /**
- * One box for any question: typed or spoken. Fixed questions are answered
- * by the analysers; anything else goes to the AI writer as a free question
- * answered from a snapshot of what the map knows. The answer always lists
- * the facts it was built from.
+ * A conversation with Atlas. Typed or spoken; the thread stays on screen so follow-ups work
+ * ("why?", "and tomorrow?"). Every Atlas turn can show the facts it was built from.
  */
 export function AskPanel({ app }: { app: CityAtlas }) {
   const lang = app.language
@@ -26,12 +24,14 @@ export function AskPanel({ app }: { app: CityAtlas }) {
   const [busy, setBusy] = useState(false)
   const [listening, setListening] = useState(false)
   const [speaking, setSpeaking] = useState(false)
-  const [showFacts, setShowFacts] = useState(false)
+  const [factsFor, setFactsFor] = useState<number | null>(null)
   const cancelRef = useRef<() => void>(() => {})
-  const a = app.lastAnswer
+  const endRef = useRef<HTMLDivElement>(null)
+  const thread = app.chat
   useEffect(() => () => { cancelRef.current(); stopSpeaking() }, [])
+  useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }) }, [thread.length, busy])
 
-  const submit = async (question: string) => { if (!question.trim()) return; setBusy(true); try { await app.ask(question) } finally { setBusy(false) } }
+  const submit = async (question: string) => { if (!question.trim() || busy) return; setQ(''); setBusy(true); try { await app.ask(question) } finally { setBusy(false) } }
   const listen = async () => {
     if (listening) { cancelRef.current(); setListening(false); return }
     setListening(true)
@@ -41,32 +41,41 @@ export function AskPanel({ app }: { app: CityAtlas }) {
     setListening(false)
     if (text) { setQ(text); await submit(text) }
   }
-  const read = () => {
-    if (!a) return
+  const read = (text: string) => {
     if (speaking) { stopSpeaking(); setSpeaking(false); return }
-    if (speak(a.summary, lang)) { setSpeaking(true); const id = setInterval(() => { if (!speechSynthesis.speaking) { setSpeaking(false); clearInterval(id) } }, 400) }
+    if (speak(text, lang)) { setSpeaking(true); const id = setInterval(() => { if (!speechSynthesis.speaking) { setSpeaking(false); clearInterval(id) } }, 400) }
   }
+  const last = app.lastAnswer
 
   return (
     <div className="ca-panel ca-ask">
-      <h3>{t.title} {a?.writer && a.writer !== 'template' && <span className="ca-badge derived" style={{ marginLeft: 6 }}>AI</span>}</h3>
-      <form onSubmit={(e) => { e.preventDefault(); void submit(q) }}>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={listening ? t.listening : t.placeholder} lang={lang === 'hi' ? 'hi' : 'en'} />
-        {canListen() && <button type="button" className={`ca-mic ${listening ? 'on' : ''}`} title={t.listen} aria-label={t.listen} onClick={() => void listen()}>{listening ? '●' : '🎤'}</button>}
-        <button type="submit" disabled={busy}>{busy ? '…' : t.ask}</button>
-        {a && <button type="button" onClick={() => { stopSpeaking(); app.lastAnswer = null; app.clearHighlights() }}>{t.clear}</button>}
-      </form>
-      {!a && <div className="ca-chips">{SUGGESTIONS[lang].map((s) => <button key={s} onClick={() => { setQ(s); void submit(s) }}>{s}</button>)}</div>}
-      {a && (
-        <div className="ca-answer" lang={lang === 'hi' ? 'hi' : 'en'}>
-          <span className={`ca-badge ${a.classification}`}>{cls(lang, a.classification)}</span> <small style={{ color: 'var(--ink-soft)' }}>{a.intent === 'free' ? t.free : a.intent.replace(/_/g, ' ')} · {t.writer} {a.writer && a.writer !== 'template' ? a.writer : t.template}</small>
-          {canSpeak() && <button type="button" className="small ca-read" onClick={read}>{speaking ? t.stop : t.read}</button>}
-          {'\n'}{a.summary}
-          {a.evidence.length > 0 && <div><button type="button" className="small" onClick={() => setShowFacts(!showFacts)}>{showFacts ? '▾' : '▸'} {a.evidence.length} {t.evidence}</button></div>}
-          {showFacts && <ul className="ca-facts">{a.evidence.map((e) => <li key={e.id}><span className={`ca-badge ${e.classification}`}>{cls(lang, e.classification)}</span> {e.statement}</li>)}</ul>}
-          {a.caveats.map((c, i) => <div className="caveat" key={i}>{c}</div>)}
+      <h3>{t.title} {last?.writer && last.writer !== 'template' && <span className="ca-badge derived" style={{ marginLeft: 6 }}>AI</span>}</h3>
+      {thread.length > 0 && (
+        <div className="ca-thread" lang={lang === 'hi' ? 'hi' : 'en'}>
+          {thread.map((turn, i) => turn.role === 'user' ? <div key={i} className="ca-turn user">{turn.content}</div> : (
+            <div key={i} className="ca-turn atlas">
+              {turn.content}
+              {turn.answer && <div className="ca-turn-meta">
+                <span className={`ca-badge ${turn.answer.classification}`}>{cls(lang, turn.answer.classification)}</span>
+                <span>{t.writer} {turn.answer.writer && turn.answer.writer !== 'template' ? turn.answer.writer : t.template}</span>
+                {turn.answer.evidence.length > 0 && <button type="button" onClick={() => setFactsFor(factsFor === i ? null : i)}>{factsFor === i ? '▾' : '▸'} {turn.answer.evidence.length} {t.evidence}</button>}
+                {canSpeak() && <button type="button" onClick={() => read(turn.content)}>{speaking ? t.stop : t.read}</button>}
+              </div>}
+              {factsFor === i && turn.answer && <ul className="ca-facts">{turn.answer.evidence.map((e) => <li key={e.id}><span className={`ca-badge ${e.classification}`}>{cls(lang, e.classification)}</span> {e.statement}</li>)}</ul>}
+              {turn.answer?.caveats.map((c, j) => <div className="caveat" key={j}>{c}</div>)}
+            </div>
+          ))}
+          {busy && <div className="ca-turn atlas thinking">{t.thinking}</div>}
+          <div ref={endRef} />
         </div>
       )}
+      <form onSubmit={(e) => { e.preventDefault(); void submit(q) }} style={{ marginTop: thread.length ? 10 : 0 }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={listening ? t.listening : thread.length ? t.follow : t.placeholder} lang={lang === 'hi' ? 'hi' : 'en'} />
+        {canListen() && <button type="button" className={`ca-mic ${listening ? 'on' : ''}`} title={t.listen} aria-label={t.listen} onClick={() => void listen()}>{listening ? '●' : '🎤'}</button>}
+        <button type="submit" disabled={busy}>{busy ? '…' : t.ask}</button>
+        {thread.length > 0 && <button type="button" onClick={() => { stopSpeaking(); app.clearChat() }}>{t.clear}</button>}
+      </form>
+      {thread.length === 0 && <div className="ca-chips">{SUGGESTIONS[lang].map((s) => <button key={s} onClick={() => void submit(s)}>{s}</button>)}</div>}
     </div>
   )
 }

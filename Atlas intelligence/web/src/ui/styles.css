@@ -154,6 +154,14 @@ button { cursor: pointer; }
 .ca-ask .ca-mic.on { background: var(--risk); color: #fff; border-color: var(--risk); animation: ca-pulse 1s infinite alternate; }
 @keyframes ca-pulse { from { opacity: 1 } to { opacity: 0.55 } }
 .ca-answer { margin-top: 10px; white-space: pre-wrap; max-height: 240px; overflow: auto; font-size: 13px; line-height: 1.55; }
+.ca-thread { margin-top: 10px; max-height: 300px; overflow: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+.ca-turn { max-width: 86%; padding: 8px 12px; border-radius: 16px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+.ca-turn.user { align-self: flex-end; background: var(--brand-blue); color: #fff; border-bottom-right-radius: 4px; }
+.ca-turn.atlas { align-self: flex-start; background: var(--panel-raised); border: 1px solid var(--line); border-bottom-left-radius: 4px; color: var(--fg); }
+.ca-turn.atlas .ca-turn-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; font-size: 10px; color: var(--fg-faint); letter-spacing: 0.04em; }
+.ca-turn.atlas .ca-turn-meta button { font-size: 10px; padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--fg-soft); cursor: pointer; }
+.ca-turn .caveat { color: var(--fg-soft); font-size: 11px; margin-top: 4px; font-style: italic; }
+.ca-turn.thinking { color: var(--fg-faint); font-style: italic; }
 .ca-answer .caveat { color: var(--fg-soft); font-size: 11px; margin-top: 6px; font-style: italic; }
 .ca-answer button.small, .ca-answer .ca-read { font-size: 10px; padding: 2px 9px; margin: 6px 6px 0 0; border: 1px solid var(--line); border-radius: 999px; background: var(--panel-raised); cursor: pointer; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg); }
 .ca-facts { margin: 6px 0 0; padding-left: 0; list-style: none; font-size: 11.5px; line-height: 1.45; }

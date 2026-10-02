@@ -4,6 +4,8 @@ import { createTemplateExplainer } from './templateExplainer'
 export type Language = 'en' | 'hi'
 
 export interface WriterReply { text: string; writer: string; language: Language }
+export interface ChatReply extends WriterReply { actions: string[] }
+export interface ChatTurn { role: 'user' | 'assistant'; content: string }
 
 /**
  * The AI writer behind the server's `/api/explain` and `/api/ask`. It is
@@ -43,6 +45,17 @@ export class ClaudeExplainer implements ExplanationProvider {
       this.lastWriter = 'template'; this.lastError = (e as Error).message
       return this.template.explain(question, intent, evidence)
     }
+  }
+
+  /** A conversation turn: the recent thread, the facts the app knows now, a little context. Null when the writer is unavailable. */
+  async chat(messages: ChatTurn[], facts: EvidenceItem[], context: Record<string, string | number>): Promise<ChatReply | null> {
+    try {
+      const r = await fetch(`${this.baseUrl}/api/chat`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: messages.slice(-20), facts: facts.slice(0, 80).map(slim), language: this.language(), context }), signal: AbortSignal.timeout(this.timeoutMs + 8000) })
+      if (!r.ok) { let d = `HTTP ${r.status}`; try { d = String((await r.json()).detail ?? d) } catch { /* not json */ } throw new Error(d) }
+      const reply = (await r.json()) as ChatReply
+      this.lastWriter = reply.writer; this.lastError = null
+      return reply
+    } catch (e) { this.lastWriter = 'template'; this.lastError = (e as Error).message; return null }
   }
 
   /** A free question answered from a snapshot of facts; null when the writer is unavailable. */
