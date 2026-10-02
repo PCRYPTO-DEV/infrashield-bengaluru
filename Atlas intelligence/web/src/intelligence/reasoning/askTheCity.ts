@@ -68,8 +68,10 @@ function gather(intent: Intent, ctx: AskContext, ev: EvidenceItem[], hl: Answer[
         const ep = world.graph.endpoints(e); if (!ep || !inFocus({ x: (ep.a.x + ep.b.x) / 2, y: (ep.a.y + ep.b.y) / 2 })) continue
         const road = world.entities.get(e.roadId)
         const name = (road?.entity.properties as RoadProperties | undefined)?.name ?? e.roadId
-        const r = roads.get(e.roadId) ?? { name, cong: 0, count: 0, ids: [], observed: false }
-        r.cong = Math.max(r.cong, f.congestion); r.count += f.count; r.ids.push(f.edgeId); r.observed = r.observed || f.observed; roads.set(e.roadId, r)
+        // One entry per road name: a long road is many OSM ways, and the reader wants one line about it.
+        const roadKey = name || e.roadId
+        const r = roads.get(roadKey) ?? { name, cong: 0, count: 0, ids: [], observed: false }
+        r.cong = Math.max(r.cong, f.congestion); r.count += f.count; r.ids.push(f.edgeId); r.observed = r.observed || f.observed; roads.set(roadKey, r)
       }
       const top = [...roads.entries()].sort((a, b) => b[1].cong - a[1].cong).slice(0, 4)
       if (top.length === 0) push({ id: 'none', classification: 'derived', statement: 'No segment in view is currently below 60% of free-flow speed', confidence: 0.8 })

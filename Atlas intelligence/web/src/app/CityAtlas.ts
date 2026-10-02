@@ -234,6 +234,7 @@ export class CityAtlas {
   private onChunkLoaded(c: ChunkData): void {
     this.world.addChunk(c)
     this.renderer?.addChunk(c)
+    this.feeds?.rematch()
     // Real regions never get a made-up population or made-up incidents: the simulation only carries observed flow and live incidents.
     const sim = this.region.simulation
     this.sim.addChunk({ key: c.key, graph: c.graph, meta: sim ? c.meta : { ...c.meta, vehicleBudget: 0, pedestrianBudget: 0 }, incidents: sim ? c.entities.filter((e) => e.type === 'incident').map((e) => ({ id: e.id, props: e.properties as IncidentProperties })) : [] })
