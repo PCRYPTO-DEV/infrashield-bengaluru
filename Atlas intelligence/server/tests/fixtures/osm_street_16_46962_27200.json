@@ -1,0 +1,14 @@
+{"elements": [
+  {"type": "way", "id": 1, "tags": {"highway": "primary", "name": "Kasturba Gandhi Marg", "maxspeed": "50", "lanes": "3"},
+   "geometry": [{"lat": 28.6300, "lon": 77.2200}, {"lat": 28.6320, "lon": 77.2230}, {"lat": 28.6340, "lon": 77.2260}]},
+  {"type": "way", "id": 2, "tags": {"highway": "residential", "name": "Tolstoy Lane"},
+   "geometry": [{"lat": 28.6320, "lon": 77.2230}, {"lat": 28.6310, "lon": 77.2250}]},
+  {"type": "way", "id": 3, "tags": {"building": "apartments", "building:levels": "6", "name": "Statesman House"},
+   "geometry": [{"lat": 28.6325, "lon": 77.2235}, {"lat": 28.6325, "lon": 77.2245}, {"lat": 28.6332, "lon": 77.2245}, {"lat": 28.6332, "lon": 77.2235}, {"lat": 28.6325, "lon": 77.2235}]},
+  {"type": "way", "id": 4, "tags": {"building": "yes"},
+   "geometry": [{"lat": 28.6305, "lon": 77.2210}, {"lat": 28.6305, "lon": 77.2218}, {"lat": 28.6310, "lon": 77.2218}, {"lat": 28.6310, "lon": 77.2210}, {"lat": 28.6305, "lon": 77.2210}]},
+  {"type": "node", "id": 5, "lat": 28.6320, "lon": 77.2230, "tags": {"highway": "traffic_signals"}},
+  {"type": "node", "id": 6, "lat": 28.6328, "lon": 77.2240, "tags": {"public_transport": "station", "station": "subway", "name": "Barakhamba Road"}},
+  {"type": "way", "id": 7, "tags": {"leisure": "park", "name": "Central Park"},
+   "geometry": [{"lat": 28.6315, "lon": 77.2205}, {"lat": 28.6315, "lon": 77.2215}, {"lat": 28.6322, "lon": 77.2215}, {"lat": 28.6322, "lon": 77.2205}, {"lat": 28.6315, "lon": 77.2205}]}
+]}

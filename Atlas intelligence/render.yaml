@@ -1,0 +1,35 @@
+# One Render web service hosts everything: the FastAPI server (real
+# geography tiles, live traffic and weather, the AI writer) and the built
+# web app it serves from web/dist. Create a Blueprint from this file, then
+# set the two secret keys in the Render dashboard.
+services:
+  - type: web
+    name: atlas-infinity
+    runtime: python
+    plan: starter
+    region: singapore
+    buildCommand: |
+      pip install -r server/requirements.txt
+      npm --prefix web ci
+      npm --prefix web run build
+    startCommand: uvicorn app.main:app --app-dir server --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    disk:
+      name: atlas-cache
+      mountPath: /var/data
+      sizeGB: 2
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: NODE_VERSION
+        value: "20"
+      - key: ATLAS_REGION
+        value: ncr
+      - key: ATLAS_DATA_DIR
+        value: /var/data
+      - key: TOMTOM_DAILY_BUDGET
+        value: "2000"
+      - key: TOMTOM_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
