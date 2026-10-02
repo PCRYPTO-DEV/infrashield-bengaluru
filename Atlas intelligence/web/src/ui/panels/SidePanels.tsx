@@ -1,7 +1,10 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CityAtlas } from '../../app/CityAtlas'
 import type { LayerFlags } from '../../rendering/layers/modes'
-import { search } from '../../interaction/search/search'
+import { search, type SearchResult } from '../../interaction/search/search'
+import { geocode, type GeoResult } from '../../data/adapters/routeAdapter'
+import { SERVER_BASE } from '../../app/CityAtlas'
+import { lngLatToLocal } from '../../geo/projection/frame'
 import { makeT, type StringKey } from '../i18n'
 
 const LAYER_KEYS: Array<keyof LayerFlags> = ['roads', 'buildings', 'labels', 'vehicles', 'pedestrians', 'signals', 'incidents', 'zones', 'uploads', 'flow', 'density', 'activity', 'anomalies', 'risk', 'predictions', 'forecast']
@@ -74,19 +77,38 @@ function PlaceInput({ app, value, onPick, placeholder, label }: { app: CityAtlas
   const T = makeT(app.language)
   const [q, setQ] = useState(value?.label ?? '')
   const [open, setOpen] = useState(false)
-  const results = open && q && q !== value?.label ? search(app.world, q, 8) : []
+  const [far, setFar] = useState<GeoResult[]>([])
+  const [searching, setSearching] = useState(false)
+  const local = open && q && q !== value?.label ? search(app.world, q, 5) : []
+  // Anywhere in India: the server's place search, after a short pause in typing.
+  useEffect(() => {
+    if (!open || q.trim().length < 3 || q === value?.label) { setFar([]); return }
+    const id = setTimeout(async () => {
+      setSearching(true)
+      try { const c = app.lngLatOf(app.camera.centre); setFar(await geocode(SERVER_BASE, q, c)) } catch { setFar([]) } finally { setSearching(false) }
+    }, 350)
+    return () => clearTimeout(id)
+  }, [q, open]) // eslint-disable-line react-hooks/exhaustive-deps
+  const pickLocal = (r: SearchResult) => { setQ(r.label); setOpen(false); onPick({ label: r.label, point: r.point, lngLat: app.lngLatOf(r.point) }) }
+  const pickFar = (g: GeoResult) => { setQ(g.name); setOpen(false); onPick({ label: g.name, point: lngLatToLocal(app.frame, { lng: g.lng, lat: g.lat }), lngLat: { lng: g.lng, lat: g.lat }, far: true }) }
   return (
     <label className="ca-place">
       <span>{label}</span>
       <span className="ca-search">
         <input value={q} placeholder={placeholder} onChange={(e) => { setQ(e.target.value); setOpen(true); if (value) onPick(null) }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} />
-        {results.length > 0 && <ul>{results.map((r, i) => <li key={i} onMouseDown={() => { setQ(r.label); setOpen(false); onPick({ label: r.label, point: r.point }) }}>{r.label}<small>{r.sub}</small></li>)}</ul>}
-        {open && q.length >= 2 && results.length === 0 && q !== value?.label && <ul><li className="ca-nomatch">{T('route.nomatch')}</li></ul>}
+        {open && (local.length > 0 || far.length > 0 || searching || (q.length >= 2 && q !== value?.label)) && <ul>
+          {local.map((r, i) => <li key={`l${i}`} onMouseDown={() => pickLocal(r)}>{r.label}<small>{r.sub}</small></li>)}
+          {far.map((g, i) => <li key={`f${i}`} onMouseDown={() => pickFar(g)}>{g.name}<small>{g.address ?? g.town ?? ''} · {T('route.india')}</small></li>)}
+          {searching && <li className="ca-nomatch">{T('route.searching')}</li>}
+          {!searching && local.length === 0 && far.length === 0 && q.length >= 2 && q !== value?.label && <li className="ca-nomatch">{T('route.nomatch')}</li>}
+        </ul>}
       </span>
     </label>
   )
 }
-type PlacePick = { label: string; point: { x: number; y: number } }
+type PlacePick = { label: string; point: { x: number; y: number }; lngLat: { lng: number; lat: number }; far?: boolean }
+
+function fmtMin(s: number): string { return `${Math.round(s / 60)} min` }
 
 export function RoutePanel({ app }: { app: CityAtlas }) {
   const T = makeT(app.language)
@@ -96,8 +118,16 @@ export function RoutePanel({ app }: { app: CityAtlas }) {
   const [to, setTo] = useState<PlacePick | null>(null)
   const [swapKey, setSwapKey] = useState(0)
   const rows: Array<keyof typeof w> = ['travelTime', 'incidentRisk', 'congestion', 'pedestrianRisk', 'environmental']
-  const go = () => { if (from && to) { app.setRouteEndpoints(from.point, to.point); app.flyTo({ x: (from.point.x + to.point.x) / 2, y: (from.point.y + to.point.y) / 2 }) } }
+  const upm = app.world.unitPerMetre
+  const go = () => {
+    if (!from || !to) return
+    const distM = Math.hypot(from.point.x - to.point.x, from.point.y - to.point.y) / upm
+    // Beyond the streets loaded on screen (or a long hop): the country-wide router with live traffic.
+    if (from.far || to.far || distM > 2500 || app.region.source === 'osm') void app.routeFar(from.lngLat, to.lngLat)
+    else { app.setRouteEndpoints(from.point, to.point); app.flyTo({ x: (from.point.x + to.point.x) / 2, y: (from.point.y + to.point.y) / 2 }) }
+  }
   const swap = () => { const a = from; setFrom(to); setTo(a); setSwapKey((k) => k + 1) }
+  const ans = app.routeAnswer
   return (
     <div className="ca-panel ca-side ca-route">
       <h3>{T('route.title')}</h3>
@@ -106,14 +136,26 @@ export function RoutePanel({ app }: { app: CityAtlas }) {
         <PlaceInput app={app} value={from} onPick={setFrom} label={T('route.from')} placeholder={T('route.fromph')} />
         <PlaceInput app={app} value={to} onPick={setTo} label={T('route.to')} placeholder={T('route.toph')} />
         <div className="ca-row">
-          <button className="primary" disabled={!from || !to} onClick={go}>{T('route.go')}</button>
+          <button className="primary" disabled={!from || !to || app.routeBusy} onClick={go}>{app.routeBusy ? '…' : T('route.go')}</button>
           <button className="small" onClick={swap}>⇅ {T('route.swap')}</button>
-          {r && <button className="small" onClick={() => app.clearHighlights()}>{T('route.clear')}</button>}
+          {(r || ans) && <button className="small" onClick={() => app.clearRoute()}>{T('route.clear')}</button>}
         </div>
+        {app.routeError && <p className="note" style={{ color: 'var(--risk)' }}>{app.routeError}</p>}
       </div>
-      <button className={`ca-tool ${app.draw.state?.kind === 'route' ? 'active' : ''}`} onClick={() => app.draw.start('route')}>{T('route.pick')}</button>
-      {rows.map((k) => <div className="w" key={k}><span>{T(`route.w.${k}` as StringKey)}</span><input type="range" min={0} max={k === 'travelTime' ? 5 : 300} step={k === 'travelTime' ? 0.1 : 5} value={w[k]} onChange={(e) => app.setRouteWeights({ [k]: Number(e.target.value) })} /><span style={{ fontFamily: 'var(--mono)' }}>{w[k]}</span></div>)}
-      {r && <>
+      {ans && ans.routes.length > 0 && <div className="ca-route-options">
+        {ans.routes.map((o, i) => {
+          const tag = i === ans.recommended?.safer && i === ans.recommended?.fastest ? `${T('route.fastest')} · ${T('route.safer')}` : i === ans.recommended?.safer ? T('route.safer') : i === ans.recommended?.fastest ? T('route.fastest') : T('route.option', { n: i + 1 })
+          return <button key={i} className={`ca-route-opt ${i === app.routeChoice ? 'active' : ''}`} onClick={() => app.chooseRoute(i)}>
+            <b>{tag}</b><span>{fmtMin(o.travelTimeS)} · {(o.lengthM / 1000).toFixed(1)} km</span>
+            <small>{T('route.delay', { n: Math.round((o.trafficDelayS || 0) / 60) })} · {T('route.incidents', { n: o.incidentsNear })}</small>
+          </button>
+        })}
+        {ans.explanation?.map((l, i) => <p className="note" key={i} style={{ margin: '4px 0' }}>{l}</p>)}
+        <p className="note"><span className="ca-badge derived">{T.cls('derived')}</span> {ans.source} · {T('route.live')}</p>
+      </div>}
+      {!ans && <button className={`ca-tool ${app.draw.state?.kind === 'route' ? 'active' : ''}`} onClick={() => app.draw.start('route')}>{T('route.pick')}</button>}
+      {!ans && rows.map((k) => <div className="w" key={k}><span>{T(`route.w.${k}` as StringKey)}</span><input type="range" min={0} max={k === 'travelTime' ? 5 : 300} step={k === 'travelTime' ? 0.1 : 5} value={w[k]} onChange={(e) => app.setRouteWeights({ [k]: Number(e.target.value) })} /><span style={{ fontFamily: 'var(--mono)' }}>{w[k]}</span></div>)}
+      {r && !ans && <>
         <table><tbody>
           <tr><td>{T('route.distance')}</td><td>{(r.distanceM / 1000).toFixed(2)} km</td></tr>
           <tr><td>{T('route.time')}</td><td>{Math.round(r.travelTimeS / 60)} min</td></tr>

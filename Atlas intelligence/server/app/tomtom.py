@@ -81,6 +81,46 @@ class TomTomClient:
             r.raise_for_status()
             return r.content if binary else r.json()
 
+    # ---- whole-country routing and place search (same key, live traffic) ----
+    async def geocode(self, q: str, lat: float | None, lng: float | None, limit: int = 6) -> list[dict[str, Any]]:
+        """Places anywhere in India by name: TomTom Search, biased to a point when given. Cached a day."""
+        key = f"tomtom:geo:{q.strip().lower()}:{round(lat or 0, 1)},{round(lng or 0, 1)}"
+        cached = self.cache.get(key)
+        if cached is not None:
+            return cached
+        params: dict[str, Any] = {"countrySet": "IN", "limit": limit, "language": "en-GB"}
+        if lat is not None and lng is not None:
+            params.update({"lat": lat, "lon": lng})
+        from urllib.parse import quote
+        data = await self._get(f"/search/2/search/{quote(q.strip())}.json", params, "tomtom_search.json")
+        out = []
+        for r in data.get("results", []):
+            a = r.get("address", {}); pos = r.get("position", {})
+            name = (r.get("poi") or {}).get("name") or a.get("freeformAddress") or q
+            out.append({"name": name, "address": a.get("freeformAddress"), "town": a.get("municipality"), "lat": pos.get("lat"), "lng": pos.get("lon"), "kind": r.get("type"), "source": "tomtom-search"})
+        self.cache.set(key, out, 86400, time.time())
+        return out
+
+    async def route(self, a: tuple[float, float], b: tuple[float, float], alternatives: int = 2) -> dict[str, Any]:
+        """Routes with live traffic between two points anywhere: TomTom Routing. The fastest and its alternatives, cached 60 s."""
+        key = f"tomtom:route:{a[0]:.4f},{a[1]:.4f}:{b[0]:.4f},{b[1]:.4f}:{alternatives}"
+        cached = self.cache.get(key)
+        if cached is not None:
+            return cached
+        data = await self._get(f"/routing/1/calculateRoute/{a[0]},{a[1]}:{b[0]},{b[1]}/json",
+                               {"traffic": "true", "routeType": "fastest", "maxAlternatives": alternatives, "travelMode": "car", "computeTravelTimeFor": "all"}, "tomtom_route.json")
+        now = time.time()
+        routes = []
+        for i, r in enumerate(data.get("routes", [])):
+            sm = r.get("summary", {})
+            pts = [[p["longitude"], p["latitude"]] for leg in r.get("legs", []) for p in leg.get("points", [])]
+            routes.append({"index": i, "lengthM": sm.get("lengthInMeters"), "travelTimeS": sm.get("travelTimeInSeconds"), "trafficDelayS": sm.get("trafficDelayInSeconds", 0),
+                           "noTrafficTravelTimeS": sm.get("noTrafficTravelTimeInSeconds"), "arrival": sm.get("arrivalTime"), "points": pts})
+        result = {"from": {"lat": a[0], "lng": a[1]}, "to": {"lat": b[0], "lng": b[1]}, "routes": routes, "fetchedAt": int(now * 1000), "source": "tomtom-routing",
+                  "evidence": {"classification": "derived", "source": "tomtom-routing", "timestamp": int(now * 1000), "confidence": 0.8, "model": "tomtom routing with live traffic"}}
+        self.cache.set(key, result, 60, now)
+        return result
+
     # ---- flow tiles ----
     async def flow_tile(self, z: int, x: int, y: int, max_age: float | None = None) -> dict[str, Any]:
         """A flow tile from the cache (FLOW_TTL), or fresh when the cached one is older than `max_age` seconds."""
@@ -204,6 +244,26 @@ def _ts(v: str | None) -> int | None:
         return None
 
 
+def _incidents_near_route(history: Any, points: list[list[float]], radius_m: float = 300.0) -> list[dict[str, Any]]:
+    """Active incidents (last 2 h) within `radius_m` of the route, sampled every few points."""
+    if history is None or not points:
+        return []
+    import math
+    lngs = [p[0] for p in points]; lats = [p[1] for p in points]
+    pad = radius_m / 111320 * 1.2
+    inc = history.incidents_in_bbox(min(lngs) - pad, min(lats) - pad, max(lngs) + pad, max(lats) + pad, since_s=7200)
+    near = []
+    step = max(1, len(points) // 300)  # at most ~300 samples per route, every point on short ones
+    for i in inc:
+        if i.get("lng") is None:
+            continue
+        kx = 111320 * math.cos(math.radians(i["lat"]))
+        for p in points[::step]:
+            if math.hypot((p[0] - i["lng"]) * kx, (p[1] - i["lat"]) * 111320) <= radius_m:
+                near.append(i); break
+    return near
+
+
 def register(app: FastAPI, cache: Cache, fixtures: Path | None, history=None) -> None:
     client = TomTomClient(cache, settings.tomtom_api_key, fixtures, settings.tomtom_daily_budget)
     client.history = history
@@ -244,6 +304,36 @@ def register(app: FastAPI, cache: Cache, fixtures: Path | None, history=None) ->
         if getattr(client, "hot", None) is not None:
             client.hot.touch_bbox(bbox)
         return await client.incidents(bbox)
+
+    @app.get("/api/geocode")
+    @guard
+    async def geocode(q: str = Query(..., min_length=2, max_length=120), lat: float | None = Query(None), lng: float | None = Query(None)):
+        return {"results": await client.geocode(q, lat, lng)}
+
+    @app.get("/api/route")
+    @guard
+    async def route(frm: str = Query(..., alias="from", pattern=r"^-?[\d.]+,-?[\d.]+$"), to: str = Query(..., pattern=r"^-?[\d.]+,-?[\d.]+$"), alternatives: int = Query(2, ge=0, le=3)):
+        """Routes with live traffic anywhere in India, plus the incidents the city has seen near each one, so a safer choice can be made."""
+        a = tuple(float(v) for v in frm.split(",")); b = tuple(float(v) for v in to.split(","))
+        r = await client.route((a[0], a[1]), (b[0], b[1]), alternatives)
+        for rt in r["routes"]:
+            near = _incidents_near_route(history, rt["points"])
+            rt["incidentsNear"] = len(near)
+            rt["incidentSeverity"] = round(sum(float(i.get("severity") or 0.5) for i in near), 2)
+            rt["incidents"] = [{"kind": i.get("kind"), "description": i.get("description"), "lng": i.get("lng"), "lat": i.get("lat")} for i in near[:6]]
+        routes = r["routes"]
+        if routes:
+            fastest = min(range(len(routes)), key=lambda i: routes[i]["travelTimeS"] or 1e9)
+            # safer: strictly less reported incident severity than the fastest route, else the fastest is also the safer; never claims to be safe
+            safer = min(range(len(routes)), key=lambda i: (routes[i]["incidentSeverity"], routes[i]["travelTimeS"] or 1e9))
+            if routes[safer]["incidentSeverity"] >= routes[fastest]["incidentSeverity"]:
+                safer = fastest
+            extra_min = max(0, (routes[safer]["travelTimeS"] or 0) - (routes[fastest]["travelTimeS"] or 0)) // 60
+            first = (f"The safer route passes fewer reported incidents ({routes[safer]['incidentsNear']} vs {routes[fastest]['incidentsNear']} within 300 m) and costs {extra_min} extra minutes."
+                     if safer != fastest else "The fastest route also passes the fewest reported incidents right now.")
+            r["recommended"] = {"fastest": fastest, "safer": safer}
+            r["explanation"] = [first, "Times include live traffic (TomTom); incidents are the ones the city has seen in the last 2 hours. Lower reported risk is not a guarantee of safety."]
+        return r
 
     @app.get("/api/traffic/status")
     async def status():

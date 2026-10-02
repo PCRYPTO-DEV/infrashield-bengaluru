@@ -44,6 +44,7 @@ import { localToLngLat } from '../geo/projection/frame'
 import type { AgentView } from '../engine/world/WorldModel'
 import { deriveInsights, type Insight } from '../intelligence/insights/insightEngine'
 import { fetchPlace, fetchChanges, type PlaceState, type ChangeReport } from '../data/adapters/placeAdapter'
+import { routeBetween as serverRoute, type RouteAnswer, type RouteOption } from '../data/adapters/routeAdapter'
 import { loadTier, saveTier, unlockWithPassword, hasFeature, type Tier, type Feature } from './tiers'
 import { tr, type StringKey } from '../ui/i18n'
 import type { IntelligenceState } from '../intelligence/types'
@@ -408,7 +409,11 @@ export class CityAtlas {
   }
   finishDrawing(): void { const r = this.draw.finish(); if (r) this.finishShape(r) }
   private finishShape(r: ZoneShape | { kind: 'route'; points: WorldPoint[] }): void {
-    if (r.kind === 'route') { this.routePick = r.points; this.computeRoute(r.points[0], r.points[1]); return }
+    if (r.kind === 'route') {
+      // Real regions: the loaded streets are only a window on the city, so two picked points route country-wide with live traffic.
+      if (this.region.source === 'osm') { void this.routeFar(localToLngLat(this.frame, r.points[0]), localToLngLat(this.frame, r.points[1])); return }
+      this.routePick = r.points; this.computeRoute(r.points[0], r.points[1]); return
+    }
     const rules: ZoneRule[] = [{ type: 'entry' }, { type: 'exit' }, { type: 'dwell', threshold: 60 }, { type: 'count', threshold: 25 }, { type: 'speed', threshold: 16, kinds: ['vehicle'] }, { type: 'density', threshold: 80 }]
     this.zones.create(`Zone ${this.zones.zones.size + 1}`, r, rules, false, this.temporal.current.timestamp)
     this.notify()
@@ -424,7 +429,40 @@ export class CityAtlas {
   }
   /** A route between two chosen places (from the search box), drawn like a picked one. */
   setRouteEndpoints(a: WorldPoint, b: WorldPoint): void { this.routePick = [a, b]; this.computeRoute(a, b) }
-  setRouteWeights(w: Partial<RouteWeights>): void { this.routeWeights = { ...this.routeWeights, ...w }; if (this.routePick.length === 2) this.computeRoute(this.routePick[0], this.routePick[1]); else this.notify() }
+
+  /** Routes across the whole country with live traffic (TomTom through the server), with the incidents the city has seen near each. */
+  routeAnswer: RouteAnswer | null = null
+  routeChoice = 0
+  routeBusy = false
+  routeError: string | null = null
+  async routeFar(a: LngLat, b: LngLat): Promise<void> {
+    this.routeBusy = true; this.routeError = null; this.routePick = [lngLatToLocal(this.frame, a), lngLatToLocal(this.frame, b)]; this.notify()
+    try {
+      this.routeAnswer = await serverRoute(SERVER_BASE, a, b)
+      this.routeChoice = this.routeAnswer.recommended?.safer ?? 0
+      this.applyRouteChoice()
+      // fit the view to the route
+      const pts = this.routeAnswer.routes[this.routeChoice]?.points ?? []
+      if (pts.length) {
+        const loc = pts.map((p) => lngLatToLocal(this.frame, { lng: p[0], lat: p[1] }))
+        const minX = Math.min(...loc.map((p) => p.x)), maxX = Math.max(...loc.map((p) => p.x)), minY = Math.min(...loc.map((p) => p.y)), maxY = Math.max(...loc.map((p) => p.y))
+        const spanM = Math.max(maxX - minX, maxY - minY) / this.world.unitPerMetre
+        const zoom = Math.max(10.5, Math.min(16.5, 16.5 - Math.log2(Math.max(1, spanM / 900))))
+        this.camera.setView({ x: (minX + maxX) / 2, y: (minY + maxY) / 2 }, zoom)
+      }
+    } catch (e) { this.routeAnswer = null; this.route = null; this.routeError = (e as Error).message }
+    finally { this.routeBusy = false; this.notify() }
+  }
+  chooseRoute(i: number): void { this.routeChoice = i; this.applyRouteChoice(); this.notify() }
+  private applyRouteChoice(): void {
+    const r = this.routeAnswer; const o: RouteOption | undefined = r?.routes[this.routeChoice]
+    if (!r || !o) return
+    const path = o.points.map((p) => lngLatToLocal(this.frame, { lng: p[0], lat: p[1] }))
+    const time = o.travelTimeS || 1
+    this.route = { edgeIds: [], nodeIds: [], path, totalCost: time, travelTimeS: time, distanceM: o.lengthM, factors: { travelTime: time, incidentRisk: o.incidentSeverity, congestion: (o.trafficDelayS || 0) / time, pedestrianRisk: 0, environmental: 0 }, explanation: r.explanation ?? [], evidence: r.evidence }
+  }
+  clearRoute(): void { this.routeAnswer = null; this.route = null; this.routePick = []; this.routeError = null; this.notify() }
+  setRouteWeights(w: Partial<RouteWeights>): void { this.routeWeights = { ...this.routeWeights, ...w }; if (this.routePick.length === 2 && !this.routeAnswer) this.computeRoute(this.routePick[0], this.routePick[1]); else this.notify() }
 
   // ---------- place intelligence, what changed, tiers ----------
   place: PlaceState | null = null

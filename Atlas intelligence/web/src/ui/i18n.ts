@@ -119,7 +119,7 @@ const S = {
   'zones.events': ['What happened', 'क्या हुआ'],
   // route
   'route.title': ['A route with less risk', 'कम ख़तरे वाला रास्ता'],
-  'route.help': ['Type where you start and where you want to go. Move the sliders to say what matters more.', 'लिखें कहाँ से चलना है और कहाँ जाना है। स्लाइडर से बताएँ क्या ज़्यादा ज़रूरी है।'],
+  'route.help': ['Type where you start and where you want to go, anywhere in India. Routes use live traffic; the one with fewer reported incidents is marked.', 'लिखें कहाँ से चलना है और कहाँ जाना है, पूरे भारत में कहीं भी। रास्ते लाइव ट्रैफ़िक से; जिस पर कम घटनाएँ हैं वह चिह्नित है।'],
   'route.pick': ['or pick two points on the map', 'या नक्शे पर दो जगह चुनें'],
   'route.from': ['From', 'कहाँ से'],
   'route.to': ['To', 'कहाँ तक'],
@@ -129,6 +129,14 @@ const S = {
   'route.swap': ['swap', 'उलटें'],
   'route.nomatch': ['Nothing by that name on the loaded map. Try a road name, or zoom to the area first.', 'इस नाम की कोई जगह लोड हुए नक्शे पर नहीं। सड़क का नाम लिखें या पहले उस इलाक़े तक ज़ूम करें।'],
   'route.clear': ['clear route', 'रास्ता हटाएँ'],
+  'route.india': ['anywhere in India', 'पूरे भारत में'],
+  'route.searching': ['searching India…', 'भारत में खोज रहे हैं…'],
+  'route.fastest': ['Fastest', 'सबसे तेज़'],
+  'route.safer': ['Fewer incidents', 'कम हादसे'],
+  'route.option': ['Option {n}', 'विकल्प {n}'],
+  'route.delay': ['+{n} min traffic', '+{n} मिनट ट्रैफ़िक'],
+  'route.incidents': ['{n} incidents within 300 m', '300 मीटर में {n} घटनाएँ'],
+  'route.live': ['times with live traffic; incidents from the last 2 hours; not a guarantee of safety', 'समय लाइव ट्रैफ़िक के साथ; घटनाएँ पिछले 2 घंटे की; सुरक्षा की गारंटी नहीं'],
   'route.w.travelTime': ['time', 'समय'], 'route.w.incidentRisk': ['accidents', 'हादसे'], 'route.w.congestion': ['jams', 'जाम'], 'route.w.pedestrianRisk': ['people on foot', 'पैदल लोग'], 'route.w.environmental': ['air and weather', 'हवा और मौसम'],
   'route.distance': ['Distance', 'दूरी'], 'route.time': ['Time (about)', 'समय (लगभग)'], 'route.inc': ['Accidents on the way', 'रास्ते में हादसे'], 'route.cong': ['Jams on the way', 'रास्ते में जाम'], 'route.ped': ['People on foot on the way', 'रास्ते में पैदल लोग'],
   // upload
