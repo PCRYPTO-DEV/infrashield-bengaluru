@@ -5,7 +5,7 @@ Infinity answers *what is happening here, why, what is unusual, what may
 happen next, and how sure are we?* It says, for every object on screen, how it
 knows: **seen**, **worked out**, **a guess**, or **made up**.
 
-First region: **Delhi NCR**, with real streets and buildings from
+Region: **all of India**, state by state (first centre: Delhi), with real streets and buildings from
 OpenStreetMap and live traffic from TomTom. Nothing on the map is made up:
 where no data exists, the map stays empty and says so. (The procedural
 city generator survives in the engine for tests only.)
@@ -66,7 +66,11 @@ server.
 
 | | |
 |---|---|
-| **Map · Traffic · Busy · Risk · Ahead · Ink 3D** | the six modes (top centre) |
+| **Click anywhere** | the Atlas place intelligence card: score, trend, every dimension with WHY, evidence class, confidence and provenance; Live-here views; Before you rent or buy; Compare areas |
+| **What changed?** | ranked, evidenced changes since yesterday for the view on screen |
+| **Around you** | traffic, air, rain, safety and unusual activity in five words |
+| **Free · Plus · Pro** | Free: what is here. Plus (password gate for now): what it means for you. Pro: what it means for a decision (coming) |
+| **Map · Traffic · Busy · Risk · Ahead · Ink 3D** | the six modes (under More) |
 | **Ask the city** | type or press the mic; answers list the facts they came from |
 | **English / हिंदी** | every label, answer and voice follows the toggle |
 | **Day / Night** | white paper and ink by default; the City Atlas deep-night look one click away (also `?theme=night` and the embed option) |

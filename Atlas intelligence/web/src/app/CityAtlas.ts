@@ -45,6 +45,7 @@ import type { AgentView } from '../engine/world/WorldModel'
 import { deriveInsights, type Insight } from '../intelligence/insights/insightEngine'
 import { fetchPlace, fetchChanges, type PlaceState, type ChangeReport } from '../data/adapters/placeAdapter'
 import { loadTier, saveTier, unlockWithPassword, hasFeature, type Tier, type Feature } from './tiers'
+import { tr, type StringKey } from '../ui/i18n'
 import type { IntelligenceState } from '../intelligence/types'
 
 export type Theme = 'day' | 'night'
@@ -438,6 +439,20 @@ export class CityAtlas {
   async openPlaceAt(lng: number, lat: number): Promise<void> { return this.openPlace(lngLatToLocal(this.frame, { lng, lat })) }
   closePlace(): void { this.place = null; this.placePoint = null; this.placeError = null; this.highlights = { ...this.highlights, points: [] }; this.notify() }
 
+  /** AROUND YOU: the cell at the centre of the view, refreshed every minute. */
+  around: PlaceState | null = null
+  private aroundAt = 0
+  private aroundKey = ''
+  async refreshAround(): Promise<void> {
+    if (this.region.source !== 'osm') return
+    const ll = localToLngLat(this.frame, this.camera.centre)
+    const key = `${ll.lng.toFixed(3)},${ll.lat.toFixed(3)}`
+    const now = Date.now()
+    if (key === this.aroundKey && now - this.aroundAt < 60000) return
+    this.aroundKey = key; this.aroundAt = now
+    try { this.around = await fetchPlace(SERVER_BASE, ll.lng, ll.lat); this.notify() } catch { /* keep the last one */ }
+  }
+
   changes: ChangeReport | null = null
   changesLoading = false
   async loadChanges(sinceS = 86400): Promise<ChangeReport | null> {
@@ -553,9 +568,44 @@ export class CityAtlas {
     return f.filter((x) => x.statement.trim().length > 0)
   }
 
+  /** Questions about a place or about change are answered from the H3 city model (deterministic tools), then phrased. */
+  private async askPlaceOrChange(question: string): Promise<Answer | null> {
+    const q = question.toLowerCase()
+    const hi = this.language === 'hi'
+    const isPlace = /(what('| i)?s this (area|place|neighbourhood)|area like|place like|live here|should i live|move here|safe to live|buy here|rent here|यह इलाक़ा|यहाँ रहना|यह जगह कैसी)/.test(q)
+    const isChange = /(what changed|what has changed|changed (around|here|near)|what's new|whats new|since yesterday|क्या बदला|नया क्या)/.test(q)
+    if (!isPlace && !isChange || this.region.source !== 'osm') return null
+    const facts: Answer['evidence'] = []
+    let summary = ''
+    if (isPlace) {
+      if (!this.place || !this.placePoint) await this.openPlace(this.camera.centre)
+      const st = this.place
+      if (!st) return null
+      const name = (k: string) => tr(this.language, `dim.${k}` as StringKey)
+      const bandWord = (b: string | null) => (b ? tr(this.language, `band.${b}` as StringKey) : tr(this.language, 'place.nodata'))
+      for (const d of st.dimensions) if (d.score !== null || d.key === 'flood') facts.push({ id: `dim:${d.key}`, classification: d.class === 'inferred' ? 'derived' : d.class === 'predicted' ? 'predicted' : d.class, statement: `${name(d.key)}: ${bandWord(d.band)}${d.score !== null ? ` (${d.score}/100)` : ''}. ${d.why[0] ?? ''}`, source: d.provenance[0]?.source, confidence: d.confidence ?? undefined })
+      const strong = st.dimensions.filter((d) => d.score !== null && d.score >= 60).slice(0, 2).map((d) => name(d.key).toLowerCase())
+      const weak = st.dimensions.filter((d) => d.score !== null && d.score < 45).slice(0, 2).map((d) => name(d.key).toLowerCase())
+      summary = (hi ? `एटलस स्कोर ${st.score ?? '–'}/100 (${st.confidenceWord ? tr('hi', `conf.${st.confidenceWord}` as StringKey) : ''} भरोसा). ` : `Atlas score ${st.score ?? '–'}/100 (${st.confidenceWord ?? ''} confidence). `)
+        + (strong.length && weak.length ? tr(this.language, 'place.summary.both', { strong: strong.join(', '), weak: weak.join(', ') }) : strong.length ? tr(this.language, 'place.summary.strong', { strong: strong.join(', ') }) : weak.length ? tr(this.language, 'place.summary.weak', { weak: weak.join(', ') }) : tr(this.language, 'place.summary.none'))
+        + (hi ? ' हर पंक्ति नीचे बताती है कि वह कैसे जानती है।' : ' Each line below says how it knows; flood and population have no data yet.')
+    } else {
+      const r = await this.loadChanges()
+      if (!r) return null
+      for (const c of r.items.slice(0, 8)) facts.push({ id: c.id, classification: c.classification === 'inferred' ? 'derived' : c.classification, statement: c.text, source: c.source, confidence: c.confidence })
+      summary = r.count ? tr(this.language, 'changed.count', { n: r.count }) + (hi ? ' सबसे अहम पहले; हर एक का स्रोत साथ है।' : '. The most significant first; each names its source.') : tr(this.language, 'changed.none')
+      if (r.notDetectable.length) summary += (hi ? ` अभी नहीं पकड़ा जा सकता: ${r.notDetectable[0]}.` : ` Not yet detectable: ${r.notDetectable[0]}.`)
+    }
+    let text = summary
+    if (this.writerConfigured) { const t = await this.writer.askFree(question, facts); if (t) text = t }
+    return { question, intent: isPlace ? 'place' : 'changed', summary: text, classification: weakest(facts.length ? facts : [{ id: 'none', classification: 'observed', statement: '' }]), evidence: facts, highlights: { points: this.placePoint ? [this.placePoint] : [], entityIds: [], agentIds: [] }, caveats: [], writer: this.writer.lastWriter } as Answer
+  }
+
   async ask(question: string): Promise<Answer> {
     const focus = this.camera.viewBounds()
     if (this.writerConfigured === null) await this.checkWriter()
+    const special = await this.askPlaceOrChange(question)
+    if (special) { this.lastAnswer = special; this.highlights = special.highlights; this.notify(); return special }
     const answer = await askTheCity(question, { world: this.world, intel: this.intel.state, memory: this.memory, time: this.temporal.current.timestamp, focus, focusPoint: this.camera.centre, unitPerMetre: this.world.unitPerMetre, explainer: this.writer, language: this.language })
     answer.writer = this.writer.lastWriter
     // A question the fixed intents do not cover goes to the writer as a free question, answered only from the snapshot.

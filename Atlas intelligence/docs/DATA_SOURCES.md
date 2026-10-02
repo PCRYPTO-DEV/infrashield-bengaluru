@@ -8,6 +8,8 @@
 | Open-Meteo | temperature, humidity, rain, wind, weather code | `/api/weather?lat&lng` | observed | 10 min | free, no key |
 | Phone or laptop camera | people and vehicles as tracked dots | in the browser only; never uploaded | observed | none | free |
 | Uploaded files | GeoJSON, JSON records, CSV with lat/lng, ≤ 10 MB | parsed and validated in the browser | observed | none | free |
+| OpenStreetMap vector tiles (OpenFreeMap, OpenMapTiles schema) | the same roads, names, buildings, green areas, stations and points of interest (hospitals, schools, police, fire, pharmacies, shops), 16 street tiles per request, anywhere in the world | server `vtiles.py` → the same tile JSON; Overpass and the OSM API are the fallbacks | observed | SQLite, 30 days | free CDN |
+| Open-Meteo Air Quality | European and US AQI, PM2.5, PM10, NO₂, O₃ (CAMS model, about 11 km) | `/api/air?lat&lng`; readings kept in `air_readings` | observed | 30 min | free, no key |
 | Anthropic API | plain-words answers | `/api/explain`, `/api/ask` | rephrases only; never a source of facts | prompt cache | per token |
 
 ## TomTom budget
@@ -67,3 +69,24 @@ are checked every time a reading arrives, fire at most once every 15
 minutes each, are logged, and go out by WhatsApp or SMS through Twilio in
 simple English or Hindi. Each message names its source ("seen by
 TomTom", "seen by the camera") and never adds a fact.
+
+## The H3 city model (Phase 1)
+
+`GET /api/place?lng&lat` returns one H3 resolution-9 cell (about 0.1 km²) as a
+state vector: traffic (TomTom, with the usual for this weekday and hour from
+memory), safety activity (reported incidents within 800 m, 24 h), air (Open-Meteo
+air quality), rain disruption (Open-Meteo), green space, access to healthcare,
+schools, police, fire stations, pharmacies and public transport (nearest mapped
+point of interest within about 2.5 km), walkability, connectivity, built
+intensity, a noise proxy (inferred), shopping, camera counts where a camera runs,
+and flood and population as "no data" until adapters exist. Each dimension has a
+score (or none), an evidence class (observed · derived · inferred), a confidence
+and provenance rows (source, timestamp, resolution, freshness). The Atlas score
+is a weighted mean of the dimensions that have data. One snapshot per cell per
+day (`cell_daily`) gives the trend after two days.
+
+`GET /api/cells?bbox&res` scores cells from cached tiles only (no network).
+`GET /api/changes?bbox&since` ranks what changed (magnitude × confidence ×
+relevance × impact): traffic against its usual, incidents started or cleared,
+air against 24 h ago, camera counts, zone events; it lists what cannot be
+detected yet (structural change needs OpenStreetMap snapshots over time).

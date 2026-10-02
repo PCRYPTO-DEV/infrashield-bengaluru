@@ -9,7 +9,10 @@ serves the built web app from `web/dist` with a single-page fallback.
 |---|---|---|
 | `TOMTOM_API_KEY` | for live traffic | TomTom developer key. Never commit it; rotate a key that was ever pasted into a chat. |
 | `ANTHROPIC_API_KEY` | for the AI writer | Anthropic API key. Without it the template writer answers. |
-| `ATLAS_REGION` | no | `ncr` (the only region so far) |
+| `ATLAS_REGION` | no | `india` (`ncr` still accepted) |
+| `OSM_TILES_URL` | no | vector-tile TileJSON or `{z}/{x}/{y}` template (default OpenFreeMap planet); empty disables |
+| `ATLAS_WARM_RADIUS` | no | z14 blocks pre-fetched around the origin at startup (default 1) |
+| `ATLAS_IPV4_ONLY` | no | `1` (default) binds outbound requests to IPv4 |
 | `ATLAS_DATA_DIR` | no | where the SQLite cache lives (default `server/data`) |
 | `TOMTOM_DAILY_BUDGET` | no | calls per UTC day before the server stops asking TomTom (default 2000) |
 | `ATLAS_FIXTURES` | no | folder of recorded responses; runs offline |
@@ -55,8 +58,9 @@ docker run -p 8000:8000 -e TOMTOM_API_KEY=... -e ANTHROPIC_API_KEY=... -v atlas-
 ## Outbound hosts the server must reach
 
 - `overpass-api.de`, `overpass.kumi.systems`, `overpass.private.coffee` (or your `OVERPASS_URL` list)
+- `tiles.openfreemap.org` (OpenStreetMap vector tiles: the fast path for streets anywhere)
 - `api.tomtom.com`
-- `api.open-meteo.com`
+- `api.open-meteo.com` and `air-quality-api.open-meteo.com`
 - `api.anthropic.com`
 - `api.twilio.com` (alerts by WhatsApp or SMS)
 - optionally `download.geofabrik.de` for a bulk extract

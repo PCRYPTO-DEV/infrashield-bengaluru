@@ -294,6 +294,8 @@ const S = {
   'changed.more': ['{n} more with City Atlas Plus', 'City Atlas Plus के साथ {n} और'],
   'changed.show': ['show me', 'दिखाओ'],
   // tiers
+  'around.title': ['Around you', 'आपके आसपास'],
+  'around.unusual': ['Unusual activity', 'असामान्य गतिविधि'],
   'tier.free': ['City Atlas', 'City Atlas'], 'tier.plus': ['City Atlas Plus', 'City Atlas Plus'], 'tier.pro': ['City Atlas Pro', 'City Atlas Pro'],
   'tier.plus.tag': ['Understand how your city affects you.', 'समझें कि आपका शहर आप पर कैसे असर डालता है।'],
   'tier.pro.tag': ['Turn location into intelligence for serious decisions.', 'जगह को बड़े फ़ैसलों की समझ में बदलें।'],

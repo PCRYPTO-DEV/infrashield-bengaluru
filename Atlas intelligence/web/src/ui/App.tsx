@@ -16,6 +16,7 @@ import { PlaceCard } from './panels/PlaceCard'
 import { WhatChanged } from './panels/WhatChanged'
 import { ComparePanel } from './panels/ComparePanel'
 import { Home } from './overlays/Home'
+import { AroundYou } from './overlays/AroundYou'
 import { unlockAudio } from './bleep'
 import { MODES } from '../rendering/layers/modes'
 import { parseWorldUri } from '../engine/seed/worldSeed'
@@ -88,6 +89,8 @@ export default function App() {
         </div>
         {more && <div className="ca-badges">{app.region.source === 'osm' ? <span className="ca-badge observed">{T('badge.osm')}</span> : <span className="ca-badge simulated">{T('badge.demo')}</span>} {app.liveStatus.live ? <span className="ca-badge observed">{T('badge.livetraffic')}</span> : <span className="ca-badge derived">{T('badge.notraffic')}</span>} <span className="ca-badge observed">{T('badge.realonly')}</span>{app.realDataFallbacks > 0 && <span className="ca-badge derived">{T('badge.fallback', { n: app.realDataFallbacks })}</span>}</div>}
       </div>
+
+      {!embed.embed && <AroundYou app={app} onOpen={() => { app.select(null); setTool((t) => (t === 'changed' ? t : null)) }} />}
 
       {/* 2. search, what changed, more */}
       <div className="ca-tools">
