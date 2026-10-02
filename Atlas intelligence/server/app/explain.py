@@ -259,4 +259,8 @@ def register(app: FastAPI, writer: Writer | None = None, fake: bool = False) -> 
 
     @app.get("/api/writer/status")
     def status() -> dict[str, Any]:
-        return {"configured": w is not None, "writer": w.name if w else None, "model": MODEL, "languages": ["en", "hi"]}
+        from .config import anthropic_env_report
+        out: dict[str, Any] = {"configured": w is not None, "writer": w.name if w else None, "model": MODEL, "languages": ["en", "hi"]}
+        if w is None or w.name == "echo-writer":
+            out["check"] = anthropic_env_report()
+        return out

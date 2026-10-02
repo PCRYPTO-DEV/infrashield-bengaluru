@@ -53,3 +53,18 @@ def test_chat_keeps_the_thread_and_returns_actions():
             return "Yesterday was slower here. [[time:past]]"
     r = client(Tagger()).post("/api/chat", json=body).json()
     assert r["text"] == "Yesterday was slower here." and r["actions"] == ["time:past"]
+
+
+def test_status_explains_a_missing_key_without_revealing_one(monkeypatch):
+    from app import config
+    for n in list(__import__("os").environ):
+        if "ANTHROPIC" in n.upper() or "CLAUDE" in n.upper():
+            monkeypatch.delenv(n, raising=False)
+    monkeypatch.setenv("anthropic_api_key ", "  sk-ant-api03-abcdef  ")
+    assert config._anthropic_key() == "sk-ant-api03-abcdef"
+    rep = config.anthropic_env_report()
+    assert rep["keyFound"] and rep["keyLooksRight"] and "abcdef" not in str(rep) and rep["variablesSeen"] == ["anthropic_api_key "]
+    monkeypatch.delenv("anthropic_api_key ")
+    c = client()
+    j = c.get("/api/writer/status").json()
+    assert j["configured"] is False and j["check"]["keyFound"] is False and j["check"]["expectedName"] == "ANTHROPIC_API_KEY"
