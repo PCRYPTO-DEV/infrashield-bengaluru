@@ -13,7 +13,7 @@ serves the built web app from `web/dist` with a single-page fallback.
 | `ATLAS_DATA_DIR` | no | where the SQLite cache lives (default `server/data`) |
 | `TOMTOM_DAILY_BUDGET` | no | calls per UTC day before the server stops asking TomTom (default 2000) |
 | `ATLAS_FIXTURES` | no | folder of recorded responses; runs offline |
-| `OVERPASS_URL` | no | another Overpass endpoint |
+| `OVERPASS_URL` | no | Overpass endpoints, comma separated; each is tried in turn (default: overpass-api.de, then the kumi.systems and private.coffee mirrors) |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | for alerts by message | Twilio credentials. Without them alerts show in the app only. |
 | `TWILIO_FROM_SMS` | for SMS alerts | the Twilio number, e.g. `+1415…` |
 | `TWILIO_FROM_WHATSAPP` | for WhatsApp alerts | the Twilio WhatsApp sender, e.g. `whatsapp:+14155238886` (sandbox) |
@@ -42,7 +42,7 @@ docker run -p 8000:8000 -e TOMTOM_API_KEY=... -e ANTHROPIC_API_KEY=... -v atlas-
 
 ## Outbound hosts the server must reach
 
-- `overpass-api.de` (or your `OVERPASS_URL`)
+- `overpass-api.de`, `overpass.kumi.systems`, `overpass.private.coffee` (or your `OVERPASS_URL` list)
 - `api.tomtom.com`
 - `api.open-meteo.com`
 - `api.anthropic.com`

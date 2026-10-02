@@ -139,7 +139,9 @@ class OverpassClient:
         self.cache = cache
         self.fixtures = fixtures
         self.min_interval = min_interval
-        self.url = url or settings.overpass_url
+        # One or more Overpass endpoints, comma separated; the next one is tried when one fails.
+        self.urls = [u.strip() for u in (url or settings.overpass_url).split(",") if u.strip()]
+        self.url = self.urls[0]
         self._lock = asyncio.Lock()
         self._last = 0.0
         self.live_calls = 0
@@ -171,7 +173,14 @@ class OverpassClient:
                 await asyncio.sleep(wait)
             self._last = time.monotonic()
             self.live_calls += 1
-            async with httpx.AsyncClient(timeout=40) as client:
-                r = await client.post(self.url, data={"data": query}, headers={"User-Agent": "atlas-infinity/0.1"})
-                r.raise_for_status()
-                return r.json().get("elements", [])
+            last_error: Exception | None = None
+            for url in self.urls:
+                try:
+                    async with httpx.AsyncClient(timeout=40) as client:
+                        r = await client.post(url, data={"data": query}, headers={"User-Agent": "atlas-infinity/0.2 (OpenStreetMap data for a live city map)"})
+                        r.raise_for_status()
+                        self.url = url
+                        return r.json().get("elements", [])
+                except Exception as e:  # try the next mirror; the caller sees the last error
+                    last_error = e
+            raise last_error or RuntimeError("no Overpass endpoint configured")

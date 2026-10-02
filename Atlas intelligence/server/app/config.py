@@ -21,7 +21,7 @@ class Settings:
     data_dir: Path = field(default_factory=lambda: Path(os.getenv("ATLAS_DATA_DIR") or (SERVER_DIR / "data")))
     fixtures: Path | None = field(default_factory=lambda: Path(os.environ["ATLAS_FIXTURES"]) if os.getenv("ATLAS_FIXTURES") else None)
     tomtom_daily_budget: int = field(default_factory=lambda: int(os.getenv("TOMTOM_DAILY_BUDGET", "2000")))
-    overpass_url: str = field(default_factory=lambda: os.getenv("OVERPASS_URL", "https://overpass-api.de/api/interpreter"))
+    overpass_url: str = field(default_factory=lambda: os.getenv("OVERPASS_URL", "https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter,https://overpass.private.coffee/api/interpreter"))
     twilio_account_sid: str = field(default_factory=lambda: os.getenv("TWILIO_ACCOUNT_SID", ""))
     twilio_auth_token: str = field(default_factory=lambda: os.getenv("TWILIO_AUTH_TOKEN", ""))
     twilio_from_sms: str = field(default_factory=lambda: os.getenv("TWILIO_FROM_SMS", ""))
