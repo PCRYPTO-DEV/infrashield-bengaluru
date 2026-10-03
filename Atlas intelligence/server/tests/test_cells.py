@@ -84,3 +84,10 @@ def test_cells_in_bbox_uses_cached_tiles_only(tmp_path):
         assert r["considered"] > 0 and all(0 <= x["score"] <= 100 and x["confidence"] is not None for x in r["cells"])
         # cached-only never fetches a tile: the tile cache is untouched by the call
         assert app.state.osm.live_calls == 0
+
+
+def pro_headers(c):
+    """Unlock Pro the way the app does and return the header the app sends."""
+    r = c.post("/api/unlock", json={"password": "atbose-pro"})
+    assert r.status_code == 200 and r.json()["tier"] == "pro"
+    return {"X-Atlas-Token": r.json()["token"]}

@@ -572,3 +572,36 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .ca-trk-table th, .ca-trk-table td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
 .ca-trk-table tr.clickable { cursor: pointer; } .ca-trk-table tr.clickable:hover { background: var(--panel-strong); }
 .ca-trk-link { margin-top: 4px; }
+
+/* ---- status ---- */
+.ca-status-rows { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ca-status-rows li { display: flex; gap: 10px; align-items: flex-start; font-size: 12.5px; }
+.ca-status-rows .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; margin-top: 3px; background: #9AA0A6; }
+.ca-status-rows li.ok .dot { background: #1E8E3E; } .ca-status-rows li.bad .dot { background: #D93025; }
+.ca-status-rows li div { display: flex; flex-direction: column; gap: 2px; }
+.ca-status-rows small { color: var(--fg-soft); } .ca-status-rows small.fix { color: #D93025; }
+.ca-status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #D93025; margin-left: 6px; vertical-align: 2px; }
+
+.ca-rep-list li { display: flex; gap: 6px; align-items: flex-start; }
+.ca-rep-list li > button:first-child { flex: 1; }
+.ca-rep-flag { flex: none; font-size: 11px !important; color: var(--fg-soft) !important; }
+
+/* ---- phone: one callout at a time, chips in one swipeable row ---- */
+@media (max-width: 720px) {
+  .ca-bubble ~ .ca-bubble { display: none; }
+  .ca-bubble { max-width: 210px; font-size: 12px; }
+  .ca-around { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .ca-around::-webkit-scrollbar { display: none; }
+  .ca-around > * { flex: none; }
+}
+
+/* phone: an open panel owns the screen; its own "What next?" stones replace the dock */
+@media (max-width: 720px) { .ca-app.has-panel .ca-stones-dock { display: none; } }
+
+/* phone: the time bar is shorter (no date line, one-line source badge) and Ask sits above it, never under it */
+@media (max-width: 720px) {
+  .ca-timeline .clock small { display: none; }
+  .ca-timeline .clock .ca-badge { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: inline-block; }
+  .ca-ask { bottom: 150px; }
+}
+@media (max-width: 720px) { .ca-stones-dock { bottom: 256px; } }

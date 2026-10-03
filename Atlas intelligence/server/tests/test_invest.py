@@ -4,7 +4,7 @@ import json
 from fastapi.testclient import TestClient
 
 from app.invest import WEIGHTS, combine, grade, supply_signal, verdict, yield_signal, fsi_signal, distress_signal
-from tests.test_cells import LAT, LNG, make
+from tests.test_cells import pro_headers, LAT, LNG, make
 
 
 def test_weights_and_grades_follow_the_deck():
@@ -50,6 +50,7 @@ def test_no_score_below_half_the_weight():
 def test_endpoint_uses_real_signals_and_names_what_is_missing(tmp_path):
     app, _ = make(tmp_path)
     with TestClient(app) as c:
+        c.headers.update(pro_headers(c))
         r = c.get("/api/invest", params={"lng": LNG, "lat": LAT, "name": "Sector 49", "purpose": "investment"})
         assert r.status_code == 200
         d = r.json()

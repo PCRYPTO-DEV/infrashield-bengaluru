@@ -1,3 +1,4 @@
+import { apiFetch } from '../../app/tiers'
 /**
  * Gentrification (City Atlas Pro): the BSOCIAL Community Behaviour and Gentrification indices on
  * real mapped places, headlines and reported crime. Price and rent have no source, so they are
@@ -50,7 +51,7 @@ export function coverageLine(r: Pick<GentriReport, 'gi'>, T: (k: never, v?: Reco
   return T('gen.cov' as never, { p: Math.round(r.gi.coverage * 100) }) + (miss.length ? ` · ${T('gen.cov.missing' as never, { m: miss.join(', ') })}` : '')
 }
 
-export async function fetchGentrification(base: string, p: { lng: number; lat: number; name?: string | null; priceTrend?: number | null }, fetchImpl: typeof fetch = (...a) => fetch(...a)): Promise<GentriReport | GentriPending> {
+export async function fetchGentrification(base: string, p: { lng: number; lat: number; name?: string | null; priceTrend?: number | null }, fetchImpl: typeof fetch = (u, i) => apiFetch(String(u), i)): Promise<GentriReport | GentriPending> {
   const q = new URLSearchParams({ lng: p.lng.toFixed(5), lat: p.lat.toFixed(5) })
   if (p.name) q.set('name', p.name.slice(0, 80))
   if (p.priceTrend !== null && p.priceTrend !== undefined && Number.isFinite(p.priceTrend)) q.set('price_trend', String(p.priceTrend))
@@ -59,7 +60,7 @@ export async function fetchGentrification(base: string, p: { lng: number; lat: n
   return (await r.json()) as GentriReport | GentriPending
 }
 
-export async function fetchGentriGrid(base: string, bbox: { west: number; south: number; east: number; north: number }, fetchImpl: typeof fetch = (...a) => fetch(...a)): Promise<GentriGrid> {
+export async function fetchGentriGrid(base: string, bbox: { west: number; south: number; east: number; north: number }, fetchImpl: typeof fetch = (u, i) => apiFetch(String(u), i)): Promise<GentriGrid> {
   const r = await fetchImpl(`${base}/api/gentrification/grid?bbox=${[bbox.west, bbox.south, bbox.east, bbox.north].map((v) => v.toFixed(4)).join(',')}`)
   if (!r.ok) throw new Error(`gentrification grid: HTTP ${r.status}`)
   return (await r.json()) as GentriGrid

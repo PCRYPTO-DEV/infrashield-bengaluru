@@ -10,7 +10,9 @@ import asyncio
 import time
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
+
+from .access import pro_only
 
 PURPOSES: dict[str, dict[str, float]] = {
     # footfall and reach matter; a quiet, green, walkable street helps
@@ -77,7 +79,7 @@ async def find_sites(cells: Any, bbox: tuple[float, float, float, float], purpos
 
 
 def register(app: FastAPI, cells: Any) -> None:
-    @app.get("/api/sites")
+    @app.get("/api/sites", dependencies=[Depends(pro_only)])
     async def sites(bbox: str = Query(..., max_length=80), purpose: str = Query("cafe", max_length=20), limit: int = Query(6, ge=1, le=12)) -> dict[str, Any]:
         if purpose not in PURPOSES:
             raise HTTPException(400, f"purpose must be one of {', '.join(PURPOSES)}")

@@ -88,3 +88,18 @@ The browser additionally loads the camera detector from
 The web app needs the server for every tile and feed; a static build on
 its own shows an empty map with "tiles have no map data". Always deploy the
 server with the built app in front of it.
+
+
+## Plus and Pro lock, and the status page
+
+Set these in Render → Environment (never in code):
+
+| Variable | What it does |
+|---|---|
+| `ATLAS_PLUS_PASSWORD` | the Plus password |
+| `ATLAS_PRO_PASSWORD` | the Pro password |
+| `ATLAS_SECRET` | any long random text; signs unlock tokens so they survive restarts (`render.yaml` generates one) |
+
+Until they are set the old passwords still work, and the status page shows a red row. A password is swapped for a signed token at `POST /api/unlock`. Pro endpoints (`/api/gentrification`, `/api/gentrification/grid`, `/api/invest`, `/api/sites`) answer 403 without a Pro token.
+
+**Status page:** More → *status*, or `GET /api/status`. Every source (deploy commit, storage disk, TomTom, the Anthropic writer, the lock, Overpass, Google News, Open-Meteo, street tiles, track record) is shown green, red or grey. Red rows include the fix. A red dot on *More* means something needs fixing.

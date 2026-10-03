@@ -1,3 +1,4 @@
+import { apiFetch } from '../../app/tiers'
 /** UINTEL+ INVEST score (City Atlas Pro): five real signals with the deck's weights; information, not advice. */
 export type InvestPurpose = 'investment' | 'office' | 'home' | 'retail' | 'risk'
 export const INVEST_PURPOSES: InvestPurpose[] = ['investment', 'home', 'office', 'retail', 'risk']
@@ -12,7 +13,7 @@ export interface InvestReport {
 export const GRADE_COLORS: Record<string, string> = { 'A+': '#1E8E3E', A: '#34A853', B: '#F9AB00', C: '#E8710A', D: '#D93025' }
 export function gradeColor(g: string | null): string { return g ? GRADE_COLORS[g] ?? '#5F6368' : '#9AA0A6' }
 
-export async function fetchInvest(base: string, p: { lng: number; lat: number; purpose: InvestPurpose; name?: string | null; price?: number | null; rent?: number | null; permittedFar?: number | null }, fetchImpl: typeof fetch = (...a) => fetch(...a)): Promise<InvestReport> {
+export async function fetchInvest(base: string, p: { lng: number; lat: number; purpose: InvestPurpose; name?: string | null; price?: number | null; rent?: number | null; permittedFar?: number | null }, fetchImpl: typeof fetch = (u, i) => apiFetch(String(u), i)): Promise<InvestReport> {
   const q = new URLSearchParams({ lng: p.lng.toFixed(5), lat: p.lat.toFixed(5), purpose: p.purpose })
   if (p.name) q.set('name', p.name.slice(0, 80))
   const pos = (v: number | null | undefined) => v !== null && v !== undefined && Number.isFinite(v) && v > 0

@@ -2,7 +2,7 @@
 from fastapi.testclient import TestClient
 
 from app.sites import PURPOSES, score_cell
-from tests.test_cells import B, make
+from tests.test_cells import pro_headers, B, make
 
 
 def test_score_cell_inverts_gaps_and_skips_no_data():
@@ -19,6 +19,7 @@ def test_score_cell_inverts_gaps_and_skips_no_data():
 def test_sites_endpoint_ranks_cells_from_cached_tiles(tmp_path):
     app, _ = make(tmp_path)
     with TestClient(app) as c:
+        c.headers.update(pro_headers(c))
         bbox = f"{B.west},{B.south},{B.east},{B.north}"
         c.get("/api/place", params={"lng": (B.west + B.east) / 2, "lat": (B.south + B.north) / 2})  # caches the fixture tiles
         r = c.get("/api/sites", params={"bbox": bbox, "purpose": "cafe"}).json()

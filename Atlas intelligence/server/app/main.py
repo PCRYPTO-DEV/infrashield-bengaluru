@@ -63,8 +63,11 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
 
     app = FastAPI(title="Atlas Infinity", version="0.2.0", lifespan=lifespan)
     app.state.cache = cache
+    from .access import Access, register as register_access
+    app.state.access = Access(cache)
+    register_access(app, app.state.access)
     app.state.osm = osm
-    app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5174", "http://127.0.0.1:5174"], allow_methods=["GET", "POST", "DELETE"], allow_headers=["*"])
+    app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5174", "http://127.0.0.1:5174"], allow_methods=["GET", "POST", "DELETE"], allow_headers=["*"])  # X-Atlas-Token included
 
     @app.get("/api/health")
     async def health():
@@ -129,6 +132,8 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
     from .trackrecord import TrackRecord, register as register_trackrecord
     app.state.trackrecord = TrackRecord(osm, history, app.state.tomtom, fixtures)
     register_trackrecord(app, app.state.trackrecord)
+    from .status import Status, register as register_status
+    register_status(app, Status(app, history, fixtures))
     changes = ChangeEngine(history, air)
 
     @app.get("/api/place")

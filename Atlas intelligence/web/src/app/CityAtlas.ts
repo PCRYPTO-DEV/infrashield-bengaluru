@@ -34,7 +34,7 @@ import { SnapshotRecorder } from '../engine/simulation/snapshotRecorder'
 import { TimeMachine, type TimeKind } from '../data/realtime/timeMachine'
 import { parseIntent } from '../intelligence/reasoning/intentParser'
 import { saveItem } from './saved'
-import { fetchReports, postReport, type CrimeReport, type ReportKind } from '../data/adapters/reportsAdapter'
+import { fetchReports, postReport, flagReport, type CrimeReport, type ReportKind } from '../data/adapters/reportsAdapter'
 import { fetchInvest, type InvestPurpose } from '../data/adapters/investAdapter'
 import { fetchGentriGrid, fetchGentrification, giColor, coverageLine, type GentriGrid, type GentriReport } from '../data/adapters/gentrificationAdapter'
 import { inkDocument } from '../rendering/svg/inkSvg'
@@ -51,13 +51,13 @@ import type { AgentView } from '../engine/world/WorldModel'
 import { deriveInsights, type Insight } from '../intelligence/insights/insightEngine'
 import { fetchPlace, fetchChanges, type PlaceState, type ChangeReport } from '../data/adapters/placeAdapter'
 import { routeBetween as serverRoute, type RouteAnswer, type RouteOption } from '../data/adapters/routeAdapter'
-import { loadTier, saveTier, unlockWithPassword, hasFeature, type Tier, type Feature } from './tiers'
+import { loadTier, setToken, unlockOnServer, onTokenRejected, apiFetch, hasFeature, type Tier, type Feature, type UnlockResult } from './tiers'
 import { tr, type StringKey } from '../ui/i18n'
 import type { IntelligenceState } from '../intelligence/types'
 
 export type Theme = 'day' | 'night'
 export type StoneKind = 'look' | 'go' | 'safe' | 'change' | 'worth'
-export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'sites' | 'scenario' | 'saved' | 'report' | 'changed' | 'gentrification' | 'invest' | 'trackrecord'
+export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'sites' | 'scenario' | 'saved' | 'report' | 'changed' | 'gentrification' | 'invest' | 'trackrecord' | 'status'
 
 export const DEFAULT_SEED = REGIONS[DEFAULT_REGION].seed
 /** Base URL of the Atlas server; empty means same origin (Vite proxies /api in dev). */
@@ -531,10 +531,18 @@ export class CityAtlas {
     this.reportsKey = key; this.reportsAt = now
     try {
       const r = await fetchReports(SERVER_BASE, bbox)
-      this.reports = r.items
+      this.reports = r.items.filter((x) => !this.flaggedReports.has(x.id))
       this.reportsNews = r.news ?? null
       this.notify()
     } catch { /* the layer is optional; the last list stays */ }
+  }
+  /** Reports this browser flagged as untrue (not shown again here; three people hide one for everyone). */
+  flaggedReports = new Set<string>()
+  async flagReport(id: string): Promise<void> {
+    this.flaggedReports.add(id)
+    this.reports = this.reports.filter((r) => r.id !== id)
+    this.notify()
+    try { await flagReport(SERVER_BASE, id) } catch { /* the hide here stays; the server keeps its own count */ }
   }
   /** Send a report; it comes back to everyone (this browser included) through the stream. */
   async reportCrime(kind: ReportKind, description: string, ll: LngLat): Promise<CrimeReport> {
@@ -754,10 +762,17 @@ export class CityAtlas {
   }
 
   tier: Tier = loadTier()
+  /** When the server rejects the token (expired, or a new secret), the app locks back to free. */
+  readonly tokenWatch: void = onTokenRejected(() => { if (this.tier !== 'free') this.lock() })
   can(f: Feature): boolean { return hasFeature(this.tier, f) }
   /** Plus is a password for now; a wrong one returns false. */
-  unlock(password: string, want: Tier = 'plus'): boolean { const t = unlockWithPassword(password); if (!t || (want === 'pro' && t !== 'pro')) return false; this.tier = t; saveTier(t); this.notify(); return true }
-  lock(): void { this.tier = 'free'; saveTier('free'); this.notify() }
+  /** The server checks the password and hands back a signed token; a Plus password does not open a Pro card. */
+  async unlock(password: string, want: Tier = 'plus'): Promise<UnlockResult> {
+    const r = await unlockOnServer(SERVER_BASE, password)
+    if ('tier' in r) { this.tier = r.tier; this.notify(); if (want === 'pro' && r.tier !== 'pro') return { error: 'wrong' } }
+    return r
+  }
+  lock(): void { this.tier = 'free'; setToken(null); this.notify() }
 
   // ---------- insights for the people who run the city ----------
   insights: Insight[] = []
@@ -909,7 +924,7 @@ export class CityAtlas {
     let summary: string
     let rings: number[][][] = []
     try {
-      const r = await fetch(`${SERVER_BASE}/api/sites?bbox=${bbox}&purpose=${purpose}&limit=3`)
+      const r = await apiFetch(`${SERVER_BASE}/api/sites?bbox=${bbox}&purpose=${purpose}&limit=3`)
       if (!r.ok) { let d = `HTTP ${r.status}`; try { d = String((await r.json()).detail ?? d) } catch { /* not json */ } throw new Error(d) }
       const a = (await r.json()) as { candidates: Array<{ cell: string; centre: { lng: number; lat: number }; boundary: number[][]; score: number | null; coverage: number; why: Array<{ key: string; score: number; inverted: boolean }>; gaps: string[] }>; cellsChecked: number }
       const dn = (k: string) => tr(this.language, `dim.${k}` as StringKey)

@@ -33,11 +33,14 @@ export function InsightBubbles({ app, onOpen, onReport }: { app: CityAtlas; onOp
     return () => clearTimeout(id)
   }, [withPoint.map((i) => i.id).join('|'), reports.map((r) => r.id).join('|')]) // eslint-disable-line react-hooks/exhaustive-deps
   const local = (lng: number, lat: number) => app.camera.worldToScreen(app.localOf({ lng, lat }))
+  // keep callouts out of the toolbars at the top (taller on a phone, where they stack)
+  const topClear = (typeof window !== 'undefined' && window.innerWidth <= 720 ? 250 : 120) + 70
+  const offscreen = (s: { x: number; y: number }) => s.x < -200 || s.y < topClear || s.x > app.camera.width + 200 || s.y > app.camera.height + 100
   return (
     <div className="ca-bubbles" aria-live="polite">
       {reports.map((r) => {
         const s = local(r.lng, r.lat)
-        if (s.x < -200 || s.y < -100 || s.x > app.camera.width + 200 || s.y > app.camera.height + 100) return null
+        if (offscreen(s)) return null
         const when = r.ageMin < 60 ? T('rep.min', { n: r.ageMin }) : T('rep.hr', { n: Math.round(r.ageMin / 60) })
         return (
           <div key={r.id} className={`ca-bubble crime${fresh.has(r.id) ? ' pop' : ''}`} style={{ left: s.x, top: s.y }} onClick={onReport ?? onOpen} role="button" title={r.evidence.source}>
@@ -49,7 +52,7 @@ export function InsightBubbles({ app, onOpen, onReport }: { app: CityAtlas; onOp
       })}
       {withPoint.map((i) => {
         const s = app.camera.worldToScreen(i.point!)
-        if (s.x < -200 || s.y < -100 || s.x > app.camera.width + 200 || s.y > app.camera.height + 100) return null
+        if (offscreen(s)) return null
         return (
           <div key={i.id} className={`ca-bubble ${i.kind} sev-${severityBand(i)}${fresh.has(i.id) ? ' pop' : ''}`} style={{ left: s.x, top: s.y }} onClick={onOpen} role="button" title={i.source}>
             <span className="ca-bubble-txt">{T(i.key as StringKey, i.vars)}</span>

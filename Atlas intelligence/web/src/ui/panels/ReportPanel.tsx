@@ -44,7 +44,7 @@ export function ReportPanel({ app }: { app: CityAtlas }) {
       {err && <p className="note" style={{ color: 'var(--risk)' }}>{err}</p>}
       <h4>{T('rep.today', { n: nearby.length })}</h4>
       {nearby.length === 0 && <p className="note">{T('rep.today.none')}</p>}
-      <ul className="ca-rep-list">{nearby.slice(0, 14).map((r) => <li key={r.id}><button className={r.source === 'news' ? 'news' : ''} onClick={() => app.flyToLngLat(r.lng, r.lat, 16.5)}>☠ <b>{T(`rep.k.${r.kind}` as StringKey)}</b> · {r.ageMin < 60 ? T('rep.min', { n: r.ageMin }) : T('rep.hr', { n: Math.round(r.ageMin / 60) })}{r.source === 'news' && r.publisher ? ` · ${r.publisher}` : ''}{r.description ? <small>{r.description}</small> : null}</button></li>)}</ul>
+      <ul className="ca-rep-list">{nearby.slice(0, 14).map((r) => <li key={r.id}><button className={r.source === 'news' ? 'news' : ''} onClick={() => app.flyToLngLat(r.lng, r.lat, 16.5)}>☠ <b>{T(`rep.k.${r.kind}` as StringKey)}</b> · {r.ageMin < 60 ? T('rep.min', { n: r.ageMin }) : T('rep.hr', { n: Math.round(r.ageMin / 60) })}{r.source === 'news' && r.publisher ? ` · ${r.publisher}` : ''}{r.description ? <small>{r.description}</small> : null}</button><button className="small ca-rep-flag" title={T('rep.flag.tip')} onClick={() => void app.flagReport(r.id)}>{T('rep.flag')}</button></li>)}</ul>
       {app.reportsNews?.city && <p className="note">{T('rep.news.city', { c: app.reportsNews.city, n: app.reportsNews.unplaced ?? 0 })}</p>}
       <p className="note"><span className="ca-badge observed">{T.cls('observed')}</span> {T('rep.source')}</p>
       <Stones app={app} variant="next" exclude="safe" />

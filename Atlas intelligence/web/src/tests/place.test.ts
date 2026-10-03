@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { orderDimensions, viewScore, strengthsAndWeaknesses, questionsWorthAsking, bestMatch } from '../intelligence/place/relevance'
-import { hasFeature, unlockWithPassword, FEATURES } from '../app/tiers'
+import { hasFeature, tierFromToken, unlockOnServer, FEATURES } from '../app/tiers'
 import type { Dimension, PlaceState } from '../data/adapters/placeAdapter'
 
 const d = (key: string, score: number | null, cls: Dimension['class'] = 'derived'): Dimension => ({ key, score, band: null, class: cls, confidence: score === null ? null : 0.6, confidenceWord: null, why: [`${key} why`], provenance: [], note: score === null ? 'no data' : null })
@@ -46,9 +46,14 @@ describe('tiers', () => {
     expect(hasFeature('pro', 'pro.scenario')).toBe(true)
     expect(Object.values(FEATURES).every((t) => ['free', 'plus', 'pro'].includes(t))).toBe(true)
   })
-  it('the password unlocks plus and nothing else', () => {
-    expect(unlockWithPassword('atbose')).toBe('plus')
-    expect(unlockWithPassword(' atbose ')).toBe('plus')
-    expect(unlockWithPassword('wrong')).toBeNull()
+  it('reads the tier from the server token, and nothing unlocks without the server', async () => {
+    const tok = (t: string, exp: number) => `${btoa(JSON.stringify({ t, exp })).replace(/=+$/, '')}.sig`
+    expect(tierFromToken(tok('pro', Date.now() / 1000 + 3600))).toBe('pro')
+    expect(tierFromToken(tok('pro', Date.now() / 1000 - 10))).toBe('free')
+    expect(tierFromToken(null)).toBe('free')
+    const wrong = (async () => new Response('{}', { status: 401 })) as unknown as typeof fetch
+    expect(await unlockOnServer('', 'atbose', wrong)).toEqual({ error: 'wrong' })
+    const busy = (async () => new Response('{}', { status: 429 })) as unknown as typeof fetch
+    expect(await unlockOnServer('', 'x', busy)).toEqual({ error: 'tries' })
   })
 })

@@ -21,3 +21,10 @@ export async function postReport(base: string, body: { kind: ReportKind; descrip
   if (!r.ok) { let d = `HTTP ${r.status}`; try { d = String((await r.json()).detail ?? d) } catch { /* not json */ } throw new Error(d) }
   return (await r.json()) as CrimeReport
 }
+
+/** "This is not true": three different people hide a report for everyone. */
+export async function flagReport(base: string, id: string, fetchImpl: typeof fetch = (...a) => fetch(...a)): Promise<{ id: string; flags: number; hidden: boolean; counted: boolean }> {
+  const r = await fetchImpl(`${base}/api/reports/${encodeURIComponent(id)}/flag`, { method: 'POST' })
+  if (!r.ok) { let d = `HTTP ${r.status}`; try { d = String((await r.json()).detail ?? d) } catch { /* not json */ } throw new Error(d) }
+  return (await r.json()) as { id: string; flags: number; hidden: boolean; counted: boolean }
+}

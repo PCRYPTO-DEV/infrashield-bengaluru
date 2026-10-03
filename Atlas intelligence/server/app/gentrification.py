@@ -25,7 +25,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
+
+from .access import pro_only
 
 from .news import city_for, parse_feed
 from .osm import http_client
@@ -578,12 +580,12 @@ class Gentrification:
 
 
 def register(app: FastAPI, engine: Gentrification) -> None:
-    @app.get("/api/gentrification")
+    @app.get("/api/gentrification", dependencies=[Depends(pro_only)])
     async def gentrification(lng: float = Query(..., ge=60, le=100), lat: float = Query(..., ge=5, le=38), name: str | None = Query(None, max_length=80), price_trend: float | None = Query(None, ge=-50, le=100)) -> dict[str, Any]:
         """Gentrification for the 1 km around a point in India: CBI, GI, archetype, two years of mapped-place momentum, advisory."""
         return await engine.report(lng, lat, name=(name or "").strip() or None, price_trend=price_trend)
 
-    @app.get("/api/gentrification/grid")
+    @app.get("/api/gentrification/grid", dependencies=[Depends(pro_only)])
     async def gentrification_grid(bbox: str = Query(..., pattern=r"^-?[\d.]+,-?[\d.]+,-?[\d.]+,-?[\d.]+$")) -> dict[str, Any]:
         w, s, e, n = (float(v) for v in bbox.split(","))
         if not (w < e and s < n) or (e - w) * (n - s) > MAX_GRID_DEG2:

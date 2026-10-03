@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CityAtlas } from '../app/CityAtlas'
+import { CityAtlas, SERVER_BASE } from '../app/CityAtlas'
 import { REGIONS, PLACES, regionFromSearch } from '../app/regions'
 import { useAppVersion } from './useApp'
 import { CityView } from './CityView'
@@ -19,6 +19,7 @@ import { SiteFinderPanel } from './panels/SiteFinderPanel'
 import { GentrificationPanel } from './panels/GentrificationPanel'
 import { InvestPanel } from './panels/InvestPanel'
 import { TrackRecordPanel } from './panels/TrackRecordPanel'
+import { StatusPanel, fetchStatus } from './panels/StatusPanel'
 import { giColor } from '../data/adapters/gentrificationAdapter'
 import { ScenarioPanel } from './panels/ScenarioPanel'
 import { SavedPanel } from './panels/SavedPanel'
@@ -34,8 +35,8 @@ import { lngLatToLocal } from '../geo/projection/frame'
 import type { PlaceState } from '../data/adapters/placeAdapter'
 import { Stones } from './controls/Stones'
 
-type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'changed' | 'compare' | 'sites' | 'scenario' | 'saved' | 'report' | 'gentrification' | 'invest' | 'trackrecord' | null
-const TOOLS = ['insights', 'layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'compare', 'sites', 'gentrification', 'invest', 'trackrecord', 'scenario', 'saved', 'report'] as const
+type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'changed' | 'compare' | 'sites' | 'scenario' | 'saved' | 'report' | 'gentrification' | 'invest' | 'trackrecord' | 'status' | null
+const TOOLS = ['insights', 'layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'compare', 'sites', 'gentrification', 'invest', 'trackrecord', 'status', 'scenario', 'saved', 'report'] as const
 
 function seedFromUrl(): string {
   const p = new URLSearchParams(window.location.search)
@@ -64,6 +65,9 @@ export default function App() {
   const embed = useMemo(() => readEmbedParams(window.location.search), [])
   const [tool, setTool] = useState<Tool>(embed.tool ?? null)
   const [more, setMore] = useState(false)
+  // a small red dot on More when a server source is broken (checked once a load; the Status panel has the details)
+  const [problems, setProblems] = useState(0)
+  useEffect(() => { fetchStatus(SERVER_BASE).then((s) => setProblems(s.problems), () => setProblems(0)) }, [])
   const [compare, setCompare] = useState<Array<{ name: string; state: PlaceState }>>([])
   useEffect(() => { if (app.toolRequest) { setTool(app.toolRequest); app.toolRequest = null } }, [app.toolRequest]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const u = () => unlockAudio(); window.addEventListener('pointerdown', u, { once: true }); window.addEventListener('keydown', u, { once: true }); return () => { window.removeEventListener('pointerdown', u); window.removeEventListener('keydown', u) } }, [])
@@ -109,10 +113,10 @@ export default function App() {
     return installEmbed(app)
   }, [app, embed])
   const addCompare = (name: string, st: PlaceState) => { setCompare((c) => (c.some((x) => x.state.cell === st.cell) || c.length >= 3 ? c : [...c, { name, state: st }])); setTool('compare') }
-  const sidePanel = tool === 'zones' || tool === 'route' || tool === 'upload' || tool === 'pulse' || tool === 'sites' || tool === 'gentrification' || tool === 'invest' || tool === 'trackrecord' || tool === 'scenario' || tool === 'saved' || tool === 'report'
+  const sidePanel = tool === 'zones' || tool === 'route' || tool === 'upload' || tool === 'pulse' || tool === 'sites' || tool === 'gentrification' || tool === 'invest' || tool === 'trackrecord' || tool === 'status' || tool === 'scenario' || tool === 'saved' || tool === 'report'
   const cardOverList = (tool === 'sites' || tool === 'saved' || tool === 'gentrification' || tool === 'invest') && !!app.placePoint
   return (
-    <div className={`ca-app ${app.theme}${embed.embed ? ' ca-embed' : ''}`}>
+    <div className={`ca-app ${app.theme}${embed.embed ? ' ca-embed' : ''}${tool || app.placePoint || app.selection ? ' has-panel' : ''}`}>
       <CityView key={`${regionId}:${seed}:${placeKey}`} app={app} />
 
       {/* 1. the mark, with language and theme */}
@@ -135,7 +139,7 @@ export default function App() {
           <select className="ca-place-select" title={T('place.goto')} value={placeNow} onChange={(e) => goPlace(e.target.value)}>{placeKey.startsWith('ll:') && <option value="">{cityName.name}</option>}{PLACES.map((c) => <option key={c.id} value={c.id}>{app.language === 'hi' ? c.hi : c.name}</option>)}</select>
           <button className={`ca-tool ca-changed-btn ${tool === 'changed' ? 'active' : ''}`} onClick={() => toggle('changed')}>{T('changed.btn')}{app.changes && app.changes.count > 0 && <b>{app.changes.count}</b>}</button>
           <button className={`ca-tool ca-report-btn ${tool === 'report' ? 'active' : ''}`} onClick={() => { toggle('report'); app.select(null) }} title={T('rep.title')}>{T('rep.btn')}{app.reports.length > 0 && <b>{app.reports.length}</b>}</button>
-          <button className={`ca-tool ${more ? 'active' : ''}`} onClick={() => setMore(!more)}>{T('more')} {more ? '▴' : '▾'}</button>
+          <button className={`ca-tool ${more ? 'active' : ''}`} onClick={() => setMore(!more)}>{T('more')} {more ? '▴' : '▾'}{problems > 0 && <span className="ca-status-dot" title={T('st.problems', { n: problems })} />}</button>
         </div>
         {more && <div className="ca-more" role="menu">
           <button className="ca-more-close" aria-label="close" onClick={() => setMore(false)}>×</button>
@@ -158,6 +162,7 @@ export default function App() {
       {tool === 'gentrification' && !app.selection && <div className="ca-keep" hidden={cardOverList}><GentrificationPanel app={app} /></div>}
       {tool === 'invest' && !app.selection && <div className="ca-keep" hidden={cardOverList}><InvestPanel app={app} /></div>}
       {tool === 'trackrecord' && !app.selection && <TrackRecordPanel app={app} />}
+      {tool === 'status' && !app.selection && <StatusPanel app={app} />}
       {tool === 'scenario' && !app.selection && <ScenarioPanel app={app} />}
       {tool === 'report' && !app.selection && <ReportPanel app={app} />}
       {tool === 'saved' && !app.selection && <div className="ca-keep" hidden={cardOverList}><SavedPanel app={app} /></div>}

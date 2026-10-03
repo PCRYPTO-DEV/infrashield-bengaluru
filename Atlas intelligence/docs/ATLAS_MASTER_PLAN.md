@@ -127,7 +127,7 @@ App
 | Compare | – | 3 neighbourhoods | market intelligence |
 | Scenario lab, site finder, reports, projects | – | – | Pro |
 
-Gate today: a password (`atbose`) unlocks Plus on this browser; Pro is shown locked with its scope. Replace with accounts and billing when tested pricing exists.
+Gate today: passwords set on the server (`ATLAS_PLUS_PASSWORD`, `ATLAS_PRO_PASSWORD`) are swapped for a signed token; Pro endpoints answer 403 without it. Replace with accounts and billing when tested pricing exists.
 
 ## 9. Phases
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.gentrification import (ARCHETYPES, advisory, archetypes, cbi, classify, components, counts_within, developer_grade, gi, gi_class, history_query, months_ago_iso, project, te, trend)
-from tests.test_cells import LAT, LNG, make
+from tests.test_cells import pro_headers, LAT, LNG, make
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -101,6 +101,7 @@ def test_endpoint_reports_real_parts_and_says_what_is_missing(tmp_path):
     app, history = make(tmp_path)
     history.record_report("theft", "phone snatched", LNG + 0.001, LAT, "t1")
     with TestClient(app) as c:
+        c.headers.update(pro_headers(c))
         r = c.get("/api/gentrification", params={"lng": LNG, "lat": LAT, "name": "Sector 49"})
         assert r.status_code == 200
         d = r.json()

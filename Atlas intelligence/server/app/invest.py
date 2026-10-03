@@ -24,7 +24,9 @@ import time
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
+
+from .access import pro_only
 
 from .cells import ring_area_m2
 from .gentrification import te
@@ -296,7 +298,7 @@ class Invest:
 
 
 def register(app: FastAPI, engine: Invest) -> None:
-    @app.get("/api/invest")
+    @app.get("/api/invest", dependencies=[Depends(pro_only)])
     async def invest(lng: float = Query(..., ge=60, le=100), lat: float = Query(..., ge=5, le=38), purpose: str = Query("investment", max_length=20),
                      name: str | None = Query(None, max_length=80), price: float | None = Query(None, gt=0, le=1e12), rent: float | None = Query(None, gt=0, le=1e10),
                      permitted_far: float | None = Query(None, gt=0, le=20)) -> dict[str, Any]:

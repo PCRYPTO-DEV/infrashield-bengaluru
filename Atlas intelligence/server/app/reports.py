@@ -18,6 +18,7 @@ from .memory import History
 KINDS = ("theft", "snatching", "harassment", "assault", "vandalism", "suspicious", "accident", "other")
 KEEP_S = 86400
 MAX_PER_DAY = 10
+MAX_FLAGS_PER_DAY = 20
 MAX_BBOX_DEG2 = 0.25
 
 
@@ -50,6 +51,17 @@ def register(app: FastAPI, history: History, news: Any = None) -> None:
         now = time.time()
         r = history.record_report(body.kind, body.description.strip(), body.lng, body.lat, who, now)
         return shape(r, now)
+
+    @app.post("/api/reports/{report_id}/flag")
+    def flag(report_id: str, request: Request) -> dict[str, Any]:
+        """'This is not true': three different people hide a report. Twenty flags per person per day."""
+        who = _reporter(request)
+        if history.flags_today_by(who) >= MAX_FLAGS_PER_DAY:
+            raise HTTPException(429, "that is enough flags from one place for one day")
+        r = history.flag_report(report_id[:40], who)
+        if r is None:
+            raise HTTPException(404, "no such report")
+        return r
 
     @app.get("/api/reports")
     async def list_reports(bbox: str = Query(..., max_length=80), since: float = Query(KEEP_S, ge=60, le=KEEP_S)) -> dict[str, Any]:

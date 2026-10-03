@@ -25,3 +25,17 @@ def test_reports_round_trip_and_limits(tmp_path):
         # a report from yesterday is no longer shown
         history.record_report("theft", "old", 77.25, 28.65, "x", ts=__import__("time").time() - 90000)
         assert c.get("/api/reports", params={"bbox": "77.2,28.6,77.3,28.7"}).json()["count"] == 10
+
+
+def test_three_people_flagging_hides_a_report(tmp_path):
+    from app.memory import History
+    h = History(tmp_path / "f.db")
+    r = h.record_report("theft", "made up", 77.2, 28.6, "someone")
+    box = (77.1, 28.5, 77.3, 28.7)
+    assert len(h.reports_in_bbox(*box)) == 1
+    assert h.flag_report(r["id"], "a")["hidden"] is False
+    assert h.flag_report(r["id"], "a")["counted"] is False  # the same person twice counts once
+    assert h.flag_report(r["id"], "b")["flags"] == 2
+    assert h.flag_report(r["id"], "c")["hidden"] is True
+    assert h.reports_in_bbox(*box) == []
+    assert h.flag_report("nope", "a") is None

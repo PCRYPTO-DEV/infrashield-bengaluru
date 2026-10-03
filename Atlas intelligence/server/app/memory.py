@@ -20,6 +20,8 @@ from pydantic import BaseModel, Field
 
 MIN_SAMPLES = 3
 BASELINE_DAYS = 28
+# a report flagged as untrue by this many different people is hidden for everyone
+HIDE_AT_FLAGS = 3
 
 
 class History:
@@ -42,7 +44,8 @@ class History:
         c.execute("CREATE TABLE IF NOT EXISTS cell_daily (h3 TEXT NOT NULL, day TEXT NOT NULL, score REAL, vector TEXT, PRIMARY KEY (h3, day))")
         c.execute("CREATE TABLE IF NOT EXISTS crime_reports (id TEXT PRIMARY KEY, ts REAL NOT NULL, kind TEXT NOT NULL, description TEXT, lng REAL NOT NULL, lat REAL NOT NULL, reporter TEXT)")
         c.execute("CREATE INDEX IF NOT EXISTS rep_ts ON crime_reports (ts)")
-        for col, typ in (("source", "TEXT"), ("url", "TEXT"), ("precision_m", "REAL"), ("publisher", "TEXT")):
+        c.execute("CREATE TABLE IF NOT EXISTS report_flags (report TEXT NOT NULL, flagger TEXT NOT NULL, ts REAL NOT NULL, PRIMARY KEY (report, flagger))")
+        for col, typ in (("source", "TEXT"), ("url", "TEXT"), ("precision_m", "REAL"), ("publisher", "TEXT"), ("flags", "INTEGER DEFAULT 0")):
             try:
                 c.execute(f"ALTER TABLE crime_reports ADD COLUMN {col} {typ}")
             except sqlite3.OperationalError:
@@ -129,8 +132,25 @@ class History:
     def reports_in_bbox(self, west: float, south: float, east: float, north: float, since_s: float = 86400, now: float | None = None, limit: int = 200) -> list[dict[str, Any]]:
         now = time.time() if now is None else now
         with self._lock:
-            rows = self._conn.execute("SELECT id, ts, kind, description, lng, lat, source, url, precision_m, publisher FROM crime_reports WHERE ts >= ? AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? ORDER BY ts DESC LIMIT ?", (now - since_s, west, east, south, north, limit)).fetchall()
+            rows = self._conn.execute("SELECT id, ts, kind, description, lng, lat, source, url, precision_m, publisher FROM crime_reports WHERE ts >= ? AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? AND COALESCE(flags, 0) < ? ORDER BY ts DESC LIMIT ?", (now - since_s, west, east, south, north, HIDE_AT_FLAGS, limit)).fetchall()
         return [{"id": r[0], "ts": r[1], "kind": r[2], "description": r[3], "lng": r[4], "lat": r[5], "source": r[6] or "person", "url": r[7], "precisionM": r[8], "publisher": r[9]} for r in rows]
+
+    def flag_report(self, report_id: str, flagger: str, now: float | None = None) -> dict[str, Any] | None:
+        """One flag per person per report; at HIDE_AT_FLAGS different people the report is hidden for everyone."""
+        now = time.time() if now is None else now
+        with self._lock:
+            if not self._conn.execute("SELECT 1 FROM crime_reports WHERE id = ?", (report_id,)).fetchone():
+                return None
+            new = self._conn.execute("INSERT OR IGNORE INTO report_flags VALUES (?,?,?)", (report_id, flagger, now)).rowcount
+            n = int(self._conn.execute("SELECT COUNT(*) FROM report_flags WHERE report = ?", (report_id,)).fetchone()[0])
+            self._conn.execute("UPDATE crime_reports SET flags = ? WHERE id = ?", (n, report_id))
+            self._conn.commit()
+        return {"id": report_id, "flags": n, "hidden": n >= HIDE_AT_FLAGS, "counted": bool(new)}
+
+    def flags_today_by(self, flagger: str, now: float | None = None) -> int:
+        now = time.time() if now is None else now
+        with self._lock:
+            return int(self._conn.execute("SELECT COUNT(*) FROM report_flags WHERE flagger = ? AND ts >= ?", (flagger, now - 86400)).fetchone()[0])
 
     def reports_today_by(self, reporter: str, now: float | None = None) -> int:
         now = time.time() if now is None else now

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { SERVER_BASE, type CityAtlas } from '../../app/CityAtlas'
 import { makeT, type StringKey } from '../i18n'
 import { TierGate } from './TierGate'
+import { apiFetch } from '../../app/tiers'
 
 export const PURPOSES = ['cafe', 'pharmacy', 'clinic', 'school', 'shop', 'office', 'logistics', 'housing'] as const
 export type Purpose = (typeof PURPOSES)[number]
@@ -43,7 +44,7 @@ export function SiteFinderPanel({ app }: { app: CityAtlas }) {
       const v = app.camera.viewBounds()
       const sw = app.lngLatOf({ x: v.minX, y: v.maxY }), ne = app.lngLatOf({ x: v.maxX, y: v.minY })
       const bbox = [Math.min(sw.lng, ne.lng), Math.min(sw.lat, ne.lat), Math.max(sw.lng, ne.lng), Math.max(sw.lat, ne.lat)].map((x) => x.toFixed(4)).join(',')
-      const r = await fetch(`${SERVER_BASE}/api/sites?bbox=${bbox}&purpose=${p}&limit=5`)
+      const r = await apiFetch(`${SERVER_BASE}/api/sites?bbox=${bbox}&purpose=${p}&limit=5`)
       if (!r.ok) { let d = `HTTP ${r.status}`; try { d = String((await r.json()).detail ?? d) } catch { /* not json */ } throw new Error(d) }
       const a = (await r.json()) as SiteAnswer
       setAns(a)
