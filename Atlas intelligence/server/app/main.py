@@ -123,6 +123,9 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
     gentri = Gentrification(osm, history, cells, fixtures)
     app.state.gentrification = gentri
     register_gentrification(app, gentri)
+    from .invest import Invest, register as register_invest
+    app.state.invest = Invest(osm, cells, gentri, fixtures)
+    register_invest(app, app.state.invest)
     changes = ChangeEngine(history, air)
 
     @app.get("/api/place")

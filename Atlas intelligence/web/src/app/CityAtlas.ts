@@ -35,6 +35,7 @@ import { TimeMachine, type TimeKind } from '../data/realtime/timeMachine'
 import { parseIntent } from '../intelligence/reasoning/intentParser'
 import { saveItem } from './saved'
 import { fetchReports, postReport, type CrimeReport, type ReportKind } from '../data/adapters/reportsAdapter'
+import { fetchInvest, type InvestPurpose } from '../data/adapters/investAdapter'
 import { fetchGentriGrid, fetchGentrification, giColor, coverageLine, type GentriGrid, type GentriReport } from '../data/adapters/gentrificationAdapter'
 import { inkDocument } from '../rendering/svg/inkSvg'
 import { ClaudeExplainer, type Language } from '../intelligence/reasoning/claudeExplainer'
@@ -55,7 +56,7 @@ import { tr, type StringKey } from '../ui/i18n'
 import type { IntelligenceState } from '../intelligence/types'
 
 export type Theme = 'day' | 'night'
-export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'sites' | 'scenario' | 'saved' | 'report' | 'changed' | 'gentrification'
+export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'sites' | 'scenario' | 'saved' | 'report' | 'changed' | 'gentrification' | 'invest'
 
 export const DEFAULT_SEED = REGIONS[DEFAULT_REGION].seed
 /** Base URL of the Atlas server; empty means same origin (Vite proxies /api in dev). */
@@ -553,6 +554,41 @@ export class CityAtlas {
     return !!best
   }
 
+  // ---- Pro: UINTEL+ INVEST score ----
+  investIntent: { lng: number; lat: number; name: string | null; purpose?: InvestPurpose } | null = null
+  openInvest(lng: number, lat: number, name: string | null, purpose?: InvestPurpose): void { this.closePlace(); this.investIntent = { lng, lat, name, purpose }; this.requestTool('invest'); this.notify() }
+  /** Ask Atlas: "analyse Bandra West for an office investment", "should I invest in Whitefield", "risk profile for Cyber City". */
+  private async askInvest(question: string): Promise<Answer | null> {
+    if (this.region.source !== 'osm') return null
+    const q = question.trim()
+    if (!/\binvest|investment|risk profile|good (for|place) (to )?(buy|co-?work|office)|should i buy|property|निवेश|ख़रीद/i.test(q)) return null
+    const T = (k: StringKey, v?: Record<string, string | number>) => tr(this.language, k, v)
+    const purpose: InvestPurpose = /office|co-?work|दफ़्तर/i.test(q) ? 'office' : /shop|retail|store|दुकान/i.test(q) ? 'retail' : /risk/i.test(q) ? 'risk' : /home|live|flat|घर/i.test(q) ? 'home' : 'investment'
+    const m = q.match(/(?:\b(?:analyse|analyze|in|of|for|at|near|is)\s+)([A-Za-z0-9][A-Za-z0-9 ,.'-]{1,60}?)(?:\s+(?:for|good|a|an|as|worth)\b|[?.!]|$)/i)
+    const raw = m ? m[1].trim() : ''
+    const placeName = raw && !/^(this|here|it|the area|my area|invest(ment)?|property)$/i.test(raw) ? raw : null
+    let lng: number, lat: number, name: string | null = null
+    if (placeName) {
+      try {
+        const { geocode } = await import('../data/adapters/routeAdapter')
+        const g = await geocode(SERVER_BASE, placeName, this.lngLatOf(this.camera.centre))
+        if (!g.length) return null
+        lng = g[0].lng; lat = g[0].lat; name = g[0].name
+      } catch { return null }
+      this.flyToLngLat(lng, lat, Math.max(this.camera.zoom, 15))
+    } else { const c = this.lngLatOf(this.camera.centre); lng = c.lng; lat = c.lat; name = this.nearestAreaName(this.camera.centre) }
+    this.openInvest(lng, lat, name, purpose)
+    const empty = { points: [], entityIds: [], agentIds: [] }
+    if (!this.can('pro.invest')) return { question, intent: 'help', summary: T('inv.locked'), classification: 'observed', evidence: [], highlights: empty, caveats: [], writer: 'template' } as Answer
+    try {
+      const r = await fetchInvest(SERVER_BASE, { lng, lat, purpose, name })
+      const at = lngLatToLocal(this.frame, { lng, lat })
+      const scoreText = r.score === null ? T('inv.noscore', { p: Math.round(r.coverage * 100) }) : `${Math.round(r.score)}/100, ${T('inv.grade', { g: r.grade ?? '' })}`
+      const facts: Answer['evidence'] = r.signals.map((s) => ({ id: `invest:${s.key}`, classification: (s.class === 'observed' ? 'observed' : 'derived') as 'observed' | 'derived', statement: `${s.key} (${Math.round(s.weight * 100)}%): ${s.score === null ? 'no data' : Math.round(s.score)}. ${s.why.join(' ')}`, location: at, source: s.class === 'observed' ? 'google-news' : 'atlas-invest', confidence: s.confidence ?? 0.3 }))
+      return { question, intent: 'place', summary: T('inv.ask.summary', { a: name ?? T('gen.where'), p: T(`inv.p.${purpose}` as StringKey).toLowerCase(), s: scoreText, v: r.verdict.join(' ') }), classification: 'derived', evidence: facts, highlights: { points: [at], entityIds: [], agentIds: [] }, caveats: [T('inv.notadvice')], writer: 'template' } as Answer
+    } catch (e) { return { question, intent: 'help', summary: (e as Error).message, classification: 'observed', evidence: [], highlights: empty, caveats: [], writer: 'template' } as Answer }
+  }
+
   // ---- Pro: gentrification (BSOCIAL indices on real mapped places) ----
   /** What the gentrification panel should open on (from Ask Atlas, the place card or a hex click). */
   gentriIntent: { lng: number; lat: number; name: string | null; question?: string } | null = null
@@ -877,7 +913,7 @@ export class CityAtlas {
     const focus = this.camera.viewBounds()
     if (this.writerConfigured !== true && Date.now() - this.writerCheckedAt > 20_000) await this.checkWriter()
     // 1. The deterministic tools: facts and highlights for whatever the question is about.
-    let answer = (await this.askGentrification(question)) ?? (await this.askPlaceOrChange(question)) ?? (await this.askSites(question))
+    let answer = (await this.askGentrification(question)) ?? (await this.askInvest(question)) ?? (await this.askPlaceOrChange(question)) ?? (await this.askSites(question))
     if (!answer) {
       answer = await askTheCity(question, { world: this.world, intel: this.intel.state, memory: this.memory, time: this.temporal.current.timestamp, focus, focusPoint: this.camera.centre, unitPerMetre: this.world.unitPerMetre, explainer: this.writer, language: this.language })
       answer.writer = this.writer.lastWriter
@@ -921,7 +957,7 @@ export class CityAtlas {
   /** An action tag from the writer: open a panel or move the clock. */
   private actOn(tag: string): void {
     const [kind, v] = tag.split(':')
-    if (kind === 'open' && ['changed', 'route', 'sites', 'report', 'scenario', 'saved', 'camera', 'alerts', 'zones', 'insights', 'gentrification'].includes(v)) this.requestTool(v as ToolName)
+    if (kind === 'open' && ['changed', 'route', 'sites', 'report', 'scenario', 'saved', 'camera', 'alerts', 'zones', 'insights', 'gentrification', 'invest'].includes(v)) this.requestTool(v as ToolName)
     if (kind === 'time') { const live = this.temporal.liveTimestamp(); if (v === 'past') this.temporal.seek(live - 3600_000); else if (v === 'future') this.temporal.seek(live + 3600_000); else this.temporal.goLive() }
   }
 

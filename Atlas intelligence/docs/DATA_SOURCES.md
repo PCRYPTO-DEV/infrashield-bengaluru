@@ -13,6 +13,8 @@
 | OpenStreetMap history (Overpass `[date:…]` + `out count`) | how many places, premium places and food places were mapped 24/18/12/6 months ago, for 1 km and a 5 km ring (gentrification momentum) | `gentrification.py` | observed counts → derived trend | SQLite, 30 days | free; 5 count queries per area, once a month |
 | Overpass places census (amenity/shop/leisure/office, BSOCIAL query) | every mapped place within 2.5 km of an H3 res-7 cell, classified with BSOCIAL's categories | `gentrification.py` → `/api/gentrification`, `/api/gentrification/grid` | observed | SQLite, 7 days | free |
 | Google News RSS (area search) | headlines naming an area in the last 30 days (digital buzz) | `gentrification.py` | observed | 6 h | free, no key |
+| Overpass construction count (`landuse`/`building` = construction, 1.5 km) | competing projects for the UINTEL+ supply signal | `invest.py` → `/api/invest` | observed count → derived score | SQLite, 7 days | free |
+| Google News RSS (distress search) | headlines naming the area with auction, SARFAESI, NCLT, insolvency, stalled-project words, 6 months | `invest.py` | observed | 12 h | free, no key |
 | Anthropic API | plain-words answers | `/api/explain`, `/api/ask` | rephrases only; never a source of facts | prompt cache | per token |
 
 ## TomTom budget

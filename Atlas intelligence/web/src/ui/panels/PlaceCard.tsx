@@ -98,6 +98,7 @@ export function PlaceCard({ app, onCompare }: { app: CityAtlas; onCompare: (name
           <button className="small" onClick={() => onCompare(name, st)}>{T('place.compare.add')}</button>
           <button className="small" onClick={() => setReport(!report)}>{T('report.btn')}</button>
           <button className="small ca-gentri-btn" title={app.can('pro.gentrification') ? '' : T('gen.locked')} onClick={() => { app.select(null); app.openGentrification(st.centre.lng, st.centre.lat, name) }}>{T('gen.here')}{!app.can('pro.gentrification') && <span className="ca-pro-tag">PRO</span>}</button>
+          <button className="small ca-gentri-btn" title={app.can('pro.invest') ? '' : T('inv.locked')} onClick={() => { app.select(null); app.openInvest(st.centre.lng, st.centre.lat, name) }}>{T('inv.here')}{!app.can('pro.invest') && <span className="ca-pro-tag">PRO</span>}</button>
           <button className="small" disabled={watched} onClick={() => { if (!app.can('watchlist')) { setReport(false); setWatch(true); return } app.save({ kind: 'place', name: T('saved.place.name', { n: name }), lng: st.centre.lng, lat: st.centre.lat, score: st.score, data: { band: st.band, dimensions: st.dimensions.map((d) => ({ key: d.key, score: d.score })) } }); setWatched(true) }}>{watched ? T('saved.done') : T('saved.watch')}</button>
         </div>
         {watch && !app.can('watchlist') && <TierGate app={app} feature="watchlist"><span /></TierGate>}

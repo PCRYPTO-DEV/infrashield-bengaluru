@@ -150,7 +150,12 @@ def make_gentrification(out: Path, lng: float, lat: float) -> int:
     items = "".join(f"<item><title>Connaught Place {t} (synthetic) - Fixture</title><link>https://example.org/{i}</link><pubDate>{format_datetime(now - timedelta(days=d))}</pubDate><source url='https://example.org'>Fixture</source></item>"
                     for i, (t, d) in enumerate([("new cafe row", 3), ("metro exit reopens", 11), ("traders meet", 19)]))
     (out / "news_area_default.xml").write_text(f"<?xml version='1.0'?><rss><channel>{items}</channel></rss>")
-    return 8
+    # UINTEL+: construction count and distress headlines (synthetic)
+    (out / "overpass_construction_default.json").write_text(json.dumps({"elements": [{"type": "count", "tags": {"total": "6"}}], "synthetic": True}))
+    d_items = "".join(f"<item><title>Connaught Place {t} (synthetic) - Fixture</title><link>https://example.org/d{i}</link><pubDate>{format_datetime(now - timedelta(days=d))}</pubDate><source url='https://example.org'>Fixture</source></item>"
+                      for i, (t, d) in enumerate([("shop unit e-auction under SARFAESI", 12), ("builder insolvency plea at NCLT", 60)]))
+    (out / "news_distress_default.xml").write_text(f"<?xml version='1.0'?><rss><channel>{d_items}</channel></rss>")
+    return 10
 
 
 if __name__ == "__main__":

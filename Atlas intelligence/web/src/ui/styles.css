@@ -521,3 +521,16 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .ca-gen-src summary { cursor: pointer; font-size: 12.5px; margin-top: 8px; }
 .ca-gen-tip { position: fixed; z-index: 40; pointer-events: none; background: #fff; color: #202124; border: 1px solid #dadce0; border-radius: 8px; padding: 6px 9px; box-shadow: 0 2px 8px rgba(0,0,0,.15); display: flex; flex-direction: column; font-size: 12.5px; max-width: 230px; }
 .ca-pro-tag { margin-left: 5px; font-size: 9.5px; font-weight: 800; background: #0F6FFF; color: #fff; border-radius: 3px; padding: 0 4px; vertical-align: 1px; }
+
+/* ---- Pro: UINTEL+ INVEST ---- */
+.ca-invest h4 { margin: 12px 0 6px; }
+.ca-inv-figs { margin-top: 8px; font-size: 12.5px; }
+.ca-inv-figs summary { cursor: pointer; }
+.ca-inv-figs label { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 6px 0; }
+.ca-inv-figs input { width: 140px; }
+.ca-inv-head { display: flex; gap: 12px; align-items: center; }
+.ca-inv-score { width: 84px; height: 84px; border: 6px solid; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none; }
+.ca-inv-score b { font-size: 26px; line-height: 1; }
+.ca-inv-score small { font-size: 11px; font-weight: 700; }
+.ca-inv-verdict { margin: 0; padding-left: 18px; font-size: 13px; }
+.ca-gen-bars li small.why a { display: block; color: #0F6FFF; }

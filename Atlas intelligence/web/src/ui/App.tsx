@@ -17,6 +17,7 @@ import { WhatChanged } from './panels/WhatChanged'
 import { ComparePanel } from './panels/ComparePanel'
 import { SiteFinderPanel } from './panels/SiteFinderPanel'
 import { GentrificationPanel } from './panels/GentrificationPanel'
+import { InvestPanel } from './panels/InvestPanel'
 import { giColor } from '../data/adapters/gentrificationAdapter'
 import { ScenarioPanel } from './panels/ScenarioPanel'
 import { SavedPanel } from './panels/SavedPanel'
@@ -31,8 +32,8 @@ import { installEmbed, readEmbedParams } from '../app/embed'
 import { lngLatToLocal } from '../geo/projection/frame'
 import type { PlaceState } from '../data/adapters/placeAdapter'
 
-type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'changed' | 'compare' | 'sites' | 'scenario' | 'saved' | 'report' | 'gentrification' | null
-const TOOLS = ['insights', 'layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'compare', 'sites', 'gentrification', 'scenario', 'saved', 'report'] as const
+type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'changed' | 'compare' | 'sites' | 'scenario' | 'saved' | 'report' | 'gentrification' | 'invest' | null
+const TOOLS = ['insights', 'layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'compare', 'sites', 'gentrification', 'invest', 'scenario', 'saved', 'report'] as const
 
 function seedFromUrl(): string {
   const p = new URLSearchParams(window.location.search)
@@ -106,8 +107,8 @@ export default function App() {
     return installEmbed(app)
   }, [app, embed])
   const addCompare = (name: string, st: PlaceState) => { setCompare((c) => (c.some((x) => x.state.cell === st.cell) || c.length >= 3 ? c : [...c, { name, state: st }])); setTool('compare') }
-  const sidePanel = tool === 'zones' || tool === 'route' || tool === 'upload' || tool === 'pulse' || tool === 'sites' || tool === 'gentrification' || tool === 'scenario' || tool === 'saved' || tool === 'report'
-  const cardOverList = (tool === 'sites' || tool === 'saved' || tool === 'gentrification') && !!app.placePoint
+  const sidePanel = tool === 'zones' || tool === 'route' || tool === 'upload' || tool === 'pulse' || tool === 'sites' || tool === 'gentrification' || tool === 'invest' || tool === 'scenario' || tool === 'saved' || tool === 'report'
+  const cardOverList = (tool === 'sites' || tool === 'saved' || tool === 'gentrification' || tool === 'invest') && !!app.placePoint
   return (
     <div className={`ca-app ${app.theme}${embed.embed ? ' ca-embed' : ''}`}>
       <CityView key={`${regionId}:${seed}:${placeKey}`} app={app} />
@@ -150,6 +151,7 @@ export default function App() {
       {/* list panels stay mounted (their results survive) while a place card opened from them is on top */}
       {tool === 'sites' && !app.selection && <div className="ca-keep" hidden={cardOverList}><SiteFinderPanel app={app} /></div>}
       {tool === 'gentrification' && !app.selection && <div className="ca-keep" hidden={cardOverList}><GentrificationPanel app={app} /></div>}
+      {tool === 'invest' && !app.selection && <div className="ca-keep" hidden={cardOverList}><InvestPanel app={app} /></div>}
       {tool === 'scenario' && !app.selection && <ScenarioPanel app={app} />}
       {tool === 'report' && !app.selection && <ReportPanel app={app} />}
       {tool === 'saved' && !app.selection && <div className="ca-keep" hidden={cardOverList}><SavedPanel app={app} /></div>}
