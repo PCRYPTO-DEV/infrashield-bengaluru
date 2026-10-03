@@ -126,6 +126,9 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
     from .invest import Invest, register as register_invest
     app.state.invest = Invest(osm, cells, gentri, fixtures)
     register_invest(app, app.state.invest)
+    from .trackrecord import TrackRecord, register as register_trackrecord
+    app.state.trackrecord = TrackRecord(osm, history, app.state.tomtom, fixtures)
+    register_trackrecord(app, app.state.trackrecord)
     changes = ChangeEngine(history, air)
 
     @app.get("/api/place")

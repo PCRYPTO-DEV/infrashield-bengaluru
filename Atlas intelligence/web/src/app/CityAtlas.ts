@@ -57,7 +57,7 @@ import type { IntelligenceState } from '../intelligence/types'
 
 export type Theme = 'day' | 'night'
 export type StoneKind = 'look' | 'go' | 'safe' | 'change' | 'worth'
-export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'sites' | 'scenario' | 'saved' | 'report' | 'changed' | 'gentrification' | 'invest'
+export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'sites' | 'scenario' | 'saved' | 'report' | 'changed' | 'gentrification' | 'invest' | 'trackrecord'
 
 export const DEFAULT_SEED = REGIONS[DEFAULT_REGION].seed
 /** Base URL of the Atlas server; empty means same origin (Vite proxies /api in dev). */
@@ -977,7 +977,7 @@ export class CityAtlas {
   /** An action tag from the writer: open a panel or move the clock. */
   private actOn(tag: string): void {
     const [kind, v] = tag.split(':')
-    if (kind === 'open' && ['changed', 'route', 'sites', 'report', 'scenario', 'saved', 'camera', 'alerts', 'zones', 'insights', 'gentrification', 'invest'].includes(v)) this.requestTool(v as ToolName)
+    if (kind === 'open' && ['changed', 'route', 'sites', 'report', 'scenario', 'saved', 'camera', 'alerts', 'zones', 'insights', 'gentrification', 'invest', 'trackrecord'].includes(v)) this.requestTool(v as ToolName)
     if (kind === 'time') { const live = this.temporal.liveTimestamp(); if (v === 'past') this.temporal.seek(live - 3600_000); else if (v === 'future') this.temporal.seek(live + 3600_000); else this.temporal.goLive() }
   }
 

@@ -240,7 +240,8 @@ def project(xs: list[float], ys: list[float], ahead: tuple[float, ...] = (6, 12)
     for m in ahead:
         x = xs[-1] + m
         p = icpt + slope * x
-        band = rmse * (1 + m * 0.15)
+        # widening fit error (BSOCIAL), never narrower than the ordinary noise of a count (Poisson, about 90%)
+        band = max(rmse * (1 + m * 0.15), 1.645 * math.sqrt(max(1.0, p)))
         out.append({"months": m, "predicted": round(max(0.0, p), 1), "upper": round(max(0.0, p + band), 1), "lower": round(max(0.0, p - band), 1), "confidence": round(max(0.2, 1 - m * 0.06), 2)})
     return {"points": out, "slopePerYear": round(slope * 12, 2)}
 

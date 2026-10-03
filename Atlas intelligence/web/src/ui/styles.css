@@ -559,3 +559,16 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .ca-stones-dock .ca-stones-row::before { left: 23px; top: 22px; bottom: 22px; }
   .ca-stone svg { width: 48px; height: 48px; }
 }
+
+/* ---- track record ---- */
+.ca-track h4 { margin: 14px 0 6px; }
+.ca-trk-big { display: flex; align-items: center; gap: 12px; }
+.ca-trk-big b { font-size: 40px; line-height: 1; color: #0F6FFF; }
+.ca-trk-big b small { font-size: 18px; color: var(--fg-faint, #5f6368); }
+.ca-trk-big span { font-size: 13px; }
+.ca-trk-facts { margin: 8px 0 0; padding-left: 18px; font-size: 12.5px; }
+.ca-trk-facts .good, .ca-trk-table .good { color: #1E8E3E; } .ca-trk-facts .bad, .ca-trk-table .bad { color: #D93025; }
+.ca-trk-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
+.ca-trk-table th, .ca-trk-table td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.ca-trk-table tr.clickable { cursor: pointer; } .ca-trk-table tr.clickable:hover { background: var(--panel-strong); }
+.ca-trk-link { margin-top: 4px; }

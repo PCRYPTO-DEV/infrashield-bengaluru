@@ -149,3 +149,10 @@ def test_a_failed_source_is_remembered_not_hammered(tmp_path):
     h1 = asyncio.run(g.history_series("883dac9a85fffff", 1759449600))
     h2 = asyncio.run(g.history_series("883dac9a85fffff", 1759449600))
     assert h1["failed"] and h2["failed"] and osm.calls == 2
+
+
+def test_projection_band_is_never_narrower_than_count_noise():
+    import math as _m
+    p = project([-24, -18, -12, -6, 0], [2, 4, 6, 8, 10])  # a perfect line: zero fit error
+    pt = p["points"][1]
+    assert pt["upper"] - pt["predicted"] >= 1.645 * _m.sqrt(pt["predicted"]) - 0.1

@@ -136,6 +136,7 @@ export function GentrificationPanel({ app }: { app: CityAtlas }) {
             <p>{T('gen.mom.line', { a: rep.momentum.premiumFrom, b: rep.momentum.premiumTo, g: rep.momentum.areaGrowth ?? '–', r: rep.momentum.ringGrowth ?? '–' })} <b>{T(`gen.trend.${rep.momentum.trend.direction}` as StringKey)}</b>.</p>
             <p className="note">{rep.momentum.projection ? T('gen.proj', { p: Math.round(rep.momentum.projection.points[1].predicted), lo: Math.round(rep.momentum.projection.points[1].lower), hi: Math.round(rep.momentum.projection.points[1].upper) }) : T('gen.proj.none')}</p>
             <p className="note">{T('gen.mom.caveat')}</p>
+            <button className="small ca-trk-link" onClick={() => app.requestTool('trackrecord')}>{T('trk.link')}</button>
           </>}
 
           <h4>{T('gen.adv')} · <span style={{ color: ADVISORY_COLORS[rep.advisory.level] }}>{T(`gen.adv.level.${rep.advisory.level}` as StringKey)}</span></h4>

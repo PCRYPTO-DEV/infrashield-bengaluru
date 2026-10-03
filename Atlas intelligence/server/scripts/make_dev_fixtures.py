@@ -144,7 +144,7 @@ def make_gentrification(out: Path, lng: float, lat: float) -> int:
             a, r = rng.random() * 2 * math.pi, rng.uniform(40, 2400)
             els.append({"type": "node", "id": len(els) + 1, "lat": lat + r * math.sin(a) / 110570, "lon": lng + r * math.cos(a) / (111320 * math.cos(math.radians(lat))), "tags": {"name": f"synthetic {i}", **tags}})
     (out / "overpass_census_default.json").write_text(json.dumps({"elements": els, "synthetic": True}))
-    for m, (t, p, f, ring) in {24: (120, 3, 25, 9000), 18: (130, 4, 27, 9300), 12: (142, 5, 30, 9600), 6: (151, 6, 33, 9800), 0: (160, 8, 36, 10000)}.items():
+    for m, (t, p, f, ring) in {36: (100, 2, 21, 8500), 30: (110, 2, 23, 8800), 24: (120, 3, 25, 9000), 18: (130, 4, 27, 9300), 12: (142, 5, 30, 9600), 6: (151, 6, 33, 9800), 0: (160, 8, 36, 10000)}.items():
         (out / f"overpass_history_{m}.json").write_text(json.dumps({"elements": [{"type": "count", "tags": {"total": str(v)}} for v in (t, p, f, ring)], "synthetic": True}))
     now = datetime.now(timezone.utc)
     items = "".join(f"<item><title>Connaught Place {t} (synthetic) - Fixture</title><link>https://example.org/{i}</link><pubDate>{format_datetime(now - timedelta(days=d))}</pubDate><source url='https://example.org'>Fixture</source></item>"
