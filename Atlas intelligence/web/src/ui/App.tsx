@@ -16,6 +16,8 @@ import { PlaceCard } from './panels/PlaceCard'
 import { WhatChanged } from './panels/WhatChanged'
 import { ComparePanel } from './panels/ComparePanel'
 import { SiteFinderPanel } from './panels/SiteFinderPanel'
+import { GentrificationPanel } from './panels/GentrificationPanel'
+import { giColor } from '../data/adapters/gentrificationAdapter'
 import { ScenarioPanel } from './panels/ScenarioPanel'
 import { SavedPanel } from './panels/SavedPanel'
 import { ReportPanel } from './panels/ReportPanel'
@@ -29,8 +31,8 @@ import { installEmbed, readEmbedParams } from '../app/embed'
 import { lngLatToLocal } from '../geo/projection/frame'
 import type { PlaceState } from '../data/adapters/placeAdapter'
 
-type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'changed' | 'compare' | 'sites' | 'scenario' | 'saved' | 'report' | null
-const TOOLS = ['insights', 'layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'compare', 'sites', 'scenario', 'saved', 'report'] as const
+type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'changed' | 'compare' | 'sites' | 'scenario' | 'saved' | 'report' | 'gentrification' | null
+const TOOLS = ['insights', 'layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'compare', 'sites', 'gentrification', 'scenario', 'saved', 'report'] as const
 
 function seedFromUrl(): string {
   const p = new URLSearchParams(window.location.search)
@@ -104,8 +106,8 @@ export default function App() {
     return installEmbed(app)
   }, [app, embed])
   const addCompare = (name: string, st: PlaceState) => { setCompare((c) => (c.some((x) => x.state.cell === st.cell) || c.length >= 3 ? c : [...c, { name, state: st }])); setTool('compare') }
-  const sidePanel = tool === 'zones' || tool === 'route' || tool === 'upload' || tool === 'pulse' || tool === 'sites' || tool === 'scenario' || tool === 'saved' || tool === 'report'
-  const cardOverList = (tool === 'sites' || tool === 'saved') && !!app.placePoint
+  const sidePanel = tool === 'zones' || tool === 'route' || tool === 'upload' || tool === 'pulse' || tool === 'sites' || tool === 'gentrification' || tool === 'scenario' || tool === 'saved' || tool === 'report'
+  const cardOverList = (tool === 'sites' || tool === 'saved' || tool === 'gentrification') && !!app.placePoint
   return (
     <div className={`ca-app ${app.theme}${embed.embed ? ' ca-embed' : ''}`}>
       <CityView key={`${regionId}:${seed}:${placeKey}`} app={app} />
@@ -147,6 +149,7 @@ export default function App() {
       {tool === 'pulse' && !app.selection && <PulsePanel app={app} />}
       {/* list panels stay mounted (their results survive) while a place card opened from them is on top */}
       {tool === 'sites' && !app.selection && <div className="ca-keep" hidden={cardOverList}><SiteFinderPanel app={app} /></div>}
+      {tool === 'gentrification' && !app.selection && <div className="ca-keep" hidden={cardOverList}><GentrificationPanel app={app} /></div>}
       {tool === 'scenario' && !app.selection && <ScenarioPanel app={app} />}
       {tool === 'report' && !app.selection && <ReportPanel app={app} />}
       {tool === 'saved' && !app.selection && <div className="ca-keep" hidden={cardOverList}><SavedPanel app={app} /></div>}
@@ -158,6 +161,11 @@ export default function App() {
       {(!sidePanel || cardOverList) && tool !== 'changed' && tool !== 'compare' && !app.selection && <PlaceCard app={app} onCompare={addCompare} />}
       <InspectorPanel app={app} />
       <InsightBubbles app={app} onOpen={() => setTool('insights')} onReport={() => setTool('report')} />
+      {app.gentriHover && !app.reportHover && (() => { const h = app.gentriHover.cell; return (
+        <div className="ca-gen-tip" style={{ left: Math.min(app.gentriHover.x + 14, window.innerWidth - 240), top: Math.max(8, app.gentriHover.y - 12) }}>
+          <b style={{ color: giColor(h.cls as never) }}>{h.cls ? T(`gen.class.${h.cls}` as StringKey) : T('gen.nodata')}</b>
+          <small>{T('gen.tip', { g: h.gi ?? '–', c: T('gen.gicomp.amenityPremium'), n: h.places })}</small>
+        </div>) })()}
       {app.reportHover && (() => { const r = app.reportHover.report; const when = r.ageMin < 60 ? T('rep.min', { n: r.ageMin }) : T('rep.hr', { n: Math.round(r.ageMin / 60) }); return (
         <div className="ca-skull-tip" style={{ left: Math.min(app.reportHover.x + 14, window.innerWidth - 300), top: Math.max(8, app.reportHover.y - 12) }} lang={app.language === 'hi' ? 'hi' : 'en'}>
           <b>☠ {T(`rep.k.${r.kind}` as StringKey)}</b> <span>{when}</span>

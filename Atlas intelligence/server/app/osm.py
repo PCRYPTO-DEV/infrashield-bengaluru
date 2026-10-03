@@ -322,6 +322,34 @@ class OverpassClient:
                 return json.loads(f.read_text()).get("elements", [])
             raise LookupError(f"no fixture for {key}")
         query = (MAJOR_QUERY if tier == "district" else STREET_QUERY).format(bbox=bbox.overpass()).replace("[timeout:25]", f"[timeout:{timeout_s}]")
+        try:
+            return (await self._post(query, key, timeout_s)).get("elements", [])
+        except Exception as e:
+            last_error: Exception | None = e
+            # Every mirror failed: the official API on a different host, splitting the area when it is too dense.
+            if settings.osm_api_url:
+                try:
+                    elements = await self._map_api(bbox, tier)
+                    self.url = settings.osm_api_url
+                    self.last_error = None
+                    log.info("osm %s via the OpenStreetMap API (%d elements)", key, len(elements))
+                    return elements
+                except Exception as e2:
+                    self.last_error = f"{settings.osm_api_url}: {type(e2).__name__}: {str(e2)[:160]} (after Overpass: {self.last_error})"
+                    log.warning("osm %s failed via the map API too: %s: %s", key, type(e2).__name__, str(e2)[:200])
+                    last_error = e2
+            raise last_error
+
+    async def raw(self, query: str, key: str, timeout_s: int = 60) -> dict[str, Any]:
+        """Any Overpass QL query through the same mirrors, slots and pacing; fixtures mode reads `<key>.json`."""
+        if self.fixtures is not None:
+            f = self.fixtures / (key.replace(":", "_").replace("/", "_") + ".json")
+            if f.exists():
+                return json.loads(f.read_text())
+            raise LookupError(f"no fixture for {key}")
+        return await self._post(query, key, timeout_s)
+
+    async def _post(self, query: str, key: str, timeout_s: int) -> dict[str, Any]:
         async with self._slots:
             async with self._lock:
                 wait = self.min_interval - (time.monotonic() - self._last)
@@ -342,24 +370,12 @@ class OverpassClient:
                         self._down.pop(url, None)
                         self.last_error = None
                         log.info("osm %s via %s in %.1fs", key, url, time.monotonic() - t0)
-                        return r.json().get("elements", [])
+                        return r.json()
                 except Exception as e:  # try the next mirror; the caller sees the last error
                     last_error = e
                     self._down[url] = time.monotonic() + DOWN_SECONDS
                     self.last_error = f"{url}: {type(e).__name__}: {str(e)[:160]}"
                     log.warning("osm %s failed via %s after %.1fs: %s: %s", key, url, time.monotonic() - t0, type(e).__name__, str(e)[:200])
-            # Every mirror failed: the official API on a different host, splitting the area when it is too dense.
-            if settings.osm_api_url:
-                try:
-                    elements = await self._map_api(bbox, tier)
-                    self.url = settings.osm_api_url
-                    self.last_error = None
-                    log.info("osm %s via the OpenStreetMap API (%d elements)", key, len(elements))
-                    return elements
-                except Exception as e:
-                    self.last_error = f"{settings.osm_api_url}: {type(e).__name__}: {str(e)[:160]} (after Overpass: {self.last_error})"
-                    log.warning("osm %s failed via the map API too: %s: %s", key, type(e).__name__, str(e)[:200])
-                    last_error = e
             raise last_error or RuntimeError("no Overpass endpoint configured")
 
     async def _map_api(self, bbox: BBox, tier: str, depth: int = 0) -> list[dict[str, Any]]:

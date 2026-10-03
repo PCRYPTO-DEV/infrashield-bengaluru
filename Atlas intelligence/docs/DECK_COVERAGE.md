@@ -48,3 +48,4 @@ Legend: ✅ working on real data · 🟡 working with a stated limit · ⛔ not 
 - **Time**: three buttons, PAST · NOW · FUTURE, and a slider from yesterday to six hours ahead; the clock says what the map shows and how sure it is.
 - **Pro**: More → *open Pro* opens the site finder with its password card; once open, the More menu lists *site finder*, *scenario lab* and *saved & projects*; the place card gains *Client report* and *Watch this area*.
 - **Ask**: typing "Where should I open a café?" answers in words and opens the site finder for the full list.
+- **Gentrification (Pro)**: More → *gentrification*, or *Gentrification here* on any place card, or ask "is Hauz Khas gentrifying?": BSOCIAL's CBI and GI on real mapped places, two years of map history, archetype, advisory and a hex layer; price and rent show as missing (see `docs/GENTRIFICATION.md`).

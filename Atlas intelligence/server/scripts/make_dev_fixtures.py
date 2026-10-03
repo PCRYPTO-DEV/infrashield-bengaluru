@@ -123,11 +123,35 @@ def main() -> None:
     (out / "tomtom_incidents_default.json").write_text(json.dumps(inc))
     (out / "weather_default.json").write_text(json.dumps({"current": {"temperature_2m": 31.4, "relative_humidity_2m": 58, "precipitation": 0.0, "weather_code": 2, "wind_speed_10m": 9.5, "time": "2026-10-02T09:00"}, "synthetic": True}))
     n += 2
+    # air quality (synthetic): one reading reused for every spot
+    (out / "air.json").write_text(json.dumps({"current": {"time": "2026-10-02T06:00", "european_aqi": 58, "us_aqi": 112, "pm2_5": 41.2, "pm10": 88.0, "nitrogen_dioxide": 31.0, "ozone": 60.0}}))
+    n += 1 + make_gentrification(out, lng, lat)
     print(f"wrote {n} synthetic fixtures to {out}")
+
+
+def make_gentrification(out: Path, lng: float, lat: float) -> int:
+    """Synthetic Overpass census, two years of counts and an area news feed for the gentrification panel (offline only)."""
+    import math
+    from datetime import datetime, timedelta, timezone
+    from email.utils import format_datetime
+    rng = random.Random(49)
+    els = []
+    kinds = [({"amenity": "cafe"}, 14), ({"amenity": "restaurant"}, 22), ({"leisure": "fitness_centre"}, 4), ({"amenity": "school"}, 5), ({"amenity": "clinic"}, 4),
+             ({"leisure": "park"}, 5), ({"amenity": "bank"}, 7), ({"shop": "convenience"}, 60), ({"shop": "clothes"}, 25), ({"amenity": "coworking_space"}, 2),
+             ({"shop": "organic"}, 2), ({"amenity": "spa"}, 2), ({"amenity": "cafe", "name": "Artisan Roasters"}, 2)]
+    for tags, k in kinds:
+        for i in range(k):
+            a, r = rng.random() * 2 * math.pi, rng.uniform(40, 2400)
+            els.append({"type": "node", "id": len(els) + 1, "lat": lat + r * math.sin(a) / 110570, "lon": lng + r * math.cos(a) / (111320 * math.cos(math.radians(lat))), "tags": {"name": f"synthetic {i}", **tags}})
+    (out / "overpass_census_default.json").write_text(json.dumps({"elements": els, "synthetic": True}))
+    for m, (t, p, f, ring) in {24: (120, 3, 25, 9000), 18: (130, 4, 27, 9300), 12: (142, 5, 30, 9600), 6: (151, 6, 33, 9800), 0: (160, 8, 36, 10000)}.items():
+        (out / f"overpass_history_{m}.json").write_text(json.dumps({"elements": [{"type": "count", "tags": {"total": str(v)}} for v in (t, p, f, ring)], "synthetic": True}))
+    now = datetime.now(timezone.utc)
+    items = "".join(f"<item><title>Connaught Place {t} (synthetic) - Fixture</title><link>https://example.org/{i}</link><pubDate>{format_datetime(now - timedelta(days=d))}</pubDate><source url='https://example.org'>Fixture</source></item>"
+                    for i, (t, d) in enumerate([("new cafe row", 3), ("metro exit reopens", 11), ("traders meet", 19)]))
+    (out / "news_area_default.xml").write_text(f"<?xml version='1.0'?><rss><channel>{items}</channel></rss>")
+    return 8
 
 
 if __name__ == "__main__":
     main()
-
-# air quality (synthetic): one reading reused for every spot
-(OUT / "air.json").write_text(json.dumps({"current": {"time": "2026-10-02T06:00", "european_aqi": 58, "us_aqi": 112, "pm2_5": 41.2, "pm10": 88.0, "nitrogen_dioxide": 31.0, "ozone": 60.0}}))

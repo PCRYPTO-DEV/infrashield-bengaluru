@@ -25,6 +25,8 @@ export interface WorldState {
   zones: MonitoringZone[]
   selection: Selection | null
   highlights: { points: WorldPoint[]; entityIds: string[]; agentIds: number[]; rings?: WorldPoint[][]; pins?: Array<{ point: WorldPoint; label: string }> }
+  /** filled cells of a map layer (e.g. gentrification), drawn under highlights */
+  hexes?: Array<{ ring: WorldPoint[]; fill: string }>
   /** crime reports in view: pink skulls; news ones carry an approximate radius in metres */
   reports?: Array<{ point: WorldPoint; precisionM?: number | null; fresh?: boolean }>
   route: RouteResult | null

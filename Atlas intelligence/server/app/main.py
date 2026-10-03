@@ -119,6 +119,10 @@ def create_app(cache: Cache | None = None, fixtures: Path | None = None, writer=
     app.state.cells = cells
     from .sites import register as register_sites
     register_sites(app, cells)
+    from .gentrification import Gentrification, register as register_gentrification
+    gentri = Gentrification(osm, history, cells, fixtures)
+    app.state.gentrification = gentri
+    register_gentrification(app, gentri)
     changes = ChangeEngine(history, air)
 
     @app.get("/api/place")

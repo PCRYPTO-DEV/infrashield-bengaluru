@@ -167,6 +167,13 @@ export class DynamicCanvasRenderer {
       const pulse = 0.5 + 0.5 * Math.sin(s.wallClock / 500)
       ctx.beginPath(); ctx.arc(p.x, p.y, (8 + pulse * 4) * px, 0, Math.PI * 2); ctx.strokeStyle = this.c.selection; ctx.lineWidth = 1.5 * px; ctx.stroke()
     }
+    // ---- filled cells of a map layer (gentrification): soft fill, white edges so streets stay readable ----
+    for (const h of s.hexes ?? []) {
+      if (h.ring.length < 3) continue
+      ctx.beginPath(); h.ring.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath()
+      ctx.fillStyle = h.fill; ctx.globalAlpha = 0.3; ctx.fill(); ctx.globalAlpha = 0.9
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * px; ctx.stroke(); ctx.globalAlpha = 1
+    }
     for (const id of s.highlights.entityIds) this.outlineEntity(ctx, s, id, this.c.selection, px)
     for (const [i, pin] of (s.highlights.pins ?? []).entries()) {
       // a numbered pin: the first is the pick, the rest follow

@@ -35,6 +35,7 @@ import { TimeMachine, type TimeKind } from '../data/realtime/timeMachine'
 import { parseIntent } from '../intelligence/reasoning/intentParser'
 import { saveItem } from './saved'
 import { fetchReports, postReport, type CrimeReport, type ReportKind } from '../data/adapters/reportsAdapter'
+import { fetchGentriGrid, fetchGentrification, giColor, coverageLine, type GentriGrid, type GentriReport } from '../data/adapters/gentrificationAdapter'
 import { inkDocument } from '../rendering/svg/inkSvg'
 import { ClaudeExplainer, type Language } from '../intelligence/reasoning/claudeExplainer'
 import type { EvidenceItem } from '../intelligence/reasoning/evidence'
@@ -54,7 +55,7 @@ import { tr, type StringKey } from '../ui/i18n'
 import type { IntelligenceState } from '../intelligence/types'
 
 export type Theme = 'day' | 'night'
-export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'sites' | 'scenario' | 'saved' | 'report' | 'changed'
+export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'sites' | 'scenario' | 'saved' | 'report' | 'changed' | 'gentrification'
 
 export const DEFAULT_SEED = REGIONS[DEFAULT_REGION].seed
 /** Base URL of the Atlas server; empty means same origin (Vite proxies /api in dev). */
@@ -212,6 +213,7 @@ export class CityAtlas {
       this.feeds?.setView(view)
       if (ts.mode !== 'live') this.syncTimeMachine()
       void this.loadReports()
+      if (this.gentriLayer) void this.loadGentriGrid()
     }
     if (ts.mode === 'historical' && this.region.simulation) {
       // Replay: show the recorded frame for this instant; the simulation is not consulted.
@@ -232,7 +234,7 @@ export class CityAtlas {
   }
 
   worldState(wallClock: number, lod = this.lodController.lod(this.camera.zoom)): WorldState {
-    return { time: this.temporal.current.timestamp, wallClock, temporal: this.temporal.current, camera: this.camera, lod, mode: this.mode, layers: this.layers, world: this.world, intel: this.intel.state, zones: this.zones.list(), selection: this.selection, highlights: this.highlights, route: this.route, routePick: this.routePick, drawing: this.draw.state, hover: this.hover, reports: this.reportPoints() }
+    return { time: this.temporal.current.timestamp, wallClock, temporal: this.temporal.current, camera: this.camera, lod, mode: this.mode, layers: this.layers, world: this.world, intel: this.intel.state, zones: this.zones.list(), selection: this.selection, highlights: this.highlights, hexes: this.gentriHexes(), route: this.route, routePick: this.routePick, drawing: this.draw.state, hover: this.hover, reports: this.reportPoints() }
   }
 
   private lastSnapshot: SimSnapshot | null = null
@@ -436,6 +438,7 @@ export class CityAtlas {
     const p = this.camera.screenToWorld({ x: sx, y: sy })
     if (this.pointPick) { const pick = this.pointPick; this.pointPick = null; pick.cb(p, localToLngLat(this.frame, p)); this.notify(); return }
     if (this.reportHover) { const r = this.reportHover.report; if (r.url) window.open(r.url, '_blank', 'noopener'); else this.requestTool('report'); return }
+    if (this.gentriHover) { const c = this.gentriHover.cell; this.openGentrification(c.lng, c.lat, this.nearestAreaName(lngLatToLocal(this.frame, { lng: c.lng, lat: c.lat }))); return }
     if (this.draw.active) {
       const res = this.draw.click(p)
       if (res) this.finishShape(res)
@@ -451,6 +454,7 @@ export class CityAtlas {
     const p = this.camera.screenToWorld({ x: sx, y: sy })
     if (this.draw.active) { this.draw.move(p); return }
     if (this.hoverReport(sx, sy)) { this.setHover(null); return }
+    this.hoverGentri(sx, sy)
     this.setHover(hitTest(this.world, this.camera, { x: sx, y: sy }, this.lodController.lod(this.camera.zoom)))
   }
   finishDrawing(): void { const r = this.draw.finish(); if (r) this.finishShape(r) }
@@ -547,6 +551,95 @@ export class CityAtlas {
     const next = best ? { report: best, x: sx, y: sy } : null
     if ((next?.report.id ?? null) !== (this.reportHover?.report.id ?? null) || (next && this.reportHover && (Math.abs(next.x - this.reportHover.x) > 2 || Math.abs(next.y - this.reportHover.y) > 2))) { this.reportHover = next; this.notify() }
     return !!best
+  }
+
+  // ---- Pro: gentrification (BSOCIAL indices on real mapped places) ----
+  /** What the gentrification panel should open on (from Ask Atlas, the place card or a hex click). */
+  gentriIntent: { lng: number; lat: number; name: string | null; question?: string } | null = null
+  gentriLayer = false
+  gentriCells: Array<GentriGrid['cells'][number] & { ring: WorldPoint[]; lng: number; lat: number }> = []
+  gentriPending = 0
+  gentriHover: { cell: { lng: number; lat: number; gi: number | null; cls: string | null; places: number }; x: number; y: number } | null = null
+  private gentriKey = ''
+  private gentriAt = 0
+  private gentriRetry: ReturnType<typeof setTimeout> | null = null
+  openGentrification(lng: number, lat: number, name: string | null): void { this.closePlace(); this.gentriIntent = { lng, lat, name }; this.requestTool('gentrification'); this.notify() }
+  setGentriLayer(on: boolean): void {
+    this.gentriLayer = on
+    if (!on) { this.gentriCells = []; this.gentriPending = 0; this.gentriHover = null; this.gentriKey = ''; if (this.gentriRetry) clearTimeout(this.gentriRetry) } else void this.loadGentriGrid(true)
+    this.notify()
+  }
+  /** The hex layer for the view: from cached censuses; areas still being counted fill in on the next pass. */
+  async loadGentriGrid(force = false): Promise<void> {
+    if (!this.gentriLayer || this.region.source !== 'osm') return
+    const v = this.camera.viewBounds()
+    const sw = this.lngLatOf({ x: v.minX, y: v.maxY }), ne = this.lngLatOf({ x: v.maxX, y: v.minY })
+    let bbox = { west: Math.min(sw.lng, ne.lng), south: Math.min(sw.lat, ne.lat), east: Math.max(sw.lng, ne.lng), north: Math.max(sw.lat, ne.lat) }
+    const w = bbox.east - bbox.west, h = bbox.north - bbox.south
+    if (w * h > 0.045) { const cx = (bbox.west + bbox.east) / 2, cy = (bbox.south + bbox.north) / 2, half = Math.sqrt(0.045) / 2; bbox = { west: cx - half, south: cy - half, east: cx + half, north: cy + half } }
+    const key = [bbox.west, bbox.south, bbox.east, bbox.north].map((x) => x.toFixed(3)).join(',')
+    const now = Date.now()
+    if (!force && key === this.gentriKey && now - this.gentriAt < 30_000) return
+    this.gentriKey = key; this.gentriAt = now
+    try {
+      const g = await fetchGentriGrid(SERVER_BASE, bbox)
+      if (key !== this.gentriKey || !this.gentriLayer) return
+      this.gentriCells = g.cells.map((c) => { const ring = c.boundary.map((p) => lngLatToLocal(this.frame, { lng: p[0], lat: p[1] })); const lng = c.boundary.reduce((a, p) => a + p[0], 0) / c.boundary.length, lat = c.boundary.reduce((a, p) => a + p[1], 0) / c.boundary.length; return { ...c, ring, lng, lat } })
+      this.gentriPending = g.pending
+      if (this.gentriRetry) clearTimeout(this.gentriRetry)
+      if (g.pending > 0) this.gentriRetry = setTimeout(() => void this.loadGentriGrid(true), 6000)
+      this.notify()
+    } catch { /* the layer is optional; the last hexes stay */ }
+  }
+  gentriHexes(): Array<{ ring: WorldPoint[]; fill: string }> { return this.gentriLayer ? this.gentriCells.map((c) => ({ ring: c.ring, fill: giColor(c.class) })) : [] }
+  private hoverGentri(sx: number, sy: number): void {
+    let next: CityAtlas['gentriHover'] = null
+    if (this.gentriLayer && this.gentriCells.length) {
+      const p = this.camera.screenToWorld({ x: sx, y: sy })
+      for (const c of this.gentriCells) if (insideRing(p, c.ring)) { next = { cell: { lng: c.lng, lat: c.lat, gi: c.gi, cls: c.class, places: c.places }, x: sx, y: sy }; break }
+    }
+    const moved = !!next !== !!this.gentriHover || (next && this.gentriHover && (next.cell.lng !== this.gentriHover.cell.lng || Math.abs(next.x - this.gentriHover.x) > 2 || Math.abs(next.y - this.gentriHover.y) > 2))
+    if (moved) { this.gentriHover = next; this.notify() }
+  }
+  /** Ask Atlas: "is Whitefield gentrifying?", "who lives in Sector 49", "displacement risk in Hauz Khas". */
+  private async askGentrification(question: string): Promise<Answer | null> {
+    if (this.region.source !== 'osm') return null
+    const q = question.trim()
+    if (!/gentrif|displacement|who (lives|stays)|community (index|score)|बदलाव|जेंट्रिफ|विस्थापन|कौन रहता/i.test(q)) return null
+    const hi = this.language === 'hi'
+    const T = (k: StringKey, v?: Record<string, string | number>) => tr(this.language, k, v)
+    // The place: the words after in/of/for/is, else the map centre.
+    const m = q.match(/(?:\b(?:in|of|for|around|near|at|is)\s+)([A-Za-z0-9][A-Za-z0-9 ,.'-]{1,60}?)(?:\s+(?:gentrif\w*|getting|becoming|changing)|[?.!]|$)/i)
+    const placeName = m && !/^(this|here|the area|my area|it)$/i.test(m[1].trim()) ? m[1].trim().replace(/\s+(area|locality|neighbourhood)$/i, '') : null
+    let lng: number, lat: number, name: string | null = null
+    if (placeName) {
+      try {
+        const { geocode } = await import('../data/adapters/routeAdapter')
+        const g = await geocode(SERVER_BASE, placeName, this.lngLatOf(this.camera.centre))
+        if (!g.length) return { question, intent: 'help', summary: hi ? `"${placeName}" नक्शे पर नहीं मिला। पूरा नाम और शहर लिखें।` : `Could not find "${placeName}" in India. Try the full name and city.`, classification: 'observed', evidence: [], highlights: { points: [], entityIds: [], agentIds: [] }, caveats: [], writer: 'template' } as Answer
+        lng = g[0].lng; lat = g[0].lat; name = g[0].name
+      } catch { return null }
+      this.flyToLngLat(lng, lat, Math.max(this.camera.zoom, 14.5))
+    } else { const c = this.lngLatOf(this.camera.centre); lng = c.lng; lat = c.lat; name = this.nearestAreaName(this.camera.centre) }
+    this.openGentrification(lng, lat, name)
+    if (!this.can('pro.gentrification')) return { question, intent: 'help', summary: T('gen.locked'), classification: 'observed', evidence: [], highlights: { points: [], entityIds: [], agentIds: [] }, caveats: [], writer: 'template' } as Answer
+    let rep: GentriReport | null = null
+    for (let i = 0; i < 4 && !rep; i++) {
+      try { const r = await fetchGentrification(SERVER_BASE, { lng, lat, name }); if (r.status === 'ok') rep = r; else await new Promise((res) => setTimeout(res, 4000)) } catch { break }
+    }
+    const where = name ?? rep?.name ?? (hi ? 'यह जगह' : 'This spot')
+    if (!rep) return { question, intent: 'help', summary: T('gen.pending'), classification: 'derived', evidence: [], highlights: { points: [], entityIds: [], agentIds: [] }, caveats: [], writer: 'template' } as Answer
+    const mom = rep.momentum.status === 'ok' && rep.momentum.areaGrowth !== null ? T('gen.mom.line', { a: rep.momentum.premiumFrom, b: rep.momentum.premiumTo, g: rep.momentum.areaGrowth, r: rep.momentum.ringGrowth ?? '—' }) : ''
+    const summary = T('gen.ask.summary', { a: where, c: rep.gi.class ? T(`gen.class.${rep.gi.class}` as StringKey) : T('gen.nodata'), g: rep.gi.value ?? '—', cov: coverageLine(rep, T as never), cbi: rep.cbi.value ?? '—', mom, adv: T(`gen.adv.level.${rep.advisory.level}` as StringKey) })
+    const at = lngLatToLocal(this.frame, { lng, lat })
+    const facts: Answer['evidence'] = [
+      { id: 'gentri:gi', classification: 'derived', statement: `Gentrification Index ${rep.gi.value ?? 'no data'} (${rep.gi.class ?? 'no class'}), covering ${Math.round(rep.gi.coverage * 100)}% of its weight; price and rent have no source.`, location: at, source: 'atlas-gentrification', confidence: rep.evidence.confidence },
+      { id: 'gentri:cbi', classification: 'derived', statement: `Community Behaviour Index ${rep.cbi.value ?? 'no data'}: ${rep.cbi.components.map((c) => `${c.key} ${c.value === null ? 'no data' : Math.round(c.value * 100)}`).join(', ')}.`, location: at, source: 'openstreetmap', confidence: 0.6 },
+      { id: 'gentri:places', classification: 'observed', statement: `${rep.counts.total} mapped places within 1 km: ${rep.counts.cafes} cafés, ${rep.counts.restaurants} restaurants, ${rep.counts.coworking} coworking, ${rep.counts.premium} premium.`, location: at, source: 'openstreetmap', confidence: 0.8 },
+    ]
+    if (mom) facts.push({ id: 'gentri:momentum', classification: 'derived', statement: mom, location: at, source: 'openstreetmap-history', confidence: 0.5 })
+    if (rep.archetypes) facts.push({ id: 'gentri:arch', classification: 'derived', statement: `Most like: ${rep.archetypes[0].label} (${Math.round(rep.archetypes[0].probability * 100)}%), inferred from the mix of places.`, location: at, source: 'atlas-gentrification', confidence: 0.4 })
+    return { question, intent: 'place', summary, classification: 'derived', evidence: facts, highlights: { points: [at], entityIds: [], agentIds: [] }, caveats: [T('gen.mom.caveat')], writer: 'template' } as Answer
   }
 
   /** Saved areas and projects live in this browser; the version lets panels refresh. */
@@ -784,7 +877,7 @@ export class CityAtlas {
     const focus = this.camera.viewBounds()
     if (this.writerConfigured !== true && Date.now() - this.writerCheckedAt > 20_000) await this.checkWriter()
     // 1. The deterministic tools: facts and highlights for whatever the question is about.
-    let answer = (await this.askPlaceOrChange(question)) ?? (await this.askSites(question))
+    let answer = (await this.askGentrification(question)) ?? (await this.askPlaceOrChange(question)) ?? (await this.askSites(question))
     if (!answer) {
       answer = await askTheCity(question, { world: this.world, intel: this.intel.state, memory: this.memory, time: this.temporal.current.timestamp, focus, focusPoint: this.camera.centre, unitPerMetre: this.world.unitPerMetre, explainer: this.writer, language: this.language })
       answer.writer = this.writer.lastWriter
@@ -828,7 +921,7 @@ export class CityAtlas {
   /** An action tag from the writer: open a panel or move the clock. */
   private actOn(tag: string): void {
     const [kind, v] = tag.split(':')
-    if (kind === 'open' && ['changed', 'route', 'sites', 'report', 'scenario', 'saved', 'camera', 'alerts', 'zones', 'insights'].includes(v)) this.requestTool(v as ToolName)
+    if (kind === 'open' && ['changed', 'route', 'sites', 'report', 'scenario', 'saved', 'camera', 'alerts', 'zones', 'insights', 'gentrification'].includes(v)) this.requestTool(v as ToolName)
     if (kind === 'time') { const live = this.temporal.liveTimestamp(); if (v === 'past') this.temporal.seek(live - 3600_000); else if (v === 'future') this.temporal.seek(live + 3600_000); else this.temporal.goLive() }
   }
 
@@ -872,4 +965,14 @@ export class CityAtlas {
     this.flyToLngLat(lng, lat, zoom)
     if (openCard) void this.openPlaceAt(lng, lat)
   }
+}
+
+/** Is a world point inside a closed ring (ray casting)? */
+function insideRing(p: WorldPoint, ring: WorldPoint[]): boolean {
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i], b = ring[j]
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside
+  }
+  return inside
 }

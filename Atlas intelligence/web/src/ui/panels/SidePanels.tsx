@@ -101,7 +101,7 @@ export function useIndiaSearch(app: CityAtlas, q: string, enabled = true): { far
   return { far, searching, settled: settledFor === key }
 }
 
-function PlaceInput({ app, value, onPick, placeholder, label }: { app: CityAtlas; value: PlacePick | null; onPick: (p: PlacePick | null) => void; placeholder: string; label: string }) {
+export function PlaceInput({ app, value, onPick, placeholder, label }: { app: CityAtlas; value: PlacePick | null; onPick: (p: PlacePick | null) => void; placeholder: string; label: string }) {
   const T = makeT(app.language)
   const [q, setQ] = useState(value?.label ?? '')
   const [open, setOpen] = useState(false)
@@ -124,7 +124,7 @@ function PlaceInput({ app, value, onPick, placeholder, label }: { app: CityAtlas
     </label>
   )
 }
-type PlacePick = { label: string; point: { x: number; y: number }; lngLat: { lng: number; lat: number }; far?: boolean }
+export type PlacePick = { label: string; point: { x: number; y: number }; lngLat: { lng: number; lat: number }; far?: boolean }
 
 function fmtMin(s: number): string { return `${Math.round(s / 60)} min` }
 

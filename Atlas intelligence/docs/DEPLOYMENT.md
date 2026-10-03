@@ -57,7 +57,8 @@ docker run -p 8000:8000 -e TOMTOM_API_KEY=... -e ANTHROPIC_API_KEY=... -v atlas-
 
 ## Outbound hosts the server must reach
 
-- `overpass-api.de`, `overpass.kumi.systems`, `overpass.private.coffee` (or your `OVERPASS_URL` list)
+- `overpass-api.de`, `overpass.kumi.systems`, `overpass.private.coffee` (or your `OVERPASS_URL` list); also used for the gentrification census and history counts
+- `news.google.com` (crime headlines and area mentions, RSS)
 - `tiles.openfreemap.org` (OpenStreetMap vector tiles: the fast path for streets anywhere)
 - `api.tomtom.com`
 - `api.open-meteo.com` and `air-quality-api.open-meteo.com`

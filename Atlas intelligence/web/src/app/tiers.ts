@@ -7,12 +7,12 @@ export type Tier = 'free' | 'plus' | 'pro'
 export type Feature =
   | 'ask.basic' | 'place.basic' | 'changes.basic' | 'route.basic' | 'alerts.app'
   | 'ask.unlimited' | 'place.views' | 'place.property' | 'compare' | 'brief' | 'changes.full' | 'alerts.message' | 'route.safer' | 'watchlist'
-  | 'pro.market' | 'pro.site' | 'pro.scenario' | 'pro.report' | 'pro.projects'
+  | 'pro.market' | 'pro.site' | 'pro.scenario' | 'pro.report' | 'pro.projects' | 'pro.gentrification'
 
 export const FEATURES: Record<Feature, Tier> = {
   'ask.basic': 'free', 'place.basic': 'free', 'changes.basic': 'free', 'route.basic': 'free', 'alerts.app': 'free',
   'ask.unlimited': 'plus', 'place.views': 'plus', 'place.property': 'plus', 'compare': 'plus', 'brief': 'plus', 'changes.full': 'plus', 'alerts.message': 'plus', 'route.safer': 'plus', 'watchlist': 'plus',
-  'pro.market': 'pro', 'pro.site': 'pro', 'pro.scenario': 'pro', 'pro.report': 'pro', 'pro.projects': 'pro',
+  'pro.market': 'pro', 'pro.site': 'pro', 'pro.scenario': 'pro', 'pro.report': 'pro', 'pro.projects': 'pro', 'pro.gentrification': 'pro',
 }
 const RANK: Record<Tier, number> = { free: 0, plus: 1, pro: 2 }
 /** The passwords agreed for this stage; replaced by accounts and billing later. */
