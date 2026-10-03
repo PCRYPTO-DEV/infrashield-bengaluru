@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+server/data/
+web/node_modules/
+web/dist/
+web/.vite/
+*.log
+.pytest_cache/
+server/dev-fixtures/

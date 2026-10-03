@@ -1,0 +1,4 @@
+{"results": [
+ {"type": "POI", "poi": {"name": "Dlf Cyber Hub"}, "address": {"freeformAddress": "Road Number A 48, Sector 28, Gurugram 122002, Haryana", "municipality": "Gurugram"}, "position": {"lat": 28.47708, "lon": 77.08875}},
+ {"type": "Geography", "address": {"freeformAddress": "Sector 67, Gurugram, Haryana", "municipality": "Gurugram"}, "position": {"lat": 28.3917, "lon": 77.0582}}
+]}

@@ -1,0 +1,50 @@
+# City Atlas (the "Atlas intelligence" folder): every push and pull request runs the web and
+# server tests and the production build, so a broken change shows up red before Render deploys it.
+name: Atlas intelligence
+
+on:
+  push:
+    branches: [atlas-intelligence, main]
+    paths: ["Atlas intelligence/**", ".github/workflows/atlas-intelligence.yml"]
+  pull_request:
+    paths: ["Atlas intelligence/**", ".github/workflows/atlas-intelligence.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web tests and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Atlas intelligence/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: Atlas intelligence/web/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit -p .
+      - run: npm test
+      - run: npm run build
+
+  server:
+    name: Server tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Atlas intelligence/server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            Atlas intelligence/server/requirements.txt
+            Atlas intelligence/server/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
