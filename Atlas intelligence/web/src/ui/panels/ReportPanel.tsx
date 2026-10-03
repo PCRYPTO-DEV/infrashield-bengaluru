@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CityAtlas } from '../../app/CityAtlas'
 import { REPORT_KINDS, type ReportKind } from '../../data/adapters/reportsAdapter'
 import { makeT, type StringKey } from '../i18n'
+import { Stones } from '../controls/Stones'
 
 /**
  * Report what just happened: pick what, say a few words, tap where. The report becomes a pink
@@ -46,6 +47,7 @@ export function ReportPanel({ app }: { app: CityAtlas }) {
       <ul className="ca-rep-list">{nearby.slice(0, 14).map((r) => <li key={r.id}><button className={r.source === 'news' ? 'news' : ''} onClick={() => app.flyToLngLat(r.lng, r.lat, 16.5)}>☠ <b>{T(`rep.k.${r.kind}` as StringKey)}</b> · {r.ageMin < 60 ? T('rep.min', { n: r.ageMin }) : T('rep.hr', { n: Math.round(r.ageMin / 60) })}{r.source === 'news' && r.publisher ? ` · ${r.publisher}` : ''}{r.description ? <small>{r.description}</small> : null}</button></li>)}</ul>
       {app.reportsNews?.city && <p className="note">{T('rep.news.city', { c: app.reportsNews.city, n: app.reportsNews.unplaced ?? 0 })}</p>}
       <p className="note"><span className="ca-badge observed">{T.cls('observed')}</span> {T('rep.source')}</p>
+      <Stones app={app} variant="next" exclude="safe" />
     </div>
   )
 }

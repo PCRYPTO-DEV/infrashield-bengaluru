@@ -6,6 +6,7 @@ import { geocode, type GeoResult } from '../../data/adapters/routeAdapter'
 import { SERVER_BASE } from '../../app/CityAtlas'
 import { lngLatToLocal } from '../../geo/projection/frame'
 import { makeT, type StringKey } from '../i18n'
+import { Stones } from '../controls/Stones'
 
 const LAYER_KEYS: Array<keyof LayerFlags> = ['roads', 'buildings', 'labels', 'vehicles', 'pedestrians', 'signals', 'incidents', 'zones', 'uploads', 'flow', 'density', 'activity', 'anomalies', 'risk', 'predictions', 'forecast']
 
@@ -135,6 +136,11 @@ export function RoutePanel({ app }: { app: CityAtlas }) {
   const [from, setFrom] = useState<PlacePick | null>(null)
   const [to, setTo] = useState<PlacePick | null>(null)
   const [swapKey, setSwapKey] = useState(0)
+  // The GO stone says where to go: the place being looked at.
+  useEffect(() => {
+    const i = app.routeToIntent
+    if (i) { app.routeToIntent = null; setTo({ label: i.label, lngLat: { lng: i.lng, lat: i.lat }, point: lngLatToLocal(app.frame, { lng: i.lng, lat: i.lat }), far: true }); setSwapKey((k) => k + 1) }
+  }, [app.routeToIntent]) // eslint-disable-line react-hooks/exhaustive-deps
   const rows: Array<keyof typeof w> = ['travelTime', 'incidentRisk', 'congestion', 'pedestrianRisk', 'environmental']
   const upm = app.world.unitPerMetre
   const go = () => {
@@ -183,6 +189,7 @@ export function RoutePanel({ app }: { app: CityAtlas }) {
         </tbody></table>
         {r.explanation.map((l, i) => <p className="note" key={i} style={{ margin: '4px 0' }}>{l}</p>)}
       </>}
+      {to && <Stones app={app} variant="next" exclude="go" />}
     </div>
   )
 }

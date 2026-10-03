@@ -534,3 +534,28 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .ca-inv-score small { font-size: 11px; font-weight: 700; }
 .ca-inv-verdict { margin: 0; padding-left: 18px; font-size: 13px; }
 .ca-gen-bars li small.why a { display: block; color: #0F6FFF; }
+
+/* ---- the five stones (docs/design/pebble-cartography.md) ---- */
+.ca-stones-dock { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); z-index: 6; }
+.ca-stones-dock .ca-stones-row { display: flex; flex-direction: column; gap: 14px; position: relative; }
+.ca-stones-dock .ca-stones-row::before { content: ''; position: absolute; left: 31px; top: 30px; bottom: 30px; width: 3px; border-radius: 2px; background: repeating-linear-gradient(to bottom, #1F2933 0 9px, transparent 9px 14px); opacity: .45; z-index: -1; }
+.ca-stone { display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--fg); }
+.ca-stone svg { width: 64px; height: 64px; flex: none; border-radius: 50%; box-shadow: 0 0 0 4px color-mix(in srgb, var(--stone) 22%, transparent), 0 3px 10px rgba(0,0,0,.18); transition: transform .15s ease, box-shadow .15s ease; }
+.ca-stone span { font-weight: 700; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; background: var(--panel-strong); border-radius: 999px; padding: 3px 10px; box-shadow: var(--shadow); opacity: 0; transform: translateX(-6px); transition: opacity .15s, transform .15s; pointer-events: none; white-space: nowrap; }
+.ca-stone:hover svg, .ca-stone:focus-visible svg { transform: scale(1.08); }
+.ca-stone:hover span, .ca-stone:focus-visible span, .ca-stone.active span { opacity: 1; transform: none; }
+.ca-stone.active svg { box-shadow: 0 0 0 5px var(--stone), 0 0 0 9px color-mix(in srgb, var(--stone) 25%, transparent), 0 3px 12px rgba(0,0,0,.2); transform: scale(1.06); }
+.ca-stones-next { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+.ca-stones-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.ca-stones-head b { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+.ca-stones-head small { color: var(--fg-faint, #5f6368); font-size: 12px; }
+.ca-stones-next .ca-stones-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.ca-stones-next .ca-stone { flex-direction: column; gap: 4px; }
+.ca-stones-next .ca-stone svg { width: 48px; height: 48px; }
+.ca-stones-next .ca-stone span { opacity: 1; transform: none; box-shadow: none; background: none; padding: 0; font-size: 11.5px; }
+@media (max-width: 720px) {
+  .ca-stones-dock { top: auto; bottom: 214px; transform: none; left: 8px; }
+  .ca-stones-dock .ca-stones-row { gap: 8px; }
+  .ca-stones-dock .ca-stones-row::before { left: 23px; top: 22px; bottom: 22px; }
+  .ca-stone svg { width: 48px; height: 48px; }
+}

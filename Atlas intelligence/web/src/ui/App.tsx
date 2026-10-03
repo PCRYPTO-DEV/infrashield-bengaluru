@@ -31,6 +31,7 @@ import { makeT, type StringKey } from './i18n'
 import { installEmbed, readEmbedParams } from '../app/embed'
 import { lngLatToLocal } from '../geo/projection/frame'
 import type { PlaceState } from '../data/adapters/placeAdapter'
+import { Stones } from './controls/Stones'
 
 type Tool = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'changed' | 'compare' | 'sites' | 'scenario' | 'saved' | 'report' | 'gentrification' | 'invest' | null
 const TOOLS = ['insights', 'layers', 'zones', 'route', 'upload', 'pulse', 'camera', 'alerts', 'compare', 'sites', 'gentrification', 'invest', 'scenario', 'saved', 'report'] as const
@@ -120,6 +121,9 @@ export default function App() {
           <span className="ca-lang ca-theme" title={T('theme.title')}><button className={app.theme === 'night' ? 'active' : ''} onClick={() => app.setTheme('night')} aria-label={T('theme.night')}>☾</button><button className={app.theme === 'day' ? 'active' : ''} onClick={() => app.setTheme('day')} aria-label={T('theme.day')}>☀</button></span>
         </div>
       </div>
+
+      {/* the five stones: LOOK · GO · SAFE · CHANGE · WORTH, always one tap away */}
+      {!embed.embed && <Stones app={app} variant="dock" active={tool === 'route' ? 'go' : tool === 'report' ? 'safe' : tool === 'gentrification' || tool === 'changed' ? 'change' : tool === 'invest' ? 'worth' : app.placePoint ? 'look' : null} />}
 
       {!embed.embed && <AroundYou app={app} onOpen={() => { app.select(null); setTool((t) => (t === 'changed' ? t : null)) }} />}
 

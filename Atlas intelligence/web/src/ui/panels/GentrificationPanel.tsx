@@ -4,6 +4,7 @@ import { ADVISORY_COLORS, coverageLine, fetchGentrification, giColor, type Gentr
 import { makeT, type StringKey } from '../i18n'
 import { TierGate } from './TierGate'
 import { PlaceInput, type PlacePick } from './SidePanels'
+import { Stones } from '../controls/Stones'
 
 type Where = { lng: number; lat: number; name: string | null }
 
@@ -157,6 +158,7 @@ export function GentrificationPanel({ app }: { app: CityAtlas }) {
             <button className="small" onClick={() => { setRep(null); setPending(null); setPick(null); setWhere(null); app.setPins([]); app.setRings([]) }}>{T('gen.again')}</button>
           </div>
           <p className="note"><span className="ca-badge derived">{T.cls('derived')}</span> {Math.round(rep.evidence.confidence * 100)}%</p>
+          <Stones app={app} variant="next" exclude="change" />
         </>}
       </TierGate>
     </div>

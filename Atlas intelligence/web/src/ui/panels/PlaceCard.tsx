@@ -5,6 +5,7 @@ import { orderDimensions, viewScore, strengthsAndWeaknesses, questionsWorthAskin
 import { makeT, type StringKey } from '../i18n'
 import { TierGate } from './TierGate'
 import { clientReportHtml, openClientReport } from '../report/clientReport'
+import { Stones } from '../controls/Stones'
 
 const VIEWS: LifeView[] = ['everyone', 'family', 'student', 'professional', 'retired']
 
@@ -106,6 +107,7 @@ export function PlaceCard({ app, onCompare }: { app: CityAtlas; onCompare: (name
           <p className="note">{T('report.help')}</p>
           <button className="primary small" onClick={() => { if (!openClientReport(clientReportHtml(st, name, app.changes, app.language, app.region.name))) alert(T('report.popup')) }}>{T('report.open')}</button>
         </TierGate>}
+        <Stones app={app} variant="next" exclude="look" />
         {property && <TierGate app={app} feature="place.property">
           <h3>{T('place.questions')}</h3>
           <ul className="ca-questions">{questionsWorthAsking(st.dimensions).map((k) => <li key={k}>{T(k as StringKey)}</li>)}</ul>

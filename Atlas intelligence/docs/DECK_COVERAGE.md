@@ -44,6 +44,8 @@ Legend: ✅ working on real data · 🟡 working with a stated limit · ⛔ not 
 
 ## Easy to use: how a person reaches each of these
 
+- **Five stones** (left edge, always there): Look · Go · Safe? · Changing? · Worth it? Each answers about the place on screen (the open place card, else the middle of the map). Every panel ends with *What next?* stones for the other four, so a child can go round the whole app without the menus.
+
 - **Six things on screen**: brand, Around-you strip, search + state picker + What changed? + More, Ask Atlas, the time bar, the map. Everything else is contextual under More and rolls up.
 - **Time**: three buttons, PAST · NOW · FUTURE, and a slider from yesterday to six hours ahead; the clock says what the map shows and how sure it is.
 - **Pro**: More → *open Pro* opens the site finder with its password card; once open, the More menu lists *site finder*, *scenario lab* and *saved & projects*; the place card gains *Client report* and *Watch this area*.

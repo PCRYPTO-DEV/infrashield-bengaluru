@@ -56,6 +56,7 @@ import { tr, type StringKey } from '../ui/i18n'
 import type { IntelligenceState } from '../intelligence/types'
 
 export type Theme = 'day' | 'night'
+export type StoneKind = 'look' | 'go' | 'safe' | 'change' | 'worth'
 export type ToolName = 'layers' | 'zones' | 'route' | 'upload' | 'pulse' | 'camera' | 'alerts' | 'insights' | 'sites' | 'scenario' | 'saved' | 'report' | 'changed' | 'gentrification' | 'invest'
 
 export const DEFAULT_SEED = REGIONS[DEFAULT_REGION].seed
@@ -552,6 +553,25 @@ export class CityAtlas {
     const next = best ? { report: best, x: sx, y: sy } : null
     if ((next?.report.id ?? null) !== (this.reportHover?.report.id ?? null) || (next && this.reportHover && (Math.abs(next.x - this.reportHover.x) > 2 || Math.abs(next.y - this.reportHover.y) > 2))) { this.reportHover = next; this.notify() }
     return !!best
+  }
+
+  // ---- The five stones: LOOK · GO · SAFE · CHANGE · WORTH, all about the same place ----
+  /** The place everything is about: the open place card, else the middle of the map. */
+  focus(): { lng: number; lat: number; name: string | null; point: WorldPoint } {
+    if (this.place && this.placePoint) return { lng: this.place.centre.lng, lat: this.place.centre.lat, name: this.nearestAreaName(this.placePoint), point: this.placePoint }
+    const c = this.lngLatOf(this.camera.centre)
+    return { lng: c.lng, lat: c.lat, name: this.nearestAreaName(this.camera.centre), point: this.camera.centre }
+  }
+  /** Where the route panel should take people to (set by the GO stone). */
+  routeToIntent: { label: string; lng: number; lat: number } | null = null
+  /** One tap, one answer about the focus place. Locked Pro answers show their own lock card. */
+  stone(kind: StoneKind): void {
+    const f = this.focus()
+    if (kind === 'look') { void this.openPlace(f.point); return }
+    if (kind === 'go') { this.closePlace(); this.routeToIntent = { label: f.name ?? `${f.lat.toFixed(4)}, ${f.lng.toFixed(4)}`, lng: f.lng, lat: f.lat }; this.requestTool('route'); return }
+    if (kind === 'safe') { this.closePlace(); void this.loadReports(true); this.requestTool('report'); return }
+    if (kind === 'change') { if (this.can('pro.gentrification')) this.openGentrification(f.lng, f.lat, f.name); else { this.closePlace(); this.requestTool('changed') } return }
+    this.openInvest(f.lng, f.lat, f.name)
   }
 
   // ---- Pro: UINTEL+ INVEST score ----

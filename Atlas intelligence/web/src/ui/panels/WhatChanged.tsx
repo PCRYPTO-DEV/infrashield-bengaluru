@@ -3,6 +3,7 @@ import type { CityAtlas } from '../../app/CityAtlas'
 import { FREE_CHANGES } from '../../app/tiers'
 import { makeT } from '../i18n'
 import { TierGate } from './TierGate'
+import { Stones } from '../controls/Stones'
 
 /** WHAT CHANGED? — ranked, evidenced differences between now and before, for the view on screen. */
 export function WhatChanged({ app }: { app: CityAtlas }) {
@@ -26,6 +27,7 @@ export function WhatChanged({ app }: { app: CityAtlas }) {
       </ul>
       {r && !full && r.items.length > FREE_CHANGES && <TierGate app={app} feature="changes.full"><span /></TierGate>}
       {r && r.notDetectable.length > 0 && <p className="note"><b>{T('changed.cannot')}:</b> {r.notDetectable.join('; ')}.</p>}
+      <Stones app={app} variant="next" exclude="change" />
     </div>
   )
 }

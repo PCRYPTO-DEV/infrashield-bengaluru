@@ -4,6 +4,7 @@ import { fetchInvest, gradeColor, INVEST_PURPOSES, type InvestPurpose, type Inve
 import { makeT, type StringKey } from '../i18n'
 import { TierGate } from './TierGate'
 import { PlaceInput, type PlacePick } from './SidePanels'
+import { Stones } from '../controls/Stones'
 
 type Where = { lng: number; lat: number; name: string | null }
 const num = (s: string): number | null => { const v = parseFloat(s.replace(/[, ]/g, '')); return Number.isFinite(v) && v > 0 ? v : null }
@@ -92,6 +93,7 @@ export function InvestPanel({ app }: { app: CityAtlas }) {
             <button className="small" onClick={() => { const c = rep.centre; app.openGentrification(c.lng, c.lat, rep.name) }}>{T('gen.here')}</button>
           </div>
           <p className="note">{T('inv.notadvice')}</p>
+          <Stones app={app} variant="next" exclude="worth" />
         </>}
       </TierGate>
     </div>
