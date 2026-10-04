@@ -8,6 +8,7 @@ from app.cache import Cache
 from app.main import create_app
 from app.memory import History
 from app.news import city_for, kind_of, parse_feed, place_candidates
+from tests.conftest import dated_fixtures
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -23,7 +24,7 @@ def test_parsing_and_classification():
 
 def test_news_reports_land_on_the_map_with_approximate_places(tmp_path):
     history = History(tmp_path / "c.db")
-    app = create_app(cache=Cache(tmp_path / "c.db"), fixtures=FIXTURES, history=history)
+    app = create_app(cache=Cache(tmp_path / "c.db"), fixtures=dated_fixtures(tmp_path), history=history)
     with TestClient(app) as c:
         r = c.get("/api/reports", params={"bbox": "77.0,28.4,77.4,28.8"}).json()
         news = [i for i in r["items"] if i["source"] == "news"]

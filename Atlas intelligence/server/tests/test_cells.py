@@ -9,6 +9,7 @@ from app.cache import Cache
 from app.main import create_app
 from app.memory import History
 from app.tiles import tile_bbox
+from tests.conftest import dated_fixtures
 
 FIXTURES = Path(__file__).parent / "fixtures"
 B = tile_bbox(16, 46962, 27200)
@@ -18,7 +19,7 @@ LNG, LAT = (B.west + B.east) / 2, (B.south + B.north) / 2
 def make(tmp_path):
     cache = Cache(tmp_path / "c.db")
     history = History(tmp_path / "c.db")
-    app = create_app(cache=cache, fixtures=FIXTURES, history=history)
+    app = create_app(cache=cache, fixtures=dated_fixtures(tmp_path), history=history)
     return app, history
 
 
