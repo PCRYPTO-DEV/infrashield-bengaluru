@@ -9,3 +9,4 @@ web/.vite/
 *.log
 .pytest_cache/
 server/dev-fixtures/
+scripts/video/node_modules
