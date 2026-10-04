@@ -1,0 +1,6 @@
+{"routes": [
+ {"summary": {"lengthInMeters": 31962, "travelTimeInSeconds": 3293, "trafficDelayInSeconds": 181, "noTrafficTravelTimeInSeconds": 3112, "departureTime": "2026-10-02T08:00:00+05:30", "arrivalTime": "2026-10-02T08:54:53+05:30"},
+  "legs": [{"points": [{"latitude": 28.6315, "longitude": 77.2167}, {"latitude": 28.60, "longitude": 77.18}, {"latitude": 28.55, "longitude": 77.12}, {"latitude": 28.50, "longitude": 77.08}, {"latitude": 28.4595, "longitude": 77.0266}]}]},
+ {"summary": {"lengthInMeters": 37833, "travelTimeInSeconds": 3456, "trafficDelayInSeconds": 0, "noTrafficTravelTimeInSeconds": 3456, "departureTime": "2026-10-02T08:00:00+05:30", "arrivalTime": "2026-10-02T08:57:36+05:30"},
+  "legs": [{"points": [{"latitude": 28.6315, "longitude": 77.2167}, {"latitude": 28.62, "longitude": 77.25}, {"latitude": 28.55, "longitude": 77.20}, {"latitude": 28.48, "longitude": 77.10}, {"latitude": 28.4595, "longitude": 77.0266}]}]}
+]}
