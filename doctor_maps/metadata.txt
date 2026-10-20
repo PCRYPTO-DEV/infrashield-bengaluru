@@ -1,0 +1,18 @@
+[general]
+name=Doctor Maps
+qgisMinimumVersion=3.22
+qgisMaximumVersion=3.99
+description=An AI agent that builds anything in QGIS from plain-language requests.
+about=Doctor Maps adds a chat dock to QGIS. Describe what you want (load data, run analysis, style layers, build print layouts, export results) and the agent does it in your live session using PyQGIS and the Processing framework, showing you every step. Requires the Anthropic Python SDK (pip install anthropic) and an Anthropic API key.
+version=0.1.0
+author=InfraShield Bengaluru
+email=poojab2311@gmail.com
+tracker=https://github.com/pcrypto-dev/infrashield-bengaluru/issues
+repository=https://github.com/pcrypto-dev/infrashield-bengaluru
+homepage=https://github.com/pcrypto-dev/infrashield-bengaluru
+tags=ai,agent,automation,processing,python,claude
+category=Plugins
+icon=
+experimental=True
+deprecated=False
+hasProcessingProvider=no

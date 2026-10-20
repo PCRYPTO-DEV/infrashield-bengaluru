@@ -49,6 +49,17 @@ A web application that scores every critical facility on eight risk dimensions, 
 
 ---
 
+## Doctor Maps — AI agent for QGIS
+
+`doctor_maps/` is a Claude-powered agent that builds anything inside QGIS from plain-language requests: load data, run Processing algorithms, style and label layers, build print layouts, export results. It runs as a QGIS plugin dock, as a terminal command driving a running QGIS desktop, or fully headless. See [doctor_maps/README.md](doctor_maps/README.md) for setup and usage.
+
+```bash
+pip install -e .            # installs the `doctor-maps` command
+doctor-maps "load backend/data/bengaluru_facilities_seed.csv and style facilities by criticality_score"
+```
+
+---
+
 ## Setup — Local (No Docker)
 
 ### Backend
