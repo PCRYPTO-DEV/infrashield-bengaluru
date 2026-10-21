@@ -45,3 +45,6 @@ nul
 .env
 .env.local
 .env.*.local
+
+# X agent local state
+x_agent/*.db
