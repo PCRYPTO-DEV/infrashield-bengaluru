@@ -16,7 +16,7 @@ from .tools import AgentContext, make_tools
 
 log = logging.getLogger(__name__)
 
-SYSTEM_TEMPLATE = """You manage the X (Twitter) account for Polymath InfraShield Bengaluru.
+SYSTEM_TEMPLATE = """You manage the X (Twitter) account @{handle} ("{display_name}") for Polymath InfraShield Bengaluru.
 
 You work for the account owner, who reviews everything you draft. Your job is to keep
 the account active, accurate and on-voice while making the owner's review quick:
@@ -76,7 +76,12 @@ def build_context(settings: Settings, store: Store | None = None, publisher=None
 
 def build_system_prompt(settings: Settings, facts_text: str) -> str:
     voice = settings.voice_path.read_text(encoding="utf-8") if settings.voice_path.is_file() else ""
-    return SYSTEM_TEMPLATE.format(voice=voice.strip(), facts=facts_text.strip())
+    return SYSTEM_TEMPLATE.format(
+        handle=settings.handle,
+        display_name=settings.display_name,
+        voice=voice.strip(),
+        facts=facts_text.strip(),
+    )
 
 
 def mission_text(name: str, settings: Settings) -> str:

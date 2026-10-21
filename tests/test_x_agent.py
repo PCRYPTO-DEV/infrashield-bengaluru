@@ -180,6 +180,7 @@ def test_run_agent_with_fake_client(ctx):
     assert client.kwargs["fallbacks"] == "default"
     assert client.kwargs["system"][0]["cache_control"] == {"type": "ephemeral"}
     assert "FACTS" in client.kwargs["system"][0]["text"]
+    assert "@globerasia" in client.kwargs["system"][0]["text"]
     assert len(ctx.store.list_drafts("pending")) == 1
 
 
@@ -198,8 +199,10 @@ def test_settings_validate_publisher(monkeypatch):
     s.validate_publisher()
     monkeypatch.setenv("X_AGENT_PUBLISHER", "DRYRUN")
     monkeypatch.setenv("X_AGENT_AUTO_PUBLISH_POSTS", "yes")
+    monkeypatch.setenv("X_AGENT_HANDLE", "@globerasia")
     s = Settings.from_env(dotenv=None)
     assert s.publisher == "dryrun" and s.auto_publish_posts is True
+    assert s.handle == "globerasia" and s.display_name == "globereader"
 
 
 # ---------------------------------------------------------------- CLI

@@ -123,6 +123,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.cmd == "whoami":
+        print(f"managing: @{settings.handle} ({settings.display_name})")
         print(f"publisher: {ctx.publisher.name}  account: {ctx.publisher.whoami()}")
         print(f"model: {settings.model}  effort: {settings.effort}  auto-publish posts: {settings.auto_publish_posts}")
         print(f"db: {settings.db_path}")

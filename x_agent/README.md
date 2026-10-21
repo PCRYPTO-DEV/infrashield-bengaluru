@@ -58,7 +58,8 @@ X_ACCESS_TOKEN_SECRET=...
 X_BEARER_TOKEN=...       # optional, used for reads
 ```
 
-Check with `python -m x_agent whoami`.
+Check with `python -m x_agent whoami`. The keys must belong to @globerasia; the
+agent posts as whichever account generated the access token.
 
 X API tiers matter: the free tier lets the app post but does not allow reading
 mentions or metrics. `mentions` and `report` need at least the Basic tier.
@@ -108,6 +109,8 @@ and being happy with them.
 
 | Env | Default | Meaning |
 |---|---|---|
+| `X_AGENT_HANDLE` | `globerasia` | The handle being managed (shown to the model) |
+| `X_AGENT_DISPLAY_NAME` | `globereader` | The account's display name |
 | `X_AGENT_MODEL` | `claude-opus-5-5` | Claude model |
 | `X_AGENT_EFFORT` | `medium` | `low`..`max`; raise if drafts feel thin |
 | `X_AGENT_PUBLISHER` | `dryrun` | `dryrun`, `x`, `typefully` |

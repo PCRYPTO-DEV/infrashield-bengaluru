@@ -49,6 +49,10 @@ class Settings:
     typefully_api_key: str | None = None
     typefully_social_set_id: str | None = None
 
+    # The account being managed (shown to the model; the X keys decide what is actually posted as)
+    handle: str = "globerasia"
+    display_name: str = "globereader"
+
     # Behaviour
     auto_publish_posts: bool = False  # original posts may skip human approval. Replies never do.
     max_posts_per_run: int = 3
@@ -75,6 +79,8 @@ class Settings:
             x_bearer_token=env.get("X_BEARER_TOKEN"),
             typefully_api_key=env.get("TYPEFULLY_API_KEY"),
             typefully_social_set_id=env.get("TYPEFULLY_SOCIAL_SET_ID"),
+            handle=env.get("X_AGENT_HANDLE", cls.handle).lstrip("@"),
+            display_name=env.get("X_AGENT_DISPLAY_NAME", cls.display_name),
             auto_publish_posts=_bool(env.get("X_AGENT_AUTO_PUBLISH_POSTS"), False),
             max_posts_per_run=int(env.get("X_AGENT_MAX_POSTS_PER_RUN", "3")),
             timezone=env.get("X_AGENT_TIMEZONE", "Asia/Kolkata"),
