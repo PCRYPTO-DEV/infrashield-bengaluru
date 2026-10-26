@@ -32,7 +32,8 @@ desktop.ini
 
 # Superpowers / local agent working state
 .superpowers/
-.claude/
+.claude/*
+!.claude/skills/
 .cursor/
 
 # Local docs / artifacts not meant for repo
