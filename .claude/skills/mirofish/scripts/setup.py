@@ -69,6 +69,27 @@ def ensure_source():
     run(["git", "checkout", "-q", "FETCH_HEAD"], cwd=SRC)
 
 
+def patch_zep_timeout():
+    """Make MiroFish's hard-coded 600s Zep ingestion wait configurable.
+
+    Zep's free tier can take longer than 10 minutes to ingest long documents.
+    The wait then reads MIROFISH_ZEP_TIMEOUT from the backend's environment
+    (default 3600 seconds). Returns True if the file was changed.
+    """
+    path = BACKEND / "app" / "utils" / "zep.py"
+    old = "ZEP_INGESTION_WAIT_TIMEOUT_SECONDS = 600\n"
+    new = 'ZEP_INGESTION_WAIT_TIMEOUT_SECONDS = int(os.environ.get("MIROFISH_ZEP_TIMEOUT", "3600"))\n'
+    text = path.read_text()
+    if new in text:
+        return False
+    if old not in text:
+        log("warning: could not find MiroFish's Zep timeout to raise; long documents may time out")
+        return False
+    path.write_text(text.replace(old, new))
+    log("Raised MiroFish's Zep ingestion wait to MIROFISH_ZEP_TIMEOUT (default 3600s)")
+    return True
+
+
 def ensure_deps():
     if (BACKEND / ".venv" / "bin" / "python").exists():
         return
@@ -122,12 +143,22 @@ def stop_backend():
         log("No backend started by this script.")
         return
     pid = int(PID_FILE.read_text())
+    PID_FILE.unlink()
     try:
         os.killpg(pid, signal.SIGTERM)
-        log(f"Stopped backend (pid {pid}).")
     except ProcessLookupError:
         log("Backend was not running.")
-    PID_FILE.unlink()
+        return
+    # Flask's dev server can ignore SIGTERM while worker threads are busy.
+    for _ in range(20):
+        time.sleep(0.5)
+        try:
+            os.killpg(pid, 0)
+        except ProcessLookupError:
+            log(f"Stopped backend (pid {pid}).")
+            return
+    os.killpg(pid, signal.SIGKILL)
+    log(f"Stopped backend (pid {pid}, forced).")
 
 
 def main():
@@ -139,14 +170,16 @@ def main():
     if args.stop:
         stop_backend()
         return
-    if backend_up() and not args.reconfigure:
+    patched = (BACKEND / "run.py").exists() and patch_zep_timeout()
+    if backend_up() and not args.reconfigure and not patched:
         log(f"MiroFish is ready at {URL}")
         return
     HOME.mkdir(parents=True, exist_ok=True)
     ensure_source()
+    patched = patch_zep_timeout() or patched
     ensure_deps()
     ensure_env(args.reconfigure)
-    if args.reconfigure:
+    if args.reconfigure or patched:
         stop_backend()
     start_backend()
     log(f"MiroFish is ready at {URL}")
