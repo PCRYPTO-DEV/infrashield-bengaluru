@@ -155,7 +155,12 @@ def step_ontology(c, args):
 def step_build(c, args):
     project_id = need(args, "project_id")
     log("[2/6] Building knowledge graph (Zep)...")
-    data = c.post("/api/graph/build", {"project_id": project_id})
+    body = {"project_id": project_id}
+    if getattr(args, "chunk_size", None):
+        body["chunk_size"] = args.chunk_size
+    if getattr(args, "force", False):
+        body["force"] = True
+    data = c.post("/api/graph/build", body)
     graph_id = data.get("graph_id")
     if data.get("task_id"):
         task = poll(
@@ -348,6 +353,7 @@ def build_parser():
     sp = sub.add_parser("run", help="Full pipeline: ontology -> report")
     seed_args(sp)
     run_args(sp)
+    sp.add_argument("--chunk-size", type=int, help="Text chunk size for the Zep graph (default 500; raise for long documents)")
     sp.add_argument("--out", default="mirofish_report.md")
     sp.set_defaults(func=cmd_run)
 
@@ -357,6 +363,8 @@ def build_parser():
 
     sp = sub.add_parser("build", help="Step 2: build knowledge graph")
     ids(sp, "project_id")
+    sp.add_argument("--chunk-size", type=int, help="Text chunk size (default 500; raise for long documents)")
+    sp.add_argument("--force", action="store_true", help="Rebuild even if a build already ran or failed")
     sp.set_defaults(func=step_build)
 
     sp = sub.add_parser("create", help="Step 3: create simulation")
