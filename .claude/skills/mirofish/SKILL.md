@@ -1,6 +1,6 @@
 ---
 name: mirofish
-description: Run MiroFish (github.com/666ghj/MiroFish), the open-source multi-agent swarm-intelligence prediction engine, to simulate how people, groups and public opinion react to a scenario. Use when the user wants to "predict what happens if...", rehearse a policy / announcement / PR move / product launch, simulate public opinion or social-media reaction, run a "what if" on a story or novel, or explicitly mentions MiroFish. Covers installing and starting MiroFish, feeding it seed documents, running the 5-step pipeline (graph → environment → simulation → report → interaction) through its REST API, and interviewing simulated agents afterwards.
+description: Run MiroFish (github.com/666ghj/MiroFish), the open-source multi-agent swarm-intelligence prediction engine, to simulate how people, groups and public opinion react to a scenario. Use when the user wants to "predict what happens if...", rehearse a policy / announcement / PR move / product launch, simulate public opinion or social-media reaction, run a "what if" on a story or novel, or types "mirofish" / "miro fish" at all, even as a single word: that means "get MiroFish ready". Covers installing and starting MiroFish, feeding it seed documents, running the 5-step pipeline (graph → environment → simulation → report → interaction) through its REST API, and interviewing simulated agents afterwards.
 ---
 
 # MiroFish
@@ -13,29 +13,36 @@ then writes a prediction report, and you can interview individual agents or chat
 It is a **separate app** (Flask backend on :5001, Vue frontend on :3000). This skill drives it
 through the backend API with `scripts/mirofish.py` (Python 3.9+, standard library only).
 
-## 1. Make sure MiroFish is running
+## 1. Make it ready (always do this first)
 
-Check first: `python scripts/mirofish.py ping`. If it is not reachable, set it up:
+Whenever this skill is invoked, run this first, before anything else:
 
 ```bash
-git clone https://github.com/666ghj/MiroFish && cd MiroFish
-cp .env.example .env        # then fill in the keys below
+python scripts/setup.py
 ```
 
-Required `.env` keys. **Ask the user for these, never invent or hard-code them:**
+It is safe to run every time. If the backend already answers it prints `MiroFish is ready` and
+exits. Otherwise it downloads MiroFish (pinned commit) to `~/.mirofish`, installs its Python
+dependencies with `uv` (a few minutes on first run), writes `.env`, starts the backend on :5001,
+and waits for it to answer. Run it in the background on a first install. Other modes:
+`--stop` stops the backend, and `--reconfigure` rewrites `.env` and restarts.
 
-| Key | What |
-|---|---|
-| `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL_NAME` | Any OpenAI-compatible chat API. Upstream default is `qwen-plus` on Alibaba DashScope. |
-| `ZEP_API_KEY` | Zep Cloud (knowledge-graph memory). Free tier at app.getzep.com is enough for small runs. |
-| `LLM_BOOST_*` (optional) | A second, faster model. **Delete these lines entirely if unused**, because placeholder values break it. |
+Keys. **Never invent, print or hard-code them:**
+- **Claude cloud session:** the keys live in the environment's network secrets, for
+  `api.getzep.com` and the LLM host (default `generativelanguage.googleapis.com`). The proxy
+  injects them, so `.env` holds the placeholder `proxy-injected`. If a host has no saved key, ask
+  the user for it with the credential form (`request_credential`), never in chat. For Zep, use
+  header `Authorization` with prefix `Api-Key`.
+- **The user's own computer:** set `MIROFISH_LLM_KEY` and `MIROFISH_ZEP_KEY` (plus
+  `MIROFISH_LLM_BASE_URL` / `MIROFISH_LLM_MODEL` for a provider other than Gemini) before running
+  `setup.py --reconfigure`.
 
-Start it with either:
-- **Docker:** `docker compose up -d` (image `ghcr.io/666ghj/mirofish:latest`)
-- **Source:** needs Node 18+, Python 3.11–3.12 and `uv`. Run `npm run setup:all && npm run dev`, or
-  `npm run backend` for the API only.
+The default model is Google Gemini `gemini-3.5-flash` through Google's OpenAI-compatible
+endpoint. If it answers 503 "high demand", retry later or reconfigure with another listed model.
+Any OpenAI-compatible provider works. A Zep key starts with `z_`; Google keys start with `AQ.` or
+`AIza`. A 401 from Zep usually means the wrong key was saved.
 
-The backend refuses to start if the keys are missing; read its console output for the reason.
+If setup fails, read `~/.mirofish/backend.log`. The backend refuses to start without both keys.
 
 ## 2. Run a prediction
 
